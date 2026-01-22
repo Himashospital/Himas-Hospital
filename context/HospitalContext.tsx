@@ -131,23 +131,35 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
   const refreshData = async () => {
     setIsLoading(true);
     try {
+      // Helper function to handle table fetch errors
+      const safeFetch = async (tableName: string) => {
+        const { data, error } = await supabase.from(tableName).select('*');
+        if (error) {
+          // 42P01 is Postgres code for "undefined_table"
+          if (error.code === '42P01') {
+            console.warn(`Table ${tableName} does not exist yet. Please run database.sql.`);
+            return [];
+          }
+          throw error;
+        }
+        return data || [];
+      };
+
       // 1. Fetch from himas_data (JSONB)
-      const { data: dataRows, error: dataError } = await supabase.from('himas_data').select('*');
-      if (dataError) throw dataError;
-      const patientsFromData = (dataRows || []).map(mapHimasDataToPatient);
+      const dataRows = await safeFetch('himas_data');
+      const patientsFromData = dataRows.map(mapHimasDataToPatient);
 
       // 2. Fetch from himas_appointments (Flat)
-      const { data: apptRows, error: apptError } = await supabase.from('himas_appointments').select('*');
-      if (apptError) throw apptError;
-      const patientsFromAppts = (apptRows || []).map(mapHimasApptToPatient);
+      const apptRows = await safeFetch('himas_appointments');
+      const patientsFromAppts = apptRows.map(mapHimasApptToPatient);
 
       // 3. Combine both sources for a unified view
       setPatients([...patientsFromData, ...patientsFromAppts]);
 
       // Handle standard appointments list for scheduling view (only Scheduled status)
-      const apptsOnly = (apptRows || [])
-        .filter(r => r.status === 'Scheduled')
-        .map(r => ({
+      const apptsOnly = apptRows
+        .filter((r: any) => r.status === 'Scheduled')
+        .map((r: any) => ({
           id: r.id || '',
           hospital_id: r.hospital_id || '',
           name: r.name || '',
@@ -163,9 +175,8 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
       setAppointments(apptsOnly);
 
       // 4. Staff
-      const { data: staffData, error: staffError } = await supabase.from('staff_users').select('*');
-      if (staffError) throw staffError;
-      setStaffUsers(staffData || []);
+      const staffData = await safeFetch('staff_users');
+      setStaffUsers(staffData);
       setIsStaffLoaded(true);
 
       setSaveStatus('saved');
