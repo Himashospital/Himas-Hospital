@@ -133,30 +133,40 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
     try {
       // Helper function to handle table fetch errors
       const safeFetch = async (tableName: string) => {
-        const { data, error } = await supabase.from(tableName).select('*');
-        if (error) {
-          // 42P01 is Postgres code for "undefined_table"
-          if (error.code === '42P01') {
-            console.warn(`Table ${tableName} does not exist yet. Please run database.sql.`);
+        try {
+          const { data, error } = await supabase.from(tableName).select('*');
+          if (error) {
+            // 42P01 is Postgres code for "undefined_table"
+            // PGRST205 is PostgREST code for "Could not find table in schema cache"
+            if (error.code === '42P01' || error.code === 'PGRST205') {
+              console.warn(`[Hospital] Table ${tableName} missing. Run database.sql in Supabase.`);
+              return [];
+            }
+            throw error;
+          }
+          return data || [];
+        } catch (fetchErr) {
+          console.error(`[Hospital] Failed to fetch ${tableName}:`, fetchErr);
+          // If it's a known "missing table" error from the catch block, return empty
+          const err = fetchErr as any;
+          if (err?.code === '42P01' || err?.code === 'PGRST205') {
             return [];
           }
-          throw error;
+          throw fetchErr;
         }
-        return data || [];
       };
 
-      // 1. Fetch from himas_data (JSONB)
-      const dataRows = await safeFetch('himas_data');
+      // Concurrent fetching
+      const [dataRows, apptRows, staffData] = await Promise.all([
+        safeFetch('himas_data'),
+        safeFetch('himas_appointments'),
+        safeFetch('staff_users')
+      ]);
+
       const patientsFromData = dataRows.map(mapHimasDataToPatient);
-
-      // 2. Fetch from himas_appointments (Flat)
-      const apptRows = await safeFetch('himas_appointments');
       const patientsFromAppts = apptRows.map(mapHimasApptToPatient);
-
-      // 3. Combine both sources for a unified view
       setPatients([...patientsFromData, ...patientsFromAppts]);
 
-      // Handle standard appointments list for scheduling view (only Scheduled status)
       const apptsOnly = apptRows
         .filter((r: any) => r.status === 'Scheduled')
         .map((r: any) => ({
@@ -174,15 +184,12 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
         }));
       setAppointments(apptsOnly);
 
-      // 4. Staff
-      const staffData = await safeFetch('staff_users');
       setStaffUsers(staffData);
       setIsStaffLoaded(true);
-
       setSaveStatus('saved');
       setLastSavedAt(new Date());
     } catch (err) {
-      console.error('Refresh Error:', err);
+      console.error('[Hospital] Global Sync Failure:', err);
       setSaveStatus('error');
     } finally {
       setIsLoading(false);

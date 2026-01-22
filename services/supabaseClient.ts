@@ -1,29 +1,25 @@
 
 import { createClient } from '@supabase/supabase-js';
 
-// Safe accessor for environment variables
-const getEnvVar = (key: string, fallback: string): string => {
-  // Check process.env (Vite define plugin injections)
-  if (typeof process !== 'undefined' && process.env && process.env[key]) {
-    return process.env[key] as string;
-  }
-  
-  // Check import.meta.env (Vite native ESM)
+/**
+ * Access environment variables using direct dot notation.
+ * This is CRITICAL for Vite's `define` plugin to perform literal string replacement.
+ * Dynamic access like process.env[key] will fail in the browser.
+ */
+const supabaseUrl = 
+  (typeof process !== 'undefined' && process.env?.VITE_SUPABASE_URL) || 
   // @ts-ignore
-  if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env[key]) {
-    // @ts-ignore
-    return import.meta.env[key];
-  }
+  (typeof import.meta !== 'undefined' && import.meta.env?.VITE_SUPABASE_URL) || 
+  "https://mcfudvdwuvldkegwgtiz.supabase.co";
 
-  return fallback;
-};
-
-// Updated with the user provided Supabase credentials and fallbacks
-const supabaseUrl = getEnvVar('VITE_SUPABASE_URL', "https://mcfudvdwuvldkegwgtiz.supabase.co");
-const supabaseAnonKey = getEnvVar('VITE_SUPABASE_ANON_KEY', "sb_publishable_7oLgId9S_lriwXxrETiHuQ_WbecTVK5");
+const supabaseAnonKey = 
+  (typeof process !== 'undefined' && process.env?.VITE_SUPABASE_ANON_KEY) || 
+  // @ts-ignore
+  (typeof import.meta !== 'undefined' && import.meta.env?.VITE_SUPABASE_ANON_KEY) || 
+  "sb_publishable_7oLgId9S_lriwXxrETiHuQ_WbecTVK5";
 
 if (!supabaseUrl || !supabaseAnonKey) {
-  console.error('CRITICAL: Supabase environment variables are missing.');
+  console.error('CRITICAL: Supabase credentials could not be resolved from environment or fallbacks.');
 }
 
 /**
