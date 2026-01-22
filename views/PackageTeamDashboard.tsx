@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { useHospital } from '../context/HospitalContext';
 import { ExportButtons } from '../components/ExportButtons';
 import { generateCounselingStrategy } from '../services/geminiService';
-import { Patient, PackageProposal, Role, StaffUser, SurgeonCode, ProposalOutcome } from '../types';
+import { Patient, PackageProposal, Role, StaffUser, SurgeonCode, ProposalOutcome, ConversionReadiness } from '../types';
 import { Briefcase, Calendar, MessageCircle, AlertTriangle, Wand2, CheckCircle2, UserPlus, Users, BadgeCheck, Mail, Phone, User, Lock, Loader2, Sparkles, Activity, ShieldCheck, FileText, Banknote, CreditCard, Bed, ClipboardList, Info, Trash2, Clock, Check, X, Share2, Stethoscope, LayoutList, Columns } from 'lucide-react';
 
 export const PackageTeamDashboard: React.FC = () => {
@@ -559,8 +559,8 @@ export const PackageTeamDashboard: React.FC = () => {
                         </td>
                         <td className="p-5">
                           <span className={`text-[9px] font-black uppercase px-2 py-1 rounded-lg ${
-                            p.doctorAssessment?.conversionReadiness === 'CR1' ? 'bg-emerald-50 text-emerald-600' :
-                            p.doctorAssessment?.conversionReadiness === 'CR2' ? 'bg-blue-50 text-blue-600' :
+                            p.doctorAssessment?.conversionReadiness === ConversionReadiness.CR1 ? 'bg-emerald-50 text-emerald-600' :
+                            p.doctorAssessment?.conversionReadiness === ConversionReadiness.CR2 ? 'bg-blue-50 text-blue-600' :
                             'bg-amber-50 text-amber-600'
                           }`}>
                             {p.doctorAssessment?.conversionReadiness || 'LEAD'}
