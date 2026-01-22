@@ -95,11 +95,11 @@ export const FrontOfficeDashboard: React.FC = () => {
     setSearchTerm('');
   };
 
-  // Registration Form State
+  // Registration Form State - Starts strictly blank as per requirements
   const [formData, setFormData] = useState<Partial<Patient>>({
-    id: '', name: '', dob: '', gender: Gender.Male, age: undefined,
-    mobile: '', occupation: '', hasInsurance: 'No', insuranceName: '',
-    source: '', condition: Condition.Piles 
+    id: '', name: '', dob: '', gender: undefined, age: undefined,
+    mobile: '', occupation: '', hasInsurance: undefined, insuranceName: '',
+    source: '', condition: undefined 
   });
 
   // Booking Form State
@@ -110,8 +110,8 @@ export const FrontOfficeDashboard: React.FC = () => {
 
   const resetForm = () => {
     setFormData({
-      id: '', name: '', dob: '', gender: Gender.Male, age: undefined, mobile: '',
-      occupation: '', hasInsurance: 'No', insuranceName: '', source: '', condition: Condition.Piles
+      id: '', name: '', dob: '', gender: undefined, age: undefined, mobile: '',
+      occupation: '', hasInsurance: undefined, insuranceName: '', source: '', condition: undefined
     });
     setEditingId(null);
     setOriginatingAppointmentId(null);
@@ -135,14 +135,29 @@ export const FrontOfficeDashboard: React.FC = () => {
     if (!bookingData.name || !bookingData.mobile) return alert("Missing details.");
     await addAppointment(bookingData as any);
     setShowBookingForm(false);
+    // Reset local booking state after confirmed schedule
+    setBookingData({
+      name: '', source: '', condition: Condition.Piles, mobile: '',
+      date: new Date().toISOString().split('T')[0], time: '10:00', bookingType: 'OPD'
+    });
   };
 
   const handleArrived = (appt: Appointment) => {
-    resetForm();
-    setFormData(prev => ({ 
-      ...prev, name: appt.name, mobile: appt.mobile, 
-      condition: appt.condition, source: appt.source 
-    }));
+    // Requirements: Pre-fill only on 'Arrived' click using stored appointment data
+    setFormData({
+      id: '', 
+      name: appt.name, 
+      dob: '', 
+      gender: undefined, 
+      age: undefined, 
+      mobile: appt.mobile, 
+      occupation: '', 
+      hasInsurance: undefined, 
+      insuranceName: '', 
+      source: appt.source, 
+      condition: appt.condition 
+    });
+    setEditingId(null);
     setOriginatingAppointmentId(appt.id);
     setStep(1);
     setShowForm(true);
@@ -279,12 +294,82 @@ export const FrontOfficeDashboard: React.FC = () => {
               ))}
             </tbody>
           </table>
+        ) : activeTab === 'APPOINTMENTS' ? (
+          <table className="w-full text-left">
+            <thead className="bg-slate-50 text-slate-400 text-[11px] font-bold uppercase tracking-widest border-b">
+              <tr>
+                <th className="p-4">Scheduled</th>
+                <th className="p-4">Patient</th>
+                <th className="p-4">Mobile</th>
+                <th className="p-4 text-center">Workflow</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-50">
+              {filteredAppointments.map(appt => (
+                <tr key={appt.id} className="hover:bg-slate-50/50">
+                  <td className="p-4">
+                    <div className="font-bold text-slate-800">{appt.time}</div>
+                    <div className="text-[10px] text-slate-400">{appt.date}</div>
+                  </td>
+                  <td className="p-4 font-bold text-slate-900">{appt.name}</td>
+                  <td className="p-4 font-mono text-slate-600">{appt.mobile}</td>
+                  <td className="p-4 text-center">
+                    <button 
+                      onClick={() => handleArrived(appt)}
+                      className="bg-green-600 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase flex items-center gap-2 mx-auto"
+                    >
+                      <LogIn className="w-3.5 h-3.5" /> Arrived
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         ) : (
-          <div className="p-10 text-center text-slate-400">Loading Module...</div>
+          <div className="p-10 text-center text-slate-400">Loading Database Module...</div>
         )}
       </div>
 
-      {/* REGISTRATION FORM (REDESIGNED) */}
+      {/* SCHEDULE BOOKING MODAL */}
+      {showBookingForm && (
+        <div className="fixed inset-0 z-[110] bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-xl overflow-hidden border border-white/20">
+            <div className="p-6 border-b flex justify-between items-center bg-indigo-600 text-white">
+              <h3 className="text-xl font-black flex items-center gap-2 uppercase tracking-tight"><Calendar className="w-6 h-6" /> Schedule Appointment</h3>
+              <button onClick={() => setShowBookingForm(false)} className="hover:bg-white/20 p-2 rounded-2xl transition-all"><X className="w-6 h-6" /></button>
+            </div>
+            <form onSubmit={handleBookingSubmit} className="p-8 space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="md:col-span-2">
+                  <label className="text-[10px] font-black uppercase text-slate-400 mb-2 block">Patient Name</label>
+                  <input required className="w-full border-b-2 p-2 outline-none focus:border-indigo-500" value={bookingData.name} onChange={e => setBookingData({...bookingData, name: e.target.value})}/>
+                </div>
+                <div>
+                  <label className="text-[10px] font-black uppercase text-slate-400 mb-2 block">Mobile</label>
+                  <input required className="w-full border-b-2 p-2 outline-none focus:border-indigo-500" value={bookingData.mobile} onChange={e => setBookingData({...bookingData, mobile: e.target.value})}/>
+                </div>
+                <div>
+                  <label className="text-[10px] font-black uppercase text-slate-400 mb-2 block">Primary Condition</label>
+                  <select className="w-full border-b-2 p-2 outline-none focus:border-indigo-500" value={bookingData.condition} onChange={e => setBookingData({...bookingData, condition: e.target.value as Condition})}>
+                    {Object.values(Condition).map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[10px] font-black uppercase text-slate-400 mb-2 block">Date</label>
+                  <input type="date" required className="w-full border-b-2 p-2 outline-none focus:border-indigo-500" value={bookingData.date} onChange={e => setBookingData({...bookingData, date: e.target.value})}/>
+                </div>
+                <div>
+                  <label className="text-[10px] font-black uppercase text-slate-400 mb-2 block">Time</label>
+                  <input type="time" required className="w-full border-b-2 p-2 outline-none focus:border-indigo-500" value={bookingData.time} onChange={e => setBookingData({...bookingData, time: e.target.value})}/>
+                </div>
+              </div>
+              <button type="submit" className="w-full py-4 bg-indigo-600 text-white font-black uppercase text-xs rounded-2xl mt-4">Confirm Schedule</button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* REGISTRATION FORM */}
       {showForm && (
         <div className="fixed inset-0 z-[100] bg-slate-900/40 backdrop-blur-xl flex items-center justify-center p-0 md:p-6 animate-in fade-in duration-300">
           <div className="bg-white w-full max-w-6xl h-full md:h-[90vh] md:rounded-[2.5rem] shadow-2xl flex flex-col md:flex-row overflow-hidden border border-white/20">
@@ -297,7 +382,7 @@ export const FrontOfficeDashboard: React.FC = () => {
                    <div className="w-8 h-8 bg-hospital-500 rounded-lg flex items-center justify-center"><PlusCircle className="w-5 h-5 text-white" /></div>
                    <span className="text-xs font-black uppercase tracking-widest text-hospital-400">Himas Hospital</span>
                  </div>
-                 <h2 className="text-3xl font-black mb-10 leading-tight">{editingId ? 'Update Profile' : 'New Registration'}</h2>
+                 <h2 className="text-3xl font-black mb-10 leading-tight">{editingId ? 'Update Profile' : originatingAppointmentId ? 'Check-in Registration' : 'New Registration'}</h2>
                  
                  <div className="bg-white/5 border border-white/10 p-5 rounded-2xl backdrop-blur-md space-y-5">
                    <div className="flex justify-between items-center">
@@ -308,7 +393,7 @@ export const FrontOfficeDashboard: React.FC = () => {
                    </div>
                    
                    <div className="space-y-4">
-                     <div><div className="text-[9px] font-bold text-hospital-400 uppercase tracking-tighter">Full Name</div><div className="text-lg font-black truncate leading-none">{formData.name || 'John Doe'}</div></div>
+                     <div><div className="text-[9px] font-bold text-hospital-400 uppercase tracking-tighter">Full Name</div><div className="text-lg font-black truncate leading-none">{formData.name || '---'}</div></div>
                      <div className="flex justify-between">
                        <div><div className="text-[9px] font-bold text-hospital-400 uppercase tracking-tighter">Age / Sex</div><div className="text-sm font-black">{formData.age || '--'} / {formData.gender || '--'}</div></div>
                        <div className="text-right"><div className="text-[9px] font-bold text-hospital-400 uppercase tracking-tighter">Condition</div><div className="text-sm font-black uppercase text-slate-300">{formData.condition || '--'}</div></div>
@@ -317,7 +402,7 @@ export const FrontOfficeDashboard: React.FC = () => {
                        <div className="text-[9px] font-bold text-hospital-400 uppercase tracking-tighter">Insurance Status</div>
                        <div className={`text-xs font-black uppercase mt-1 flex items-center gap-2 ${formData.hasInsurance === 'Yes' ? 'text-green-400' : 'text-slate-500'}`}>
                          {formData.hasInsurance === 'Yes' ? <ShieldCheck className="w-3 h-3"/> : <X className="w-3 h-3"/>}
-                         {formData.hasInsurance === 'Yes' ? (formData.insuranceName || 'Standard Policy') : 'No Insurance'}
+                         {formData.hasInsurance === 'Yes' ? (formData.insuranceName || 'Standard Policy') : 'Not Selected'}
                        </div>
                      </div>
                    </div>
@@ -357,7 +442,7 @@ export const FrontOfficeDashboard: React.FC = () => {
                            <input 
                              required autoFocus
                              className="w-full text-3xl font-black border-b-4 border-slate-100 p-2 outline-none focus:border-hospital-500 transition-all placeholder-slate-200" 
-                             value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})}
+                             value={formData.name || ''} onChange={e => setFormData({...formData, name: e.target.value})}
                              placeholder="Full Name"
                            />
                          </div>
@@ -390,7 +475,7 @@ export const FrontOfficeDashboard: React.FC = () => {
                              <input 
                                required type="tel" 
                                className="w-full text-xl font-mono p-2 outline-none" 
-                               value={formData.mobile} onChange={e => setFormData({...formData, mobile: e.target.value.replace(/\D/g, '').slice(0, 10)})}
+                               value={formData.mobile || ''} onChange={e => setFormData({...formData, mobile: e.target.value.replace(/\D/g, '').slice(0, 10)})}
                                placeholder="99999 99999"
                              />
                            </div>
@@ -399,8 +484,9 @@ export const FrontOfficeDashboard: React.FC = () => {
                            <label className="block text-[10px] font-black uppercase text-slate-400 mb-2 tracking-widest">Primary Complaint</label>
                            <select 
                              className="w-full border-b-2 border-slate-100 p-2 outline-none focus:border-hospital-500 text-sm font-bold bg-white" 
-                             value={formData.condition} onChange={e => setFormData({...formData, condition: e.target.value as Condition})}
+                             value={formData.condition || ''} onChange={e => setFormData({...formData, condition: e.target.value as Condition})}
                            >
+                             <option value="">Select Condition</option>
                              {Object.values(Condition).map(c => <option key={c} value={c}>{c}</option>)}
                            </select>
                          </div>
@@ -430,7 +516,7 @@ export const FrontOfficeDashboard: React.FC = () => {
                          </div>
                        </div>
 
-                       {/* Insurance Suite Redesign */}
+                       {/* Insurance Selection */}
                        <div className={`p-8 rounded-[2rem] transition-all duration-500 ${formData.hasInsurance === 'Yes' ? 'bg-green-50/50 border-2 border-green-200 shadow-xl shadow-green-50' : 'bg-slate-50/50 border-2 border-slate-100'}`}>
                          <div className="flex items-center justify-between mb-6">
                             <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest flex items-center gap-2">
@@ -459,7 +545,7 @@ export const FrontOfficeDashboard: React.FC = () => {
                                <input 
                                  required
                                  className="w-full bg-white border-2 border-green-200 rounded-2xl p-4 pl-12 focus:border-green-500 outline-none text-xl font-black text-slate-800 placeholder-green-200"
-                                 value={formData.insuranceName}
+                                 value={formData.insuranceName || ''}
                                  onChange={e => setFormData({...formData, insuranceName: e.target.value.toUpperCase()})}
                                  placeholder="STAR HEALTH, HDFC ERGO..."
                                />
@@ -488,7 +574,7 @@ export const FrontOfficeDashboard: React.FC = () => {
                          <input 
                            required autoFocus
                            className="text-5xl font-mono text-center border-4 border-slate-100 p-10 rounded-[3rem] w-full focus:border-hospital-500 focus:ring-8 focus:ring-hospital-50 outline-none uppercase font-black tracking-widest transition-all bg-slate-50/30" 
-                           value={formData.id} 
+                           value={formData.id || ''} 
                            onChange={e => setFormData({...formData, id: e.target.value.toUpperCase()})} 
                            placeholder="HMS-000"
                          />
