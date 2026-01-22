@@ -22,8 +22,9 @@ const getEnvVar = (key: string, fallback: string): string => {
   return fallback;
 };
 
-const supabaseUrl = getEnvVar('VITE_SUPABASE_URL', "https://xggnswfyegchwlplzvto.supabase.co");
-const supabaseAnonKey = getEnvVar('VITE_SUPABASE_ANON_KEY', "sb_publishable_SrP6OJaEA9J1Xz22Tr3jdA_5QNPSwox");
+// Updated with the user provided Supabase credentials
+const supabaseUrl = getEnvVar('VITE_SUPABASE_URL', "https://mcfudvdwuvldkegwgtiz.supabase.co");
+const supabaseAnonKey = getEnvVar('VITE_SUPABASE_ANON_KEY', "sb_publishable_7oLgId9S_lriwXxrETiHuQ_WbecTVK5");
 
 if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error(

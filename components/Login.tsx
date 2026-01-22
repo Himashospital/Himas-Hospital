@@ -3,7 +3,11 @@ import React, { useState } from "react";
 import { useHospital } from "../context/HospitalContext";
 import { supabase } from "../services/supabaseClient";
 import { Role } from "../types";
-import { Building2, Mail, Lock, Loader2, Stethoscope, Users, Briefcase, ChevronRight } from 'lucide-react';
+import { 
+  Building2, Mail, Lock, Loader2, Stethoscope, 
+  Users, Briefcase, ChevronRight, ShieldCheck, 
+  Sparkles, Fingerprint 
+} from 'lucide-react';
 
 export const Login: React.FC = () => {
   const { setCurrentUserRole } = useHospital();
@@ -62,83 +66,139 @@ export const Login: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4">
-      <div className="mb-8 text-center">
-        <div className="flex items-center justify-center gap-3 mb-4">
-           <div className="bg-hospital-600 p-3.5 rounded-2xl shadow-xl shadow-hospital-200">
-             <Building2 className="w-10 h-10 text-white" />
+    <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-4 relative overflow-hidden">
+      {/* Background Decorative Elements */}
+      <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-hospital-600/10 blur-[120px] rounded-full animate-pulse"></div>
+      <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-blue-600/5 blur-[150px] rounded-full"></div>
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-full opacity-10 pointer-events-none">
+        <div className="absolute top-1/4 left-1/4 w-px h-64 bg-gradient-to-b from-transparent via-hospital-500 to-transparent"></div>
+        <div className="absolute top-1/2 right-1/3 w-px h-96 bg-gradient-to-b from-transparent via-blue-400 to-transparent"></div>
+      </div>
+
+      <div className="mb-10 text-center relative z-10 animate-in fade-in slide-in-from-top-4 duration-700">
+        <div className="flex flex-col items-center justify-center gap-4">
+           <div className="relative">
+             <div className="absolute inset-0 bg-hospital-500/20 blur-2xl rounded-full scale-150"></div>
+             <div className="bg-slate-900 p-5 rounded-[2rem] shadow-2xl border border-white/5 relative z-10">
+               <Building2 className="w-12 h-12 text-hospital-500" />
+             </div>
            </div>
-           <div className="text-left">
-             <h1 className="text-4xl font-black text-slate-900 tracking-tighter uppercase">Himas</h1>
-             <p className="text-hospital-600 font-bold text-xs uppercase tracking-[0.3em]">Hospital MIS</p>
+           <div className="text-center">
+             <h1 className="text-5xl font-black text-white tracking-tighter uppercase mb-1">Himas</h1>
+             <div className="flex items-center justify-center gap-2">
+               <div className="h-px w-8 bg-hospital-600/30"></div>
+               <p className="text-hospital-500 font-bold text-[10px] uppercase tracking-[0.4em]">Hospital Management</p>
+               <div className="h-px w-8 bg-hospital-600/30"></div>
+             </div>
            </div>
         </div>
       </div>
 
-      <div className="bg-white p-10 rounded-[2.5rem] shadow-2xl w-full max-w-md border border-slate-100 relative overflow-hidden">
-        <div className="absolute top-0 left-0 w-full h-1.5 bg-hospital-600"></div>
-        <h2 className="text-2xl font-black text-slate-800 mb-2 text-center uppercase">Staff Portal</h2>
-        
-        <form onSubmit={handleLogin} className="space-y-6 mt-6">
-          <div className="space-y-2">
-            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Work Email</label>
-            <div className="relative group">
-              <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-hospital-500 w-5 h-5" />
-              <input
-                type="email"
-                className="w-full pl-12 pr-4 py-4 bg-slate-50 border-2 border-slate-50 rounded-2xl focus:bg-white focus:border-hospital-500 focus:outline-none transition-all font-bold text-slate-700"
-                placeholder="office@himas.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-              />
+      <div className="bg-white p-1 md:p-1.5 rounded-[3rem] shadow-[0_32px_64px_-16px_rgba(0,0,0,0.5)] w-full max-w-lg relative z-10 animate-in fade-in zoom-in-95 duration-500">
+        <div className="bg-white rounded-[2.8rem] p-8 md:p-12 border border-slate-100 flex flex-col relative overflow-hidden">
+          
+          <div className="flex items-center justify-between mb-8">
+            <div>
+              <h2 className="text-2xl font-black text-slate-900 uppercase tracking-tight">Staff Login</h2>
+              <p className="text-slate-400 text-xs font-medium mt-1 uppercase tracking-widest">Authorized Access Only</p>
+            </div>
+            <div className="bg-slate-50 p-3 rounded-2xl">
+              <ShieldCheck className="w-6 h-6 text-slate-400" />
             </div>
           </div>
-
-          <div className="space-y-2">
-             <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Password</label>
-             <div className="relative group">
-              <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-hospital-500 w-5 h-5" />
-              <input
-                type="password"
-                className="w-full pl-12 pr-4 py-4 bg-slate-50 border-2 border-slate-50 rounded-2xl focus:bg-white focus:border-hospital-500 focus:outline-none transition-all font-bold text-slate-700"
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-              />
+          
+          <form onSubmit={handleLogin} className="space-y-6">
+            <div className="space-y-2">
+              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Secure Email</label>
+              <div className="relative group">
+                <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-hospital-600 transition-colors">
+                  <Mail className="w-5 h-5" />
+                </div>
+                <input
+                  type="email"
+                  className="w-full pl-12 pr-4 py-4 bg-slate-50 border-2 border-transparent rounded-2xl focus:bg-white focus:border-hospital-500/50 focus:outline-none transition-all font-bold text-slate-700 placeholder-slate-300"
+                  placeholder="name@himas.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                />
+              </div>
             </div>
+
+            <div className="space-y-2">
+               <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Password</label>
+               <div className="relative group">
+                <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-hospital-600 transition-colors">
+                  <Lock className="w-5 h-5" />
+                </div>
+                <input
+                  type="password"
+                  className="w-full pl-12 pr-4 py-4 bg-slate-50 border-2 border-transparent rounded-2xl focus:bg-white focus:border-hospital-500/50 focus:outline-none transition-all font-bold text-slate-700 placeholder-slate-300"
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                />
+              </div>
+            </div>
+
+            {error && (
+              <div className="p-4 bg-red-50 text-red-600 text-[10px] font-black uppercase tracking-wider rounded-2xl border border-red-100 animate-in slide-in-from-top-2">
+                <div className="flex items-center gap-2">
+                  <Fingerprint className="w-4 h-4" />
+                  {error}
+                </div>
+              </div>
+            )}
+
+            <button 
+              type="submit" 
+              disabled={isLoading}
+              className="w-full bg-slate-900 hover:bg-hospital-700 text-white font-black py-5 rounded-2xl shadow-xl shadow-slate-200 active:scale-[0.98] transition-all flex items-center justify-center gap-3 uppercase text-xs tracking-[0.2em]"
+            >
+              {isLoading ? (
+                <Loader2 className="w-5 h-5 animate-spin" />
+              ) : (
+                <>Sign In to System <ChevronRight className="w-4 h-4" /></>
+              )}
+            </button>
+          </form>
+
+          <div className="mt-12">
+             <div className="relative mb-8">
+               <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-slate-100"></div></div>
+               <div className="relative flex justify-center text-[10px] uppercase tracking-[0.3em] font-black text-slate-300">
+                 <span className="bg-white px-4">Demo Profiles</span>
+               </div>
+             </div>
+             
+             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                {[
+                  { label: 'Office', email: 'office@himas.com', pass: 'Himas1984@', icon: Users, color: 'text-emerald-500', bg: 'bg-emerald-50' },
+                  { label: 'Doctor', email: 'doctor@himas.com', pass: 'Doctor8419@', icon: Stethoscope, color: 'text-rose-500', bg: 'bg-rose-50' },
+                  { label: 'Admin', email: 'team@himas.com', pass: 'Team8131@', icon: Briefcase, color: 'text-violet-500', bg: 'bg-violet-50' }
+                ].map((item) => (
+                  <button 
+                    key={item.email} 
+                    type="button" 
+                    className="group flex flex-col items-center gap-2 p-4 rounded-[2rem] hover:bg-slate-50 transition-all border border-slate-50 hover:border-slate-200 hover:-translate-y-1 active:scale-95" 
+                    onClick={() => { setEmail(item.email); setPassword(item.pass); }}
+                  >
+                     <div className={`p-4 rounded-2xl ${item.bg} ${item.color} group-hover:scale-110 transition-transform shadow-sm`}>
+                       <item.icon className="w-5 h-5" />
+                     </div>
+                     <span className="text-[10px] font-black text-slate-800 uppercase tracking-wider">{item.label}</span>
+                  </button>
+                ))}
+             </div>
           </div>
-
-          {error && <div className="p-4 bg-red-50 text-red-600 text-xs font-bold rounded-2xl animate-pulse">{error}</div>}
-
-          <button 
-            type="submit" 
-            disabled={isLoading}
-            className="w-full bg-slate-900 hover:bg-slate-800 text-white font-black py-4 rounded-2xl shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2 uppercase text-xs tracking-widest"
-          >
-            {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <>Access System <ChevronRight className="w-4 h-4" /></>}
-          </button>
-        </form>
-
-        <div className="mt-8 pt-6 border-t border-slate-100">
-           <p className="text-[10px] text-center text-slate-300 font-black uppercase tracking-[0.2em] mb-4">Quick Demo Access</p>
-           <div className="space-y-3">
-              {[
-                { label: 'Front Office', email: 'office@himas.com', pass: 'Himas1984@', icon: Users, color: 'text-blue-500' },
-                { label: 'Doctor', email: 'doctor@himas.com', pass: 'Doctor8419@', icon: Stethoscope, color: 'text-red-500' },
-                { label: 'Package Team', email: 'team@himas.com', pass: 'Team8131@', icon: Briefcase, color: 'text-purple-500' }
-              ].map((item) => (
-                <button key={item.email} type="button" className="w-full flex items-center gap-3 p-3 rounded-2xl hover:bg-slate-50 transition-all border border-slate-50 text-left" onClick={() => { setEmail(item.email); setPassword(item.pass); }}>
-                   <div className="p-2 rounded-xl bg-slate-100"><item.icon className={`w-4 h-4 ${item.color}`} /></div>
-                   <div className="text-[10px] flex flex-col">
-                      <span className="font-black text-slate-800 uppercase">{item.label}</span>
-                      <span className="text-slate-400 font-mono">Use default password</span>
-                   </div>
-                </button>
-              ))}
-           </div>
         </div>
+      </div>
+      
+      <div className="mt-10 text-slate-500 text-[10px] font-bold uppercase tracking-[0.5em] flex items-center gap-4 animate-in fade-in slide-in-from-bottom-4 duration-1000 delay-500">
+        <Sparkles className="w-3 h-3 text-hospital-500" />
+        Encrypted & Secure Session
+        <Sparkles className="w-3 h-3 text-hospital-500" />
       </div>
     </div>
   );
