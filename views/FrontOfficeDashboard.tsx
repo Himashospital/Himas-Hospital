@@ -95,16 +95,16 @@ export const FrontOfficeDashboard: React.FC = () => {
     setSearchTerm('');
   };
 
-  // Registration Form State - Starts strictly blank as per requirements
+  // Registration Form State - Starts strictly blank (Requirement 1)
   const [formData, setFormData] = useState<Partial<Patient>>({
     id: '', name: '', dob: '', gender: undefined, age: undefined,
     mobile: '', occupation: '', hasInsurance: undefined, insuranceName: '',
     source: '', condition: undefined 
   });
 
-  // Booking Form State
+  // Booking Form State - Initial values for the schedule form only
   const [bookingData, setBookingData] = useState<Partial<Appointment>>({
-    name: '', source: '', condition: Condition.Piles, mobile: '',
+    name: '', source: '', condition: undefined, mobile: '',
     date: new Date().toISOString().split('T')[0], time: '10:00', bookingType: 'OPD'
   });
 
@@ -132,18 +132,18 @@ export const FrontOfficeDashboard: React.FC = () => {
 
   const handleBookingSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!bookingData.name || !bookingData.mobile) return alert("Missing details.");
+    if (!bookingData.name || !bookingData.mobile || !bookingData.condition) return alert("Missing details.");
     await addAppointment(bookingData as any);
     setShowBookingForm(false);
-    // Reset local booking state after confirmed schedule
+    // Reset booking form after scheduling (Requirement 2)
     setBookingData({
-      name: '', source: '', condition: Condition.Piles, mobile: '',
+      name: '', source: '', condition: undefined, mobile: '',
       date: new Date().toISOString().split('T')[0], time: '10:00', bookingType: 'OPD'
     });
   };
 
   const handleArrived = (appt: Appointment) => {
-    // Requirements: Pre-fill only on 'Arrived' click using stored appointment data
+    // Requirement 3: Pre-fill only on 'Arrived' click using stored appointment data
     setFormData({
       id: '', 
       name: appt.name, 
@@ -342,15 +342,16 @@ export const FrontOfficeDashboard: React.FC = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="md:col-span-2">
                   <label className="text-[10px] font-black uppercase text-slate-400 mb-2 block">Patient Name</label>
-                  <input required className="w-full border-b-2 p-2 outline-none focus:border-indigo-500" value={bookingData.name} onChange={e => setBookingData({...bookingData, name: e.target.value})}/>
+                  <input required className="w-full border-b-2 p-2 outline-none focus:border-indigo-500" value={bookingData.name || ''} onChange={e => setBookingData({...bookingData, name: e.target.value})}/>
                 </div>
                 <div>
                   <label className="text-[10px] font-black uppercase text-slate-400 mb-2 block">Mobile</label>
-                  <input required className="w-full border-b-2 p-2 outline-none focus:border-indigo-500" value={bookingData.mobile} onChange={e => setBookingData({...bookingData, mobile: e.target.value})}/>
+                  <input required className="w-full border-b-2 p-2 outline-none focus:border-indigo-500" value={bookingData.mobile || ''} onChange={e => setBookingData({...bookingData, mobile: e.target.value})}/>
                 </div>
                 <div>
                   <label className="text-[10px] font-black uppercase text-slate-400 mb-2 block">Primary Condition</label>
-                  <select className="w-full border-b-2 p-2 outline-none focus:border-indigo-500" value={bookingData.condition} onChange={e => setBookingData({...bookingData, condition: e.target.value as Condition})}>
+                  <select className="w-full border-b-2 p-2 outline-none focus:border-indigo-500 bg-white" value={bookingData.condition || ''} onChange={e => setBookingData({...bookingData, condition: e.target.value as Condition})}>
+                    <option value="">Select Condition</option>
                     {Object.values(Condition).map(c => <option key={c} value={c}>{c}</option>)}
                   </select>
                 </div>
@@ -382,7 +383,9 @@ export const FrontOfficeDashboard: React.FC = () => {
                    <div className="w-8 h-8 bg-hospital-500 rounded-lg flex items-center justify-center"><PlusCircle className="w-5 h-5 text-white" /></div>
                    <span className="text-xs font-black uppercase tracking-widest text-hospital-400">Himas Hospital</span>
                  </div>
-                 <h2 className="text-3xl font-black mb-10 leading-tight">{editingId ? 'Update Profile' : originatingAppointmentId ? 'Check-in Registration' : 'New Registration'}</h2>
+                 <h2 className="text-3xl font-black mb-10 leading-tight">
+                    {editingId ? 'Update Profile' : originatingAppointmentId ? 'Check-in Registration' : 'New Registration'}
+                 </h2>
                  
                  <div className="bg-white/5 border border-white/10 p-5 rounded-2xl backdrop-blur-md space-y-5">
                    <div className="flex justify-between items-center">
@@ -604,7 +607,7 @@ export const FrontOfficeDashboard: React.FC = () => {
                      <button 
                        type="button" 
                        onClick={() => {
-                         if(!formData.name || !formData.mobile || !formData.source) return alert("Fill Name, Mobile & Source");
+                         if(!formData.name || !formData.mobile || !formData.source || !formData.condition) return alert("Fill Name, Mobile, Source & Condition");
                          setStep(2);
                        }} 
                        className="px-12 py-5 bg-slate-900 text-white rounded-[1.5rem] font-black text-xs uppercase shadow-2xl hover:scale-105 active:scale-95 transition-all flex items-center gap-3"
