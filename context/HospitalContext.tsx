@@ -1,6 +1,6 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { Patient, DoctorAssessment, PackageProposal, Role, StaffUser, Appointment } from '../types';
+import { Patient, DoctorAssessment, PackageProposal, Role, StaffUser, Appointment, Condition, SurgeonCode, PainSeverity, Affordability, ConversionReadiness, ProposalOutcome, Gender } from '../types';
 import { supabase } from '../services/supabaseClient';
 
 interface PatientFilters {
@@ -20,7 +20,7 @@ interface HospitalContextType {
   setCurrentUserRole: (role: Role) => void;
   patients: Patient[];
   addPatient: (patientData: Omit<Patient, 'registeredAt' | 'hospital_id'>) => Promise<void>; 
-  updatePatient: (patient: Patient) => Promise<void>;
+  updatePatient: (targetId: string, patient: Patient) => Promise<void>;
   deletePatient: (id: string) => Promise<void>;
   updateDoctorAssessment: (patientId: string, assessment: DoctorAssessment) => Promise<void>;
   updatePackageProposal: (patientId: string, proposal: PackageProposal) => Promise<void>;
@@ -40,77 +40,139 @@ interface HospitalContextType {
 }
 
 const HospitalContext = createContext<HospitalContextType | undefined>(undefined);
+const STORAGE_KEY_ROLE = 'himas_hospital_role';
 
-const STORAGE_KEY_ROLE = 'himas_hospital_role_v1';
-const STORAGE_KEY_PATIENTS = 'himas_patients_v2';
-const STORAGE_KEY_APPOINTMENTS = 'himas_appointments_v2';
-const MOCK_HOSPITAL_ID = '00000000-0000-0000-0000-000000000000';
+// Helper: Map himas_data (JSONB style) to Patient interface
+const mapHimasDataToPatient = (row: any): Patient => ({
+  id: row.id || '',
+  hospital_id: row.hospital_id || '',
+  name: row.full_name || '',
+  dob: row.dob || '',
+  gender: (row.gender || Gender.Other) as Gender,
+  age: row.age || 0,
+  mobile: row.mobile_number || '',
+  occupation: row.occupation || '',
+  hasInsurance: row.has_insurance || 'No',
+  insuranceName: row.insurance_name || '',
+  source: row.source || 'Other',
+  condition: (row.condition || Condition.Other) as Condition,
+  visitType: row.visit_type || 'OPD',
+  registeredAt: row.created_at || new Date().toISOString(),
+  entry_date: row.entry_date || (row.created_at ? row.created_at.split('T')[0] : ''),
+  doctorAssessment: row.doctor_assessment,
+  packageProposal: row.package_proposal,
+  sourceTable: 'himas_data'
+});
+
+// Helper: Map himas_appointments (Flat style) to Patient interface
+const mapHimasApptToPatient = (row: any): Patient => ({
+  id: row.id || '',
+  hospital_id: row.hospital_id || '',
+  name: row.name || '',
+  gender: (row.gender || Gender.Other) as Gender,
+  age: row.age || 0,
+  mobile: row.mobile || '',
+  occupation: row.occupation || '',
+  hasInsurance: row.has_insurance || 'No',
+  insuranceName: row.insurance_name || '',
+  source: row.source || 'Other',
+  condition: (row.patient_condition || Condition.Other) as Condition,
+  visitType: row.booking_type || 'OPD',
+  registeredAt: row.created_at || new Date().toISOString(),
+  entry_date: row.appointment_date || '',
+  sourceTable: 'himas_appointments',
+  doctorAssessment: row.doctor_signature ? {
+    quickCode: row.doctor_counseling_status as SurgeonCode,
+    painSeverity: row.pain_severity as PainSeverity,
+    affordability: row.affordability as Affordability,
+    conversionReadiness: row.readiness as ConversionReadiness,
+    doctorSignature: row.doctor_signature,
+    assessedAt: row.assessed_at,
+    doctorNote: row.clinical_findings_notes,
+    tentativeSurgeryDate: ''
+  } : undefined,
+  packageProposal: row.package_status ? {
+    outcome: row.package_status as ProposalOutcome,
+    modeOfPayment: row.mode_of_payment,
+    packageAmount: row.package_amount,
+    roomType: row.room_type,
+    outcomeDate: row.counseling_outcome_date,
+    lostReason: row.lost_reason,
+    counselingStrategy: row.counseling_strategy,
+    proposalCreatedAt: row.created_at,
+    decisionPattern: '',
+    objectionIdentified: '',
+    followUpDate: ''
+  } : undefined
+});
 
 export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [currentUserRole, setCurrentUserRole] = useState<Role>(() => 
-    (localStorage.getItem(STORAGE_KEY_ROLE) as Role) || null
-  );
-
-  const [patients, setPatients] = useState<Patient[]>(() => {
-    const backup = localStorage.getItem(STORAGE_KEY_PATIENTS);
-    return backup ? JSON.parse(backup) : [];
-  });
-
-  const [appointments, setAppointments] = useState<Appointment[]>(() => {
-    const backup = localStorage.getItem(STORAGE_KEY_APPOINTMENTS);
-    return backup ? JSON.parse(backup) : [];
-  });
-
+  const [currentUserRole, setCurrentUserRoleState] = useState<Role>(null);
+  const [patients, setPatients] = useState<Patient[]>([]);
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [staffUsers, setStaffUsers] = useState<StaffUser[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [isStaffLoaded, setIsStaffLoaded] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'error' | 'unsaved'>('saved');
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
-
-  // Persistence to LocalStorage (Safety Fallback)
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEY_PATIENTS, JSON.stringify(patients));
-    localStorage.setItem(STORAGE_KEY_APPOINTMENTS, JSON.stringify(appointments));
-  }, [patients, appointments]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isStaffLoaded, setIsStaffLoaded] = useState(false);
 
   useEffect(() => {
-    if (currentUserRole) localStorage.setItem(STORAGE_KEY_ROLE, currentUserRole);
+    const savedRole = localStorage.getItem(STORAGE_KEY_ROLE);
+    if (savedRole) setCurrentUserRoleState(savedRole as Role);
+    refreshData();
+  }, []);
+
+  const setCurrentUserRole = (role: Role) => {
+    setCurrentUserRoleState(role);
+    if (role) localStorage.setItem(STORAGE_KEY_ROLE, role);
     else localStorage.removeItem(STORAGE_KEY_ROLE);
-  }, [currentUserRole]);
-
-  const getHospitalId = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    return user?.user_metadata?.hospital_id || MOCK_HOSPITAL_ID;
   };
 
-  const loadData = async () => {
-    if (!currentUserRole) return;
+  const refreshData = async () => {
     setIsLoading(true);
-    setSaveStatus('saving');
-
     try {
-      const hospitalId = await getHospitalId();
-      
-      const { data: patientsData, error: pErr } = await supabase
-        .from('himas_data')
-        .select('*')
-        .eq('hospital_id', hospitalId)
-        .order('registeredAt', { ascending: false });
+      // 1. Fetch from himas_data (JSONB)
+      const { data: dataRows, error: dataError } = await supabase.from('himas_data').select('*');
+      if (dataError) throw dataError;
+      const patientsFromData = (dataRows || []).map(mapHimasDataToPatient);
 
-      const { data: apptData, error: aErr } = await supabase
-        .from('himas_appointments')
-        .select('*')
-        .eq('hospital_id', hospitalId)
-        .order('date', { ascending: true });
+      // 2. Fetch from himas_appointments (Flat)
+      const { data: apptRows, error: apptError } = await supabase.from('himas_appointments').select('*');
+      if (apptError) throw apptError;
+      const patientsFromAppts = (apptRows || []).map(mapHimasApptToPatient);
 
-      if (!pErr && patientsData && patientsData.length > 0) setPatients(patientsData as Patient[]);
-      if (!aErr && apptData && apptData.length > 0) setAppointments(apptData as Appointment[]);
+      // 3. Combine both sources for a unified view
+      setPatients([...patientsFromData, ...patientsFromAppts]);
+
+      // Handle standard appointments list for scheduling view (only Scheduled status)
+      const apptsOnly = (apptRows || [])
+        .filter(r => r.status === 'Scheduled')
+        .map(r => ({
+          id: r.id || '',
+          hospital_id: r.hospital_id || '',
+          name: r.name || '',
+          source: r.source || '',
+          condition: (r.patient_condition || Condition.Other) as Condition,
+          mobile: r.mobile || '',
+          date: r.appointment_date || '',
+          time: r.appointment_time || '',
+          status: (r.status || 'Scheduled') as any,
+          bookingType: (r.booking_type || 'OPD') as any,
+          createdAt: r.created_at || new Date().toISOString()
+        }));
+      setAppointments(apptsOnly);
+
+      // 4. Staff
+      const { data: staffData, error: staffError } = await supabase.from('staff_users').select('*');
+      if (staffError) throw staffError;
+      setStaffUsers(staffData || []);
+      setIsStaffLoaded(true);
 
       setSaveStatus('saved');
       setLastSavedAt(new Date());
-    } catch (e) {
-      console.warn("Using local data cache (Supabase offline or unconfigured)");
-      setSaveStatus('unsaved');
+    } catch (err) {
+      console.error('Refresh Error:', err);
+      setSaveStatus('error');
     } finally {
       setIsLoading(false);
     }
@@ -118,118 +180,197 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
 
   const addPatient = async (patientData: Omit<Patient, 'registeredAt' | 'hospital_id'>) => {
     setSaveStatus('saving');
-    const hospitalId = await getHospitalId();
-    const newPatient: Patient = {
-      ...patientData as Patient,
-      hospital_id: hospitalId,
-      registeredAt: new Date().toISOString()
-    };
-
-    // Update Local First
-    setPatients(prev => [newPatient, ...prev]);
-
     try {
-      const { error } = await supabase.from('himas_data').insert(newPatient);
+      const dbRecord = {
+        id: patientData.id,
+        full_name: patientData.name,
+        dob: patientData.dob,
+        gender: patientData.gender,
+        age: patientData.age,
+        mobile_number: patientData.mobile,
+        occupation: patientData.occupation,
+        source: patientData.source,
+        condition: patientData.condition,
+        visit_type: patientData.visitType,
+        has_insurance: patientData.hasInsurance,
+        insurance_name: patientData.insuranceName,
+        entry_date: new Date().toISOString().split('T')[0]
+      };
+      
+      const { error } = await supabase.from('himas_data').insert(dbRecord);
       if (error) throw error;
+      
+      await refreshData();
       setSaveStatus('saved');
     } catch (err) {
-      console.error("Supabase Save failed, kept in local storage:", err);
-      setSaveStatus('unsaved');
+      setSaveStatus('error');
+      console.error(err);
     }
   };
 
-  const updatePatient = async (updatedPatient: Patient) => {
+  const updatePatient = async (targetId: string, patient: Patient) => {
     setSaveStatus('saving');
-    setPatients(prev => prev.map(p => p.id === updatedPatient.id ? updatedPatient : p));
-
     try {
-      const { error } = await supabase.from('himas_data').update(updatedPatient).eq('id', updatedPatient.id);
-      if (error) throw error;
+      const isFromAppts = patient.sourceTable === 'himas_appointments';
+      
+      if (isFromAppts) {
+        const updateData = {
+          name: patient.name,
+          age: patient.age,
+          gender: patient.gender,
+          mobile: patient.mobile,
+          patient_condition: patient.condition,
+          booking_type: patient.visitType,
+          has_insurance: patient.hasInsurance,
+          insurance_name: patient.insuranceName,
+          doctor_counseling_status: patient.doctorAssessment?.quickCode,
+          pain_severity: patient.doctorAssessment?.painSeverity,
+          clinical_findings_notes: patient.doctorAssessment?.doctorNote,
+          affordability: patient.doctorAssessment?.affordability,
+          readiness: patient.doctorAssessment?.conversionReadiness,
+          doctor_signature: patient.doctorAssessment?.doctorSignature,
+          assessed_at: patient.doctorAssessment?.assessedAt,
+          package_status: patient.packageProposal?.outcome,
+          mode_of_payment: patient.packageProposal?.modeOfPayment,
+          package_amount: patient.packageProposal?.packageAmount,
+          room_type: patient.packageProposal?.roomType,
+          counseling_outcome_date: patient.packageProposal?.outcomeDate,
+          lost_reason: patient.packageProposal?.lostReason,
+          counseling_strategy: patient.packageProposal?.counselingStrategy
+        };
+        const { error } = await supabase.from('himas_appointments').update(updateData).eq('id', targetId);
+        if (error) throw error;
+      } else {
+        const updateData = {
+          full_name: patient.name,
+          dob: patient.dob,
+          gender: patient.gender,
+          age: patient.age,
+          mobile_number: patient.mobile,
+          occupation: patient.occupation,
+          source: patient.source,
+          condition: patient.condition,
+          visit_type: patient.visitType,
+          has_insurance: patient.hasInsurance,
+          insurance_name: patient.insuranceName,
+          doctor_assessment: patient.doctorAssessment,
+          package_proposal: patient.packageProposal
+        };
+        const { error } = await supabase.from('himas_data').update(updateData).eq('id', targetId);
+        if (error) throw error;
+      }
+      
+      setPatients(prev => prev.map(p => p.id === targetId ? { ...patient } : p));
       setSaveStatus('saved');
+      setLastSavedAt(new Date());
     } catch (err) {
-      setSaveStatus('unsaved');
+      setSaveStatus('error');
+      console.error(err);
     }
   };
 
   const deletePatient = async (id: string) => {
-    setPatients(prev => prev.filter(p => p.id !== id));
-    try {
-      await supabase.from('himas_data').delete().eq('id', id);
-    } catch (e) {}
-  };
-
-  const addAppointment = async (apptData: Omit<Appointment, 'id' | 'createdAt' | 'hospital_id' | 'status'>) => {
     setSaveStatus('saving');
-    const hospitalId = await getHospitalId();
-    const newAppt = {
-      ...apptData,
-      id: crypto.randomUUID(),
-      hospital_id: hospitalId,
-      status: 'Scheduled',
-      createdAt: new Date().toISOString()
-    };
-
-    setAppointments(prev => [...prev, newAppt as Appointment]);
-
     try {
-      const { error } = await supabase.from('himas_appointments').insert(newAppt);
+      const patient = patients.find(p => p.id === id);
+      const table = patient?.sourceTable === 'himas_appointments' ? 'himas_appointments' : 'himas_data';
+      const { error } = await supabase.from(table).delete().eq('id', id);
       if (error) throw error;
+      setPatients(prev => prev.filter(p => p.id !== id));
       setSaveStatus('saved');
     } catch (err) {
-      setSaveStatus('unsaved');
+      setSaveStatus('error');
     }
-  };
-
-  const updateAppointment = async (updatedAppt: Appointment) => {
-    setAppointments(prev => prev.map(a => a.id === updatedAppt.id ? updatedAppt : a));
-    try {
-      await supabase.from('himas_appointments').update(updatedAppt).eq('id', updatedAppt.id);
-    } catch (e) {}
-  };
-
-  const deleteAppointment = async (id: string) => {
-    setAppointments(prev => prev.filter(a => a.id !== id));
-    try {
-      await supabase.from('himas_appointments').delete().eq('id', id);
-    } catch (e) {}
-  };
-
-  const fetchFilteredPatients = async (filters: PatientFilters, page: number, pageSize: number) => {
-    // For simplicity, we filter the local state for search/pagination
-    let filtered = [...patients];
-    if (filters.searchTerm) {
-      const s = filters.searchTerm.toLowerCase();
-      filtered = filtered.filter(p => p.name.toLowerCase().includes(s) || p.id.toLowerCase().includes(s) || p.mobile.includes(s));
-    }
-    if (filters.condition) filtered = filtered.filter(p => p.condition === filters.condition);
-    
-    const start = page * pageSize;
-    return { data: filtered.slice(start, start + pageSize), count: filtered.length };
   };
 
   const updateDoctorAssessment = async (patientId: string, assessment: DoctorAssessment) => {
     const patient = patients.find(p => p.id === patientId);
-    if (patient) await updatePatient({ ...patient, doctorAssessment: assessment });
+    if (patient) await updatePatient(patientId, { ...patient, doctorAssessment: assessment });
   };
 
   const updatePackageProposal = async (patientId: string, proposal: PackageProposal) => {
     const patient = patients.find(p => p.id === patientId);
-    if (patient) await updatePatient({ ...patient, packageProposal: proposal });
+    if (patient) await updatePatient(patientId, { ...patient, packageProposal: proposal });
   };
 
-  const registerStaff = (staffData: Omit<StaffUser, 'id' | 'registeredAt'>) => {
-    const newStaff: StaffUser = { ...staffData, id: `USR-${Date.now()}`, registeredAt: new Date().toISOString() };
-    setStaffUsers(prev => [...prev, newStaff]);
+  const getPatientById = (id: string) => patients.find(p => p.id === id);
+
+  const fetchFilteredPatients = async (filters: PatientFilters, page: number, pageSize: number) => {
+    return { data: patients, count: patients.length };
   };
 
-  useEffect(() => { if (currentUserRole) loadData(); }, [currentUserRole]);
+  const addAppointment = async (appointmentData: Omit<Appointment, 'id' | 'createdAt' | 'hospital_id' | 'status'>) => {
+    setSaveStatus('saving');
+    try {
+      const dbRecord = {
+        id: `APP-${Math.random().toString(36).substr(2, 5).toUpperCase()}`,
+        name: appointmentData.name,
+        mobile: appointmentData.mobile,
+        source: appointmentData.source,
+        patient_condition: appointmentData.condition,
+        appointment_date: appointmentData.date,
+        appointment_time: appointmentData.time,
+        booking_type: appointmentData.bookingType,
+        status: 'Scheduled'
+      };
+      const { error } = await supabase.from('himas_appointments').insert(dbRecord);
+      if (error) throw error;
+      await refreshData();
+    } catch (err) {
+      setSaveStatus('error');
+    }
+  };
+
+  const updateAppointment = async (appointment: Appointment) => {
+    setSaveStatus('saving');
+    try {
+      const updateData = {
+        appointment_date: appointment.date,
+        appointment_time: appointment.time,
+        status: appointment.status,
+        booking_type: appointment.bookingType
+      };
+      const { error } = await supabase.from('himas_appointments').update(updateData).eq('id', appointment.id);
+      if (error) throw error;
+      await refreshData();
+    } catch (err) {
+      setSaveStatus('error');
+    }
+  };
+
+  const deleteAppointment = async (id: string) => {
+    setSaveStatus('saving');
+    try {
+      const { error } = await supabase.from('himas_appointments').delete().eq('id', id);
+      if (error) throw error;
+      await refreshData();
+    } catch (err) {
+      setSaveStatus('error');
+    }
+  };
+
+  const registerStaff = async (staffData: Omit<StaffUser, 'id' | 'registeredAt'>) => {
+    setSaveStatus('saving');
+    try {
+      const newStaff = { ...staffData, id: Math.random().toString(36).substr(2, 9), registeredAt: new Date().toISOString() };
+      const { error } = await supabase.from('staff_users').insert(newStaff);
+      if (error) throw error;
+      setStaffUsers(prev => [...prev, newStaff as StaffUser]);
+      setSaveStatus('saved');
+    } catch (err) {
+      setSaveStatus('error');
+    }
+  };
 
   return (
     <HospitalContext.Provider value={{
-      currentUserRole, setCurrentUserRole, patients, addPatient, updatePatient, deletePatient,
-      updateDoctorAssessment, updatePackageProposal, getPatientById: id => patients.find(p => p.id === id),
-      fetchFilteredPatients, appointments, addAppointment, updateAppointment, deleteAppointment,
-      staffUsers, registerStaff, saveStatus, lastSavedAt, refreshData: loadData, isLoading, isStaffLoaded
+      currentUserRole, setCurrentUserRole,
+      patients, addPatient, updatePatient, deletePatient,
+      updateDoctorAssessment, updatePackageProposal,
+      getPatientById, fetchFilteredPatients,
+      appointments, addAppointment, updateAppointment, deleteAppointment,
+      staffUsers, registerStaff,
+      saveStatus, lastSavedAt, refreshData, isLoading, isStaffLoaded
     }}>
       {children}
     </HospitalContext.Provider>
@@ -238,6 +379,6 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
 
 export const useHospital = () => {
   const context = useContext(HospitalContext);
-  if (!context) throw new Error('useHospital must be used within a HospitalProvider');
+  if (context === undefined) throw new Error('useHospital must be used within a HospitalProvider');
   return context;
 };

@@ -50,7 +50,10 @@ export interface DoctorAssessment {
   tentativeSurgeryDate: string; // YYYY-MM-DD
   doctorSignature: string;
   assessedAt: string;
+  doctorNote?: string;
 }
+
+export type ProposalOutcome = 'Scheduled' | 'Follow-Up' | 'Lost';
 
 export interface PackageProposal {
   decisionPattern: string;
@@ -58,14 +61,26 @@ export interface PackageProposal {
   counselingStrategy: string;
   followUpDate: string; // YYYY-MM-DD
   proposalCreatedAt: string;
+  modeOfPayment?: 'Cash' | 'Insurance' | 'Partly' | 'Insurance Approved';
+  packageAmount?: string;
+  preOpInvestigation?: 'Included' | 'Excluded';
+  surgeryMedicines?: 'Included' | 'Excluded';
+  equipment?: 'Included' | 'Excluded';
+  icuCharges?: 'Included' | 'Excluded';
+  roomType?: 'Private' | 'Deluxe' | 'Semi';
+  postFollowUp?: 'None' | 'Single' | 'Double';
+  surgeryDate?: string;
+  remarks?: string;
+  outcome?: ProposalOutcome;
+  outcomeDate?: string;
+  lostReason?: string;
 }
 
 export interface Patient {
-  id: string; // File Registration Number
-  hospital_id: string; // Multi-tenancy identifier
-  // Front Office Fields
+  id: string; 
+  hospital_id: string; 
   name: string;
-  dob?: string; // Date of Birth YYYY-MM-DD
+  dob?: string; 
   gender: Gender;
   age: number;
   mobile: string;
@@ -74,8 +89,13 @@ export interface Patient {
   insuranceName?: string; 
   source: string; 
   condition: Condition;
+  visitType: 'OPD' | 'Follow Up';
   registeredAt: string;
+  entry_date?: string;
   
+  // Metadata for multi-table support
+  sourceTable?: 'himas_data' | 'himas_appointments';
+
   // Role Specific Data
   doctorAssessment?: DoctorAssessment;
   packageProposal?: PackageProposal;
@@ -88,8 +108,8 @@ export interface Appointment {
   source: string;
   condition: Condition;
   mobile: string;
-  date: string; // YYYY-MM-DD
-  time: string; // HH:mm
+  date: string; 
+  time: string; 
   status: 'Scheduled' | 'Arrived' | 'Cancelled';
   bookingType: 'Follow Up' | 'OPD';
   createdAt: string;
