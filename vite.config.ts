@@ -9,11 +9,15 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [react()],
     define: {
-      // Define on import.meta.env to satisfy strict project rules and prevent runtime TypeErrors
-      'import.meta.env.API_KEY': JSON.stringify(env.API_KEY || env.GEMINI_API_KEY),
+      // Define on process.env to satisfy strict Gemini SDK requirements and project logic
+      'process.env.API_KEY': JSON.stringify(env.API_KEY || env.GEMINI_API_KEY || env.VITE_GEMINI_API_KEY),
+      'process.env.VITE_SUPABASE_URL': JSON.stringify(env.VITE_SUPABASE_URL || "https://mcfudvdwuvldkegwgtiz.supabase.co"),
+      'process.env.VITE_SUPABASE_ANON_KEY': JSON.stringify(env.VITE_SUPABASE_ANON_KEY || "sb_publishable_7oLgId9S_lriwXxrETiHuQ_WbecTVK5"),
+      'process.env.SENDGRID_API_KEY': JSON.stringify(env.SENDGRID_API_KEY || ""),
+      // Maintain import.meta.env for standard Vite compatibility
+      'import.meta.env.API_KEY': JSON.stringify(env.API_KEY || env.GEMINI_API_KEY || env.VITE_GEMINI_API_KEY),
       'import.meta.env.VITE_SUPABASE_URL': JSON.stringify(env.VITE_SUPABASE_URL || "https://mcfudvdwuvldkegwgtiz.supabase.co"),
-      'import.meta.env.VITE_SUPABASE_ANON_KEY': JSON.stringify(env.VITE_SUPABASE_ANON_KEY || "sb_publishable_7oLgId9S_lriwXxrETiHuQ_WbecTVK5"),
-      'import.meta.env.SENDGRID_API_KEY': JSON.stringify(env.SENDGRID_API_KEY || "")
+      'import.meta.env.VITE_SUPABASE_ANON_KEY': JSON.stringify(env.VITE_SUPABASE_ANON_KEY || "sb_publishable_7oLgId9S_lriwXxrETiHuQ_WbecTVK5")
     }
   };
 });
