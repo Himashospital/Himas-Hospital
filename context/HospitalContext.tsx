@@ -1,12 +1,23 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { Patient, DoctorAssessment, PackageProposal, Role, StaffUser } from '../types';
+import { Patient, DoctorAssessment, PackageProposal, Role, StaffUser, Appointment } from '../types';
 import { supabase } from '../services/supabaseClient';
+
+interface PatientFilters {
+  startDate?: string;
+  endDate?: string;
+  condition?: string;
+  source?: string;
+  hasInsurance?: string;
+  surgeryNeeded?: boolean;
+  medicationOnly?: boolean;
+  status?: 'New' | 'Consulted' | 'Counseled';
+  searchTerm?: string;
+}
 
 interface HospitalContextType {
   currentUserRole: Role;
   setCurrentUserRole: (role: Role) => void;
-  // Patient Data
   patients: Patient[];
   addPatient: (patientData: Omit<Patient, 'registeredAt' | 'hospital_id'>) => Promise<void>; 
   updatePatient: (patient: Patient) => Promise<void>;
@@ -14,10 +25,13 @@ interface HospitalContextType {
   updateDoctorAssessment: (patientId: string, assessment: DoctorAssessment) => Promise<void>;
   updatePackageProposal: (patientId: string, proposal: PackageProposal) => Promise<void>;
   getPatientById: (id: string) => Patient | undefined;
-  // Staff Data
+  fetchFilteredPatients: (filters: PatientFilters, page: number, pageSize: number) => Promise<{ data: Patient[], count: number }>;
+  appointments: Appointment[];
+  addAppointment: (appointmentData: Omit<Appointment, 'id' | 'createdAt' | 'hospital_id' | 'status'>) => Promise<void>;
+  updateAppointment: (appointment: Appointment) => Promise<void>;
+  deleteAppointment: (id: string) => Promise<void>;
   staffUsers: StaffUser[];
   registerStaff: (staffData: Omit<StaffUser, 'id' | 'registeredAt'>) => void;
-  // System State
   saveStatus: 'saved' | 'saving' | 'error' | 'unsaved';
   lastSavedAt: Date | null;
   refreshData: () => Promise<void>;
@@ -28,275 +42,194 @@ interface HospitalContextType {
 const HospitalContext = createContext<HospitalContextType | undefined>(undefined);
 
 const STORAGE_KEY_ROLE = 'himas_hospital_role_v1';
-const STORAGE_KEY_PATIENTS = 'himas_patients_backup_v1';
-const SHARED_STAFF_KEY = 'HIMAS_STAFF_DATA';
+const STORAGE_KEY_PATIENTS = 'himas_patients_v2';
+const STORAGE_KEY_APPOINTMENTS = 'himas_appointments_v2';
+const MOCK_HOSPITAL_ID = '00000000-0000-0000-0000-000000000000';
 
 export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [currentUserRole, setCurrentUserRole] = useState<Role>(() => {
-    return (localStorage.getItem(STORAGE_KEY_ROLE) as Role) || null;
-  });
+  const [currentUserRole, setCurrentUserRole] = useState<Role>(() => 
+    (localStorage.getItem(STORAGE_KEY_ROLE) as Role) || null
+  );
 
   const [patients, setPatients] = useState<Patient[]>(() => {
     const backup = localStorage.getItem(STORAGE_KEY_PATIENTS);
     return backup ? JSON.parse(backup) : [];
   });
+
+  const [appointments, setAppointments] = useState<Appointment[]>(() => {
+    const backup = localStorage.getItem(STORAGE_KEY_APPOINTMENTS);
+    return backup ? JSON.parse(backup) : [];
+  });
+
   const [staffUsers, setStaffUsers] = useState<StaffUser[]>([]);
-  
   const [isLoading, setIsLoading] = useState(false);
   const [isStaffLoaded, setIsStaffLoaded] = useState(false);
-  
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'error' | 'unsaved'>('saved');
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
 
-  // Persist role selection
+  // Persistence to LocalStorage (Safety Fallback)
   useEffect(() => {
-    if (currentUserRole) {
-      localStorage.setItem(STORAGE_KEY_ROLE, currentUserRole);
-    } else {
-      localStorage.removeItem(STORAGE_KEY_ROLE);
-    }
+    localStorage.setItem(STORAGE_KEY_PATIENTS, JSON.stringify(patients));
+    localStorage.setItem(STORAGE_KEY_APPOINTMENTS, JSON.stringify(appointments));
+  }, [patients, appointments]);
+
+  useEffect(() => {
+    if (currentUserRole) localStorage.setItem(STORAGE_KEY_ROLE, currentUserRole);
+    else localStorage.removeItem(STORAGE_KEY_ROLE);
   }, [currentUserRole]);
 
-  // Persist patients to local storage for offline support
-  useEffect(() => {
-    if (patients.length > 0) {
-      localStorage.setItem(STORAGE_KEY_PATIENTS, JSON.stringify(patients));
-    }
-  }, [patients]);
+  const getHospitalId = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    return user?.user_metadata?.hospital_id || MOCK_HOSPITAL_ID;
+  };
 
-  // Load staff data (Shared lookup)
-  useEffect(() => {
-    const loadStaffData = async () => {
-      try {
-        const { data, error } = await supabase
-          .from("app_data")
-          .select("data")
-          .eq("role", SHARED_STAFF_KEY)
-          .maybeSingle();
-        
-        if (!error && data?.data) setStaffUsers(data.data);
-      } catch(e) { 
-        console.error("Staff sync failed", e); 
-      } finally {
-        setIsStaffLoaded(true);
-      }
-    };
-    loadStaffData();
-  }, []);
-
-  // --- SELECT DATA (SCOPED BY HOSPITAL_ID) ---
   const loadData = async () => {
     if (!currentUserRole) return;
     setIsLoading(true);
     setSaveStatus('saving');
 
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const hospitalId = await getHospitalId();
       
-      if (user && user.user_metadata?.hospital_id) {
-        const hospitalId = user.user_metadata.hospital_id;
-        
-        const { data, error } = await supabase
-          .from('himas_data')
-          .select('*')
-          .eq('hospital_id', hospitalId)
-          .order('registeredAt', { ascending: false });
+      const { data: patientsData, error: pErr } = await supabase
+        .from('himas_data')
+        .select('*')
+        .eq('hospital_id', hospitalId)
+        .order('registeredAt', { ascending: false });
 
-        if (error) throw error;
-        
-        if (data) {
-          setPatients(data as Patient[]);
-          setSaveStatus('saved');
-          setLastSavedAt(new Date());
-        }
-      } else {
-        // Fallback to local data if no user session found but role is set (offline mode)
-        console.warn("No active Supabase session. Using local data.");
-        setSaveStatus('unsaved');
-      }
-    } catch (e: any) {
-      console.error("Dashboard Load Error:", e);
-      setSaveStatus('error');
+      const { data: apptData, error: aErr } = await supabase
+        .from('himas_appointments')
+        .select('*')
+        .eq('hospital_id', hospitalId)
+        .order('date', { ascending: true });
+
+      if (!pErr && patientsData && patientsData.length > 0) setPatients(patientsData as Patient[]);
+      if (!aErr && apptData && apptData.length > 0) setAppointments(apptData as Appointment[]);
+
+      setSaveStatus('saved');
+      setLastSavedAt(new Date());
+    } catch (e) {
+      console.warn("Using local data cache (Supabase offline or unconfigured)");
+      setSaveStatus('unsaved');
     } finally {
       setIsLoading(false);
     }
   };
 
-  useEffect(() => {
-    if (currentUserRole) {
-      loadData();
-    }
-  }, [currentUserRole]);
-
-  // Real-time synchronization
-  useEffect(() => {
-    if (!currentUserRole) return;
-
-    let channel: any;
-
-    const setupSubscription = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      const hospitalId = user?.user_metadata?.hospital_id;
-      if (!hospitalId) return;
-
-      channel = supabase
-        .channel(`hospital_realtime_${hospitalId}`)
-        .on('postgres_changes', { 
-          event: '*', 
-          schema: 'public', 
-          table: 'himas_data',
-          filter: `hospital_id=eq.${hospitalId}`
-        }, (payload: any) => {
-            if (payload.eventType === 'INSERT') {
-              setPatients(prev => [payload.new as Patient, ...prev]);
-            } else if (payload.eventType === 'UPDATE') {
-              setPatients(prev => prev.map(p => p.id === payload.new.id ? payload.new as Patient : p));
-            } else if (payload.eventType === 'DELETE') {
-              setPatients(prev => prev.filter(p => p.id !== payload.old.id));
-            }
-            setLastSavedAt(new Date());
-            setSaveStatus('saved');
-        })
-        .subscribe();
-    };
-
-    setupSubscription();
-    return () => { if (channel) supabase.removeChannel(channel); };
-  }, [currentUserRole]);
-
-  // --- INSERT PATIENT ---
   const addPatient = async (patientData: Omit<Patient, 'registeredAt' | 'hospital_id'>) => {
     setSaveStatus('saving');
+    const hospitalId = await getHospitalId();
     const newPatient: Patient = {
       ...patientData as Patient,
+      hospital_id: hospitalId,
       registeredAt: new Date().toISOString()
     };
 
+    // Update Local First
+    setPatients(prev => [newPatient, ...prev]);
+
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      const hospitalId = user?.user_metadata?.hospital_id;
-
-      if (hospitalId) {
-        const { error } = await supabase
-          .from('himas_data')
-          .insert({
-            ...patientData,
-            hospital_id: hospitalId,
-            registeredAt: newPatient.registeredAt
-          });
-
-        if (error) throw error;
-        setSaveStatus('saved');
-      } else {
-        // Mock success for offline/local-only
-        setPatients(prev => [newPatient, ...prev]);
-        setSaveStatus('unsaved');
-      }
+      const { error } = await supabase.from('himas_data').insert(newPatient);
+      if (error) throw error;
+      setSaveStatus('saved');
     } catch (err) {
-      console.error("Registration Error:", err);
-      // Fallback: Add locally anyway
-      setPatients(prev => [newPatient, ...prev]);
-      setSaveStatus('error');
+      console.error("Supabase Save failed, kept in local storage:", err);
+      setSaveStatus('unsaved');
     }
   };
 
-  // --- UPDATE PATIENT ---
   const updatePatient = async (updatedPatient: Patient) => {
     setSaveStatus('saving');
+    setPatients(prev => prev.map(p => p.id === updatedPatient.id ? updatedPatient : p));
+
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      const hospitalId = user?.user_metadata?.hospital_id;
-
-      if (hospitalId) {
-        const { error } = await supabase
-          .from('himas_data')
-          .update(updatedPatient)
-          .eq('id', updatedPatient.id)
-          .eq('hospital_id', hospitalId);
-
-        if (error) throw error;
-        setSaveStatus('saved');
-      } else {
-        setPatients(prev => prev.map(p => p.id === updatedPatient.id ? updatedPatient : p));
-        setSaveStatus('unsaved');
-      }
+      const { error } = await supabase.from('himas_data').update(updatedPatient).eq('id', updatedPatient.id);
+      if (error) throw error;
+      setSaveStatus('saved');
     } catch (err) {
-      console.error("Update Error:", err);
-      setPatients(prev => prev.map(p => p.id === updatedPatient.id ? updatedPatient : p));
-      setSaveStatus('error');
+      setSaveStatus('unsaved');
     }
   };
 
-  // --- DELETE PATIENT ---
   const deletePatient = async (id: string) => {
-    setSaveStatus('saving');
+    setPatients(prev => prev.filter(p => p.id !== id));
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      const hospitalId = user?.user_metadata?.hospital_id;
+      await supabase.from('himas_data').delete().eq('id', id);
+    } catch (e) {}
+  };
 
-      if (hospitalId) {
-        const { error } = await supabase
-          .from('himas_data')
-          .delete()
-          .eq('id', id)
-          .eq('hospital_id', hospitalId);
+  const addAppointment = async (apptData: Omit<Appointment, 'id' | 'createdAt' | 'hospital_id' | 'status'>) => {
+    setSaveStatus('saving');
+    const hospitalId = await getHospitalId();
+    const newAppt = {
+      ...apptData,
+      id: crypto.randomUUID(),
+      hospital_id: hospitalId,
+      status: 'Scheduled',
+      createdAt: new Date().toISOString()
+    };
 
-        if (error) throw error;
-        setSaveStatus('saved');
-      } else {
-        setPatients(prev => prev.filter(p => p.id !== id));
-        setSaveStatus('unsaved');
-      }
+    setAppointments(prev => [...prev, newAppt as Appointment]);
+
+    try {
+      const { error } = await supabase.from('himas_appointments').insert(newAppt);
+      if (error) throw error;
+      setSaveStatus('saved');
     } catch (err) {
-      console.error("Deletion Error:", err);
-      setPatients(prev => prev.filter(p => p.id !== id));
-      setSaveStatus('error');
+      setSaveStatus('unsaved');
     }
+  };
+
+  const updateAppointment = async (updatedAppt: Appointment) => {
+    setAppointments(prev => prev.map(a => a.id === updatedAppt.id ? updatedAppt : a));
+    try {
+      await supabase.from('himas_appointments').update(updatedAppt).eq('id', updatedAppt.id);
+    } catch (e) {}
+  };
+
+  const deleteAppointment = async (id: string) => {
+    setAppointments(prev => prev.filter(a => a.id !== id));
+    try {
+      await supabase.from('himas_appointments').delete().eq('id', id);
+    } catch (e) {}
+  };
+
+  const fetchFilteredPatients = async (filters: PatientFilters, page: number, pageSize: number) => {
+    // For simplicity, we filter the local state for search/pagination
+    let filtered = [...patients];
+    if (filters.searchTerm) {
+      const s = filters.searchTerm.toLowerCase();
+      filtered = filtered.filter(p => p.name.toLowerCase().includes(s) || p.id.toLowerCase().includes(s) || p.mobile.includes(s));
+    }
+    if (filters.condition) filtered = filtered.filter(p => p.condition === filters.condition);
+    
+    const start = page * pageSize;
+    return { data: filtered.slice(start, start + pageSize), count: filtered.length };
   };
 
   const updateDoctorAssessment = async (patientId: string, assessment: DoctorAssessment) => {
     const patient = patients.find(p => p.id === patientId);
-    if (patient) {
-      await updatePatient({ ...patient, doctorAssessment: assessment });
-    }
+    if (patient) await updatePatient({ ...patient, doctorAssessment: assessment });
   };
 
   const updatePackageProposal = async (patientId: string, proposal: PackageProposal) => {
     const patient = patients.find(p => p.id === patientId);
-    if (patient) {
-      await updatePatient({ ...patient, packageProposal: proposal });
-    }
+    if (patient) await updatePatient({ ...patient, packageProposal: proposal });
   };
 
   const registerStaff = (staffData: Omit<StaffUser, 'id' | 'registeredAt'>) => {
-    const newStaff: StaffUser = {
-      ...staffData,
-      id: `USR-${Date.now()}`,
-      registeredAt: new Date().toISOString()
-    };
+    const newStaff: StaffUser = { ...staffData, id: `USR-${Date.now()}`, registeredAt: new Date().toISOString() };
     setStaffUsers(prev => [...prev, newStaff]);
   };
 
-  const getPatientById = (id: string) => patients.find(p => p.id === id);
+  useEffect(() => { if (currentUserRole) loadData(); }, [currentUserRole]);
 
   return (
     <HospitalContext.Provider value={{
-      currentUserRole,
-      setCurrentUserRole,
-      patients,
-      addPatient,
-      updatePatient,
-      deletePatient,
-      updateDoctorAssessment,
-      updatePackageProposal,
-      getPatientById,
-      staffUsers,
-      registerStaff,
-      saveStatus,
-      lastSavedAt,
-      refreshData: loadData,
-      isLoading,
-      isStaffLoaded
+      currentUserRole, setCurrentUserRole, patients, addPatient, updatePatient, deletePatient,
+      updateDoctorAssessment, updatePackageProposal, getPatientById: id => patients.find(p => p.id === id),
+      fetchFilteredPatients, appointments, addAppointment, updateAppointment, deleteAppointment,
+      staffUsers, registerStaff, saveStatus, lastSavedAt, refreshData: loadData, isLoading, isStaffLoaded
     }}>
       {children}
     </HospitalContext.Provider>

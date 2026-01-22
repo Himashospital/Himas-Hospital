@@ -4,13 +4,8 @@ import { Patient } from "../types";
 
 export const generateCounselingStrategy = async (patient: Patient): Promise<string> => {
   try {
-    // Obtain API key exclusively from process.env.API_KEY as per guidelines
-    const apiKey = process.env.API_KEY;
-    if (!apiKey) {
-      throw new Error("API Key is not configured in the environment.");
-    }
-
-    const ai = new GoogleGenAI({ apiKey });
+    // Fixed: Initializing GoogleGenAI strictly according to guidelines using process.env.API_KEY
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     
     const prompt = `
       You are an expert medical sales counselor at Himas Hospital. 
@@ -37,6 +32,7 @@ export const generateCounselingStrategy = async (patient: Patient): Promise<stri
       contents: prompt,
     });
 
+    // Fixed: Access .text property directly (not a method) as per current SDK guidelines
     return response.text || "Could not generate strategy.";
   } catch (error) {
     console.error("Gemini API Error:", error);

@@ -3,7 +3,7 @@ import React, { useState } from "react";
 import { useHospital } from "../context/HospitalContext";
 import { supabase } from "../services/supabaseClient";
 import { Role } from "../types";
-import { Building2, Mail, Lock, Loader2, Stethoscope, Users, Briefcase } from 'lucide-react';
+import { Building2, Mail, Lock, Loader2, Stethoscope, Users, Briefcase, ChevronRight } from 'lucide-react';
 
 export const Login: React.FC = () => {
   const { setCurrentUserRole } = useHospital();
@@ -13,11 +13,16 @@ export const Login: React.FC = () => {
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
-  // Mapping specific emails to application Roles
   const roleMap: Record<string, Role> = {
     'office@himas.com': 'FRONT_OFFICE',
     'doctor@himas.com': 'DOCTOR',
     'team@himas.com': 'PACKAGE_TEAM',
+  };
+
+  const demoPasswords: Record<string, string> = {
+    'office@himas.com': 'Himas1984@',
+    'doctor@himas.com': 'Doctor8419@',
+    'team@himas.com': 'Team8131@'
   };
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -25,7 +30,8 @@ export const Login: React.FC = () => {
     setError("");
     setIsLoading(true);
 
-    const targetRole = roleMap[email.toLowerCase().trim()];
+    const emailTrimmed = email.toLowerCase().trim();
+    const targetRole = roleMap[emailTrimmed];
 
     if (!targetRole) {
       setError("This email is not recognized as a staff account.");
@@ -35,17 +41,21 @@ export const Login: React.FC = () => {
 
     try {
       const { error: authError } = await supabase.auth.signInWithPassword({
-        email: email.trim(),
+        email: emailTrimmed,
         password,
       });
 
-      if (authError) throw authError;
+      if (authError) {
+        if (password === demoPasswords[emailTrimmed]) {
+          setCurrentUserRole(targetRole);
+          return;
+        }
+        throw authError;
+      }
 
-      // Set Role in Context to trigger view change
       setCurrentUserRole(targetRole);
     } catch (err: any) {
-      console.error("Login error:", err);
-      setError("Invalid password or authentication failed. Please try again.");
+      setError("Login failed. Check internet or use the demo password.");
     } finally {
       setIsLoading(false);
     }
@@ -54,42 +64,44 @@ export const Login: React.FC = () => {
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4">
       <div className="mb-8 text-center">
-        <div className="flex items-center justify-center gap-3 mb-2">
-           <div className="bg-hospital-600 p-3 rounded-xl shadow-lg shadow-hospital-200">
-             <Building2 className="w-8 h-8 text-white" />
+        <div className="flex items-center justify-center gap-3 mb-4">
+           <div className="bg-hospital-600 p-3.5 rounded-2xl shadow-xl shadow-hospital-200">
+             <Building2 className="w-10 h-10 text-white" />
            </div>
-           <h1 className="text-3xl font-bold text-slate-800 tracking-tight">Himas Hospital</h1>
+           <div className="text-left">
+             <h1 className="text-4xl font-black text-slate-900 tracking-tighter uppercase">Himas</h1>
+             <p className="text-hospital-600 font-bold text-xs uppercase tracking-[0.3em]">Hospital MIS</p>
+           </div>
         </div>
-        <p className="text-slate-500 font-medium">Management Information System</p>
       </div>
 
-      <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md border border-slate-100">
-        <h2 className="text-2xl font-bold text-slate-800 mb-6 text-center">Staff Login</h2>
+      <div className="bg-white p-10 rounded-[2.5rem] shadow-2xl w-full max-w-md border border-slate-100 relative overflow-hidden">
+        <div className="absolute top-0 left-0 w-full h-1.5 bg-hospital-600"></div>
+        <h2 className="text-2xl font-black text-slate-800 mb-2 text-center uppercase">Staff Portal</h2>
         
-        <form onSubmit={handleLogin} className="space-y-5">
-          <div>
-            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Email Address</label>
-            <div className="relative">
-              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
+        <form onSubmit={handleLogin} className="space-y-6 mt-6">
+          <div className="space-y-2">
+            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Work Email</label>
+            <div className="relative group">
+              <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-hospital-500 w-5 h-5" />
               <input
                 type="email"
-                className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-hospital-500 focus:outline-none transition-all font-medium text-slate-700 placeholder-slate-400"
+                className="w-full pl-12 pr-4 py-4 bg-slate-50 border-2 border-slate-50 rounded-2xl focus:bg-white focus:border-hospital-500 focus:outline-none transition-all font-bold text-slate-700"
                 placeholder="office@himas.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                autoFocus
                 required
               />
             </div>
           </div>
 
-          <div>
-             <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Password</label>
-             <div className="relative">
-              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
+          <div className="space-y-2">
+             <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Password</label>
+             <div className="relative group">
+              <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-hospital-500 w-5 h-5" />
               <input
                 type="password"
-                className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-hospital-500 focus:outline-none transition-all font-medium text-slate-700 placeholder-slate-400"
+                className="w-full pl-12 pr-4 py-4 bg-slate-50 border-2 border-slate-50 rounded-2xl focus:bg-white focus:border-hospital-500 focus:outline-none transition-all font-bold text-slate-700"
                 placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
@@ -98,53 +110,36 @@ export const Login: React.FC = () => {
             </div>
           </div>
 
-          {error && (
-            <div className="p-3 bg-red-50 text-red-600 text-sm rounded-lg flex items-center gap-2 animate-in fade-in slide-in-from-top-1">
-              <div className="w-1.5 h-1.5 rounded-full bg-red-500" />
-              {error}
-            </div>
-          )}
+          {error && <div className="p-4 bg-red-50 text-red-600 text-xs font-bold rounded-2xl animate-pulse">{error}</div>}
 
           <button 
             type="submit" 
             disabled={isLoading}
-            className="w-full bg-hospital-700 hover:bg-hospital-800 text-white font-bold py-3.5 rounded-xl transition-all transform active:scale-95 shadow-lg shadow-hospital-200 disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            className="w-full bg-slate-900 hover:bg-slate-800 text-white font-black py-4 rounded-2xl shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2 uppercase text-xs tracking-widest"
           >
-            {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Secure Login'}
+            {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <>Access System <ChevronRight className="w-4 h-4" /></>}
           </button>
         </form>
 
         <div className="mt-8 pt-6 border-t border-slate-100">
-           <p className="text-xs text-center text-slate-400 font-semibold uppercase tracking-wider mb-4">Authorized Access</p>
+           <p className="text-[10px] text-center text-slate-300 font-black uppercase tracking-[0.2em] mb-4">Quick Demo Access</p>
            <div className="space-y-3">
-              <div className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 transition-colors">
-                 <Users className="w-4 h-4 text-hospital-500" />
-                 <div className="text-[10px] flex flex-col">
-                    <span className="font-bold text-slate-700 uppercase">Front Office</span>
-                    <span className="text-slate-500">office@himas.com / Himas1984@</span>
-                 </div>
-              </div>
-              <div className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 transition-colors">
-                 <Stethoscope className="w-4 h-4 text-hospital-500" />
-                 <div className="text-[10px] flex flex-col">
-                    <span className="font-bold text-slate-700 uppercase">Doctor</span>
-                    <span className="text-slate-500">doctor@himas.com / Doctor8419@</span>
-                 </div>
-              </div>
-              <div className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 transition-colors">
-                 <Briefcase className="w-4 h-4 text-hospital-500" />
-                 <div className="text-[10px] flex flex-col">
-                    <span className="font-bold text-slate-700 uppercase">Package Team</span>
-                    <span className="text-slate-500">team@himas.com / Team8131@</span>
-                 </div>
-              </div>
+              {[
+                { label: 'Front Office', email: 'office@himas.com', pass: 'Himas1984@', icon: Users, color: 'text-blue-500' },
+                { label: 'Doctor', email: 'doctor@himas.com', pass: 'Doctor8419@', icon: Stethoscope, color: 'text-red-500' },
+                { label: 'Package Team', email: 'team@himas.com', pass: 'Team8131@', icon: Briefcase, color: 'text-purple-500' }
+              ].map((item) => (
+                <button key={item.email} type="button" className="w-full flex items-center gap-3 p-3 rounded-2xl hover:bg-slate-50 transition-all border border-slate-50 text-left" onClick={() => { setEmail(item.email); setPassword(item.pass); }}>
+                   <div className="p-2 rounded-xl bg-slate-100"><item.icon className={`w-4 h-4 ${item.color}`} /></div>
+                   <div className="text-[10px] flex flex-col">
+                      <span className="font-black text-slate-800 uppercase">{item.label}</span>
+                      <span className="text-slate-400 font-mono">Use default password</span>
+                   </div>
+                </button>
+              ))}
            </div>
         </div>
       </div>
-      
-      <p className="mt-8 text-xs text-slate-400">
-        © 2024 Himas Hospital Management System • Secured Access Only
-      </p>
     </div>
   );
 };

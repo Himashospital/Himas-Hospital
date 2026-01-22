@@ -1,3 +1,4 @@
+
 export type Role = 'FRONT_OFFICE' | 'DOCTOR' | 'PACKAGE_TEAM' | null;
 
 export enum Gender {
@@ -78,6 +79,20 @@ export interface Patient {
   // Role Specific Data
   doctorAssessment?: DoctorAssessment;
   packageProposal?: PackageProposal;
+}
+
+export interface Appointment {
+  id: string;
+  hospital_id: string;
+  name: string;
+  source: string;
+  condition: Condition;
+  mobile: string;
+  date: string; // YYYY-MM-DD
+  time: string; // HH:mm
+  status: 'Scheduled' | 'Arrived' | 'Cancelled';
+  bookingType: 'Follow Up' | 'OPD';
+  createdAt: string;
 }
 
 export interface StaffUser {
