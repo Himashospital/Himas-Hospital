@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { Patient, DoctorAssessment, PackageProposal, Role, StaffUser, Appointment, Condition, SurgeonCode, PainSeverity, Affordability, ConversionReadiness, ProposalOutcome, Gender } from '../types';
 import { supabase } from '../services/supabaseClient';
@@ -48,7 +49,7 @@ const nullify = (val: any) => {
   return val;
 };
 
-// Map database row to internal Patient type, transforming package_proposal JSON
+// Map database row to internal Patient type
 const mapRowToPatient = (row: any): Patient => {
   const dbProposal = row.package_proposal;
   let uiProposal: PackageProposal | undefined = undefined;
@@ -62,7 +63,6 @@ const mapRowToPatient = (row: any): Patient => {
     }
 
     uiProposal = {
-      // Mappings for optional fields (undefined is acceptable)
       outcome: outcomeStatus || undefined,
       modeOfPayment: dbProposal.paymentMode || undefined,
       surgeryDate: dbProposal.outcomeDate || undefined,
@@ -75,14 +75,8 @@ const mapRowToPatient = (row: any): Patient => {
       lostReason: dbProposal.lostReason || undefined,
       remarks: dbProposal.remarks || undefined,
       postFollowUp: dbProposal.postOpFollowUp || undefined,
-      
-      // Type and structure transformations
       packageAmount: dbProposal.packageAmount != null ? String(dbProposal.packageAmount) : undefined,
-      // FIX: Robustly handle 'equipment' field from DB. It can be an array (old format) or string (new format).
-      equipment: (Array.isArray(dbProposal.equipment) ? (dbProposal.equipment.length > 0 ? 'Included' : 'Excluded') : dbProposal.equipment) || undefined,
-
-
-      // Mappings for non-optional string fields (must default to '' not undefined)
+      equipment: (dbProposal.equipment && Array.isArray(dbProposal.equipment) && dbProposal.equipment.length > 0) ? 'Included' : 'Excluded',
       decisionPattern: dbProposal.decisionPattern || '',
       objectionIdentified: dbProposal.objectionIdentified || '',
       counselingStrategy: dbProposal.counselingStrategy || '',
@@ -150,7 +144,7 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
     try {
       const [
         { data: apptRows, error: apptError },
-        { data: staffData }
+        { data: staffData, error: staffError }
       ] = await Promise.all([
         supabase.from('himas_appointments').select('*').order('created_at', { ascending: false }),
         supabase.from('staff_users').select('*')
@@ -158,28 +152,33 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
 
       if (apptError) throw apptError;
 
-      const allRecords = (apptRows || []).map(row => mapRowToPatient(row));
+      // Patients are strictly Arrived
+      const arrivedPatients = (apptRows || [])
+        .filter((r: any) => r.booking_status === 'Arrived')
+        .map(row => mapRowToPatient(row));
       
-      setPatients(allRecords);
+      setPatients(arrivedPatients);
       
-      const scheduledOnly = (apptRows || [])
-        .filter((r: any) => r.booking_status === 'Scheduled')
+      // Appointments include both 'Scheduled' and 'Follow Up' statuses to prevent items disappearing on change
+      const appointmentLeads = (apptRows || [])
+        .filter((r: any) => ['Scheduled', 'Follow Up'].includes(r.booking_status))
         .map((r: any) => ({
           id: r.id || '',
           hospital_id: r.hospital_id || '',
           name: r.name || '',
           source: r.source || '',
+          sourceDoctorName: r.source_doctor_name || '',
           condition: (r.condition || Condition.Other) as Condition,
           mobile: r.mobile || '',
           date: r.entry_date || '',
           time: r.booking_time || '',
-          status: 'Scheduled',
-          bookingType: r.is_follow_up ? 'Follow Up' : 'OPD',
+          status: r.booking_status || 'Scheduled',
+          bookingType: r.booking_status === 'Follow Up' ? 'Follow Up' : 'Scheduled',
           createdAt: r.created_at || new Date().toISOString()
         }));
-      setAppointments(scheduledOnly as Appointment[]);
+      setAppointments(appointmentLeads as Appointment[]);
 
-      if (staffData) {
+      if (!staffError && staffData) {
         setStaffUsers(staffData);
         setIsStaffLoaded(true);
       }
@@ -216,14 +215,11 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
       };
       
       const { error } = await supabase.from('himas_appointments').insert(dbRecord);
-      if (error) {
-        console.error('Supabase insert error in addPatient:', error);
-        throw error;
-      }
+      if (error) throw error;
       await refreshData();
       setSaveStatus('saved');
     } catch (err) {
-      console.error('Caught exception in addPatient:', err);
+      console.error('Add Patient Error:', err);
       setSaveStatus('error');
     }
   };
@@ -252,13 +248,11 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
           remarks: nullify(uiProposal.remarks),
           postOpFollowUp: nullify(uiProposal.postFollowUp),
           packageAmount: uiProposal.packageAmount ? parseInt(uiProposal.packageAmount.replace(/,/g, ''), 10) : null,
-          // FIX: Standardize equipment to save as a simple string like other inclusion fields.
-          equipment: nullify(uiProposal.equipment),
+          equipment: uiProposal.equipment,
         };
       }
 
       const updateData = {
-        id: patient.id,
         name: patient.name,
         dob: nullify(patient.dob),
         age: patient.age,
@@ -272,7 +266,7 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
         insurance_name: patient.insuranceName,
         source_doctor_name: patient.sourceDoctorName,
         entry_date: nullify(patient.entry_date) || new Date().toISOString().split('T')[0],
-        booking_status: patient.status === 'Scheduled' ? 'Scheduled' : 'Arrived',
+        booking_status: patient.status || 'Arrived',
         package_proposal: dbPackageProposal,
         doctor_assessment: patient.doctorAssessment || null
       };
@@ -282,7 +276,7 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
       await refreshData();
       setSaveStatus('saved');
     } catch (err) {
-      console.error('Caught exception in updatePatient:', err);
+      console.error('Update Patient Error:', err);
       setSaveStatus('error');
     }
   };
@@ -295,7 +289,6 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
       await refreshData();
       setSaveStatus('saved');
     } catch (err) {
-      console.error('Caught exception in deletePatient:', err);
       setSaveStatus('error');
     }
   };
@@ -303,7 +296,6 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
   const convertAppointment = async (appointmentId: string, patientData: Omit<Patient, 'registeredAt' | 'hospital_id'>) => {
     setSaveStatus('saving');
     try {
-        // 1. Create the new patient record. It's the same logic as addPatient.
         const dbRecord = {
             id: patientData.id,
             name: patientData.name,
@@ -324,24 +316,19 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
             hospital_id: 'himas_facility_01'
         };
         
+        // Use a more robust transaction-like approach
         const { error: insertError } = await supabase.from('himas_appointments').insert(dbRecord);
-        if (insertError) {
-            console.error('Supabase insert error in convertAppointment:', insertError);
-            throw insertError;
-        }
+        if (insertError) throw insertError;
 
-        // 2. Delete the original appointment record.
         const { error: deleteError } = await supabase.from('himas_appointments').delete().eq('id', appointmentId);
         if (deleteError) {
-            // This is a critical error to log if it happens.
-            console.error(`CRITICAL: Patient ${dbRecord.id} was created, but original appointment ${appointmentId} was NOT deleted.`, deleteError);
-            // We don't throw, because we still want to refresh the state to show the new patient.
+            console.warn(`Cleanup warning: Old lead ${appointmentId} was not removed, but patient ${dbRecord.id} was created.`);
         }
 
         await refreshData();
         setSaveStatus('saved');
     } catch (err) {
-        console.error('Caught exception in convertAppointment:', err);
+        console.error('Convert Appointment Error:', err);
         setSaveStatus('error');
     }
   };
@@ -353,7 +340,6 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
         if (!patient) throw new Error("Patient not found");
 
         const existingAssessment = patient.doctorAssessment || {};
-        
         const updatedAssessment = {
             ...existingAssessment,
             ...assessmentData,
@@ -369,11 +355,10 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
         await refreshData();
         setSaveStatus('saved');
     } catch (err) {
-        console.error("Error updating assessment:", err);
+        console.error('Update Doctor Assessment Error:', err);
         setSaveStatus('error');
     }
   };
-
 
   const updatePackageProposal = async (patientId: string, proposal: PackageProposal) => {
     const patient = patients.find(p => p.id === patientId);
@@ -390,26 +375,24 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
     setSaveStatus('saving');
     try {
       const dbRecord = {
-        id: `APP-${Math.random().toString(36).substr(2, 5).toUpperCase()}`,
+        id: `APP-${Math.random().toString(36).substring(2, 8).toUpperCase()}`,
         name: appointmentData.name,
         mobile: appointmentData.mobile,
         source: appointmentData.source,
+        source_doctor_name: nullify(appointmentData.sourceDoctorName),
         condition: appointmentData.condition,
         entry_date: nullify(appointmentData.date),
         booking_time: nullify(appointmentData.time),
         is_follow_up: appointmentData.bookingType === 'Follow Up',
-        booking_status: 'Scheduled',
+        booking_status: appointmentData.bookingType || 'Scheduled',
         hospital_id: 'himas_facility_01'
       };
       const { error } = await supabase.from('himas_appointments').insert(dbRecord);
-      if (error) {
-        console.error("Supabase insert error in addAppointment:", error);
-        throw error;
-      }
+      if (error) throw error;
       await refreshData();
       setSaveStatus('saved');
     } catch (err) {
-      console.error("Caught exception in addAppointment:", err);
+      console.error('Add Appointment Error:', err);
       setSaveStatus('error');
     }
   };
@@ -418,20 +401,22 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
     setSaveStatus('saving');
     try {
       const updateData = {
+        name: appointment.name,
+        mobile: appointment.mobile,
+        source: appointment.source,
+        source_doctor_name: nullify(appointment.sourceDoctorName),
+        condition: appointment.condition,
         entry_date: nullify(appointment.date),
         booking_time: nullify(appointment.time),
-        booking_status: appointment.status,
+        booking_status: appointment.bookingType, // Primary status column for appointments
         is_follow_up: appointment.bookingType === 'Follow Up'
       };
       const { error } = await supabase.from('himas_appointments').update(updateData).eq('id', appointment.id);
-      if (error) {
-        console.error("Supabase update error in updateAppointment:", error);
-        throw error;
-      }
+      if (error) throw error;
       await refreshData();
       setSaveStatus('saved');
     } catch (err) {
-      console.error("Caught exception in updateAppointment:", err);
+      console.error('Update Appointment Error:', err);
       setSaveStatus('error');
     }
   };
@@ -440,14 +425,10 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
     setSaveStatus('saving');
     try {
       const { error } = await supabase.from('himas_appointments').delete().eq('id', id);
-      if (error) {
-        console.error("Supabase delete error in deleteAppointment:", error);
-        throw error;
-      }
+      if (error) throw error;
       await refreshData();
       setSaveStatus('saved');
     } catch (err) {
-      console.error("Caught exception in deleteAppointment:", err);
       setSaveStatus('error');
     }
   };
@@ -457,7 +438,7 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
     try {
       const newStaff = { 
         ...staffData, 
-        id: Math.random().toString(36).substr(2, 9), 
+        id: Math.random().toString(36).substring(2, 11), 
         registered_at: new Date().toISOString() 
       };
       const { error } = await supabase.from('staff_users').insert(newStaff);
