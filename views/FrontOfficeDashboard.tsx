@@ -1,5 +1,4 @@
 
-// FIX: Corrected the import of `useState` from `react`.
 import React, { useState } from 'react';
 import { useHospital } from '../context/HospitalContext';
 import { ExportButtons } from '../components/ExportButtons';
@@ -7,61 +6,40 @@ import { Gender, Condition, Patient, Appointment, SurgeonCode } from '../types';
 import { 
   PlusCircle, Search, CheckCircle, ArrowLeft, 
   Calendar, Pencil, Trash2, User, 
-  Phone, X, CalendarCheck, Tag, ChevronLeft,
-  Chrome, MessageCircle, Instagram, Facebook, Youtube, Globe,
-  MoreVertical, ShieldCheck, Clock, ChevronRight, Briefcase, Users as UsersIcon,
-  Share2, History, Filter, FileSpreadsheet, BadgeInfo, UserPlus, FileText,
-  CreditCard, Info, Clock3, Stethoscope
+  Phone, X, CalendarCheck, Tag, Chrome, MessageCircle, Instagram, 
+  Facebook, Youtube, Globe, Clock, Users as UsersIcon,
+  Share2, History, BadgeInfo, FileText, CreditCard, Clock3, Stethoscope
 } from 'lucide-react';
 
 const formatDate = (dateString: string | undefined | null): string => {
   if (!dateString) return '';
-
   const datePart = dateString.split('T')[0];
   const parts = datePart.split('-');
-
   if (parts.length === 3) {
-    // Check for DD-MM-YYYY format and convert
     if (parts[0].length === 2 && parts[2].length === 4) {
       return `${parts[2]}-${parts[1]}-${parts[0]}`;
     }
-    // Assume YYYY-MM-DD if not the above, and return the clean date part
     return datePart;
   }
-  
-  // Fallback for any other format that isn't dash-separated
   return dateString;
 };
 
-// Specific status logic for the detailed "Patients History" tab
 const getHistoryStatus = (p: Patient): string => {
   if (p.packageProposal?.outcome) {
     switch (p.packageProposal.outcome) {
-      case 'Scheduled':
-        return 'Surgery Scheduled';
-      case 'Follow-Up':
-        return 'Package Follow-up';
-      case 'Lost':
-        return 'Surgery Lost';
-      default:
-        return p.packageProposal.outcome;
+      case 'Scheduled': return 'Surgery Scheduled';
+      case 'Follow-Up': return 'Package Follow-up';
+      case 'Lost': return 'Surgery Lost';
+      default: return p.packageProposal.outcome;
     }
   }
   if (p.doctorAssessment) {
-    if (p.doctorAssessment.quickCode === SurgeonCode.M1) {
-      return 'Medication';
-    }
-    if (p.doctorAssessment.quickCode === SurgeonCode.S1) {
-      return 'Surgery';
-    }
+    if (p.doctorAssessment.quickCode === SurgeonCode.M1) return 'Medication';
+    if (p.doctorAssessment.quickCode === SurgeonCode.S1) return 'Surgery';
     return 'Consulted';
   }
-  if (p.visitType === 'Follow Up') {
-    return 'Follow-up';
-  }
-  return 'New OPD';
+  return p.visitType === 'Follow Up' ? 'Follow-up' : 'New OPD';
 };
-
 
 export const FrontOfficeDashboard: React.FC = () => {
   const { 
@@ -87,12 +65,7 @@ export const FrontOfficeDashboard: React.FC = () => {
     status: string;
     type: 'ALL' | 'Registration' | 'Appointment';
   }>({
-    startDate: '',
-    endDate: '',
-    source: '',
-    condition: '',
-    status: '',
-    type: 'ALL'
+    startDate: '', endDate: '', source: '', condition: '', status: '', type: 'ALL'
   });
 
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -124,17 +97,8 @@ export const FrontOfficeDashboard: React.FC = () => {
     { name: "Other", icon: <PlusCircle className="w-4 h-4 text-slate-400" /> }
   ];
 
-  // Status logic for the "OPD History" tab
-  const getPatientStatus = (p: Patient) => {
-    if (p.packageProposal?.outcome) return p.packageProposal.outcome;
-    if (p.doctorAssessment) return 'Consulted';
-    return 'New OPD';
-  };
-  
-  // Styling helper for all status types across tabs
   const getStatusClass = (status?: string): string => {
     if (!status) return 'bg-slate-50 text-slate-400';
-    // History tab statuses
     if (status === 'Surgery Scheduled') return 'bg-emerald-50 text-emerald-600';
     if (status === 'Package Follow-up') return 'bg-blue-50 text-blue-600';
     if (status === 'Surgery Lost') return 'bg-rose-50 text-rose-600';
@@ -143,15 +107,9 @@ export const FrontOfficeDashboard: React.FC = () => {
     if (status === 'Follow-up') return 'bg-cyan-50 text-cyan-600';
     if (status === 'Upcoming Appt') return 'bg-indigo-50 text-indigo-600';
     if (status === 'Lead') return 'bg-slate-100 text-slate-500';
-    
-    // OPD History tab statuses
-    if (status === 'Scheduled') return 'bg-emerald-50 text-emerald-600';
-    if (status === 'Follow-Up') return 'bg-blue-50 text-blue-600';
-
-    // Defaults
+    if (status === 'Scheduled' || status === 'OPD Fixed') return 'bg-emerald-50 text-emerald-600';
     return 'bg-slate-50 text-slate-400';
   };
-
 
   const resetForm = () => {
     setFormData({ 
@@ -166,10 +124,7 @@ export const FrontOfficeDashboard: React.FC = () => {
   };
 
   const resetBookingForm = () => {
-    setBookingData({ 
-      name: '', source: '', condition: undefined, mobile: '', 
-      date: '', time: '', bookingType: undefined 
-    });
+    setBookingData({ name: '', source: '', condition: undefined, mobile: '', date: '', time: '', bookingType: undefined });
   };
 
   const handleEdit = (p: Patient) => {
@@ -180,23 +135,13 @@ export const FrontOfficeDashboard: React.FC = () => {
         sourceDoctorName = sourceDoctorName.replace(notesMatch[0], '').trim();
         sourceDoctorNotes = notesMatch[1];
     }
-    
     let source = p.source || '';
     let sourceOtherDetails = '';
     if (source.startsWith('Other: ')) {
       sourceOtherDetails = source.substring(7);
       source = 'Other';
     }
-
-    setFormData({
-      ...p,
-      source,
-      sourceOtherDetails,
-      visitType: p.visitType || 'OPD',
-      hasInsurance: p.hasInsurance || 'No',
-      sourceDoctorName,
-      sourceDoctorNotes
-    });
+    setFormData({ ...p, source, sourceOtherDetails, visitType: p.visitType || 'OPD', hasInsurance: p.hasInsurance || 'No', sourceDoctorName, sourceDoctorNotes });
     setEditingId(p.id);
     setStep(1);
     setShowForm(true);
@@ -204,18 +149,9 @@ export const FrontOfficeDashboard: React.FC = () => {
 
   const handleArrived = (appt: Appointment) => {
     setFormData({ 
-      id: '', 
-      name: appt.name || '', 
-      dob: '', 
-      gender: undefined, 
-      age: undefined, 
-      mobile: appt.mobile || '', 
-      occupation: '', 
-      hasInsurance: undefined, 
-      insuranceName: '', 
-      source: appt.source || '', 
-      condition: appt.condition,
-      visitType: appt.bookingType || 'OPD'
+      id: '', name: appt.name || '', dob: '', gender: undefined, age: undefined, mobile: appt.mobile || '', 
+      occupation: '', hasInsurance: undefined, insuranceName: '', source: appt.source || '', 
+      condition: appt.condition, visitType: appt.bookingType || 'OPD'
     });
     setEditingId(null);
     setOriginatingAppointmentId(appt.id);
@@ -225,13 +161,9 @@ export const FrontOfficeDashboard: React.FC = () => {
 
   const handleBookingSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!bookingData.name || !bookingData.mobile || !bookingData.date || !bookingData.time) {
-      return alert("Please fill in all mandatory booking fields.");
+    if (!bookingData.name || !bookingData.mobile || !bookingData.date || !bookingData.time || !bookingData.bookingType || !bookingData.source || !bookingData.condition) {
+      return alert("All fields are mandatory for booking.");
     }
-    if (!bookingData.bookingType) return alert("Please select a Visit Type (OPD/Follow Up)");
-    if (!bookingData.source) return alert("Please select an option for 'How did you know?'.");
-    if (!bookingData.condition) return alert("Please select a Condition");
-    
     await addAppointment(bookingData as any);
     setShowBookingForm(false);
     resetBookingForm();
@@ -242,64 +174,35 @@ export const FrontOfficeDashboard: React.FC = () => {
     await updateAppointment(updated);
   };
 
-  const validateStep1 = () => {
-    const { name, age, gender, mobile, occupation, condition, hasInsurance, source, sourceDoctorName, sourceOtherDetails } = formData;
-    if (!name || age == null || !gender || !mobile || !occupation || !condition || !hasInsurance || !source) {
-      alert("All fields are mandatory, and age must be a valid number.");
-      return false;
-    }
-    if (source === 'Doctor Recommend' && !sourceDoctorName) {
-      alert("Please enter the recommending doctor's name.");
-      return false;
-    }
-    if (source === 'Other' && !sourceOtherDetails) {
-      alert("Please specify the other source.");
-      return false;
-    }
-    return true;
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (step === 1 && !editingId) {
-      if (validateStep1()) setStep(2);
+      if (!formData.name || formData.age == null || !formData.gender || !formData.mobile || !formData.occupation || !formData.condition || !formData.hasInsurance || !formData.source) {
+        alert("Please complete all mandatory fields.");
+        return;
+      }
+      setStep(2);
       return;
     }
 
-    if (!formData.id) {
-      alert("Case Number is required.");
-      return;
-    }
+    if (!formData.id) return alert("Case Number is required.");
 
     const dataToSave: Partial<Patient> & { sourceDoctorNotes?: string; sourceOtherDetails?: string } = { ...formData };
-    
     if (dataToSave.source === 'Doctor Recommend' && dataToSave.sourceDoctorName) {
-        dataToSave.sourceDoctorName = dataToSave.sourceDoctorNotes 
-            ? `${dataToSave.sourceDoctorName} (Notes: ${dataToSave.sourceDoctorNotes})`
-            : dataToSave.sourceDoctorName;
-    } else {
-        dataToSave.sourceDoctorName = '';
+        dataToSave.sourceDoctorName = dataToSave.sourceDoctorNotes ? `${dataToSave.sourceDoctorName} (Notes: ${dataToSave.sourceDoctorNotes})` : dataToSave.sourceDoctorName;
     }
-    delete dataToSave.sourceDoctorNotes;
-
     if (dataToSave.source === 'Other' && dataToSave.sourceOtherDetails) {
       dataToSave.source = `Other: ${dataToSave.sourceOtherDetails}`;
     }
-    delete dataToSave.sourceOtherDetails;
 
     if (editingId) {
        const originalPatient = patients.find(p => p.id === editingId);
-       if (originalPatient) {
-         await updatePatient(editingId, { ...originalPatient, ...dataToSave as Patient });
-       }
+       if (originalPatient) await updatePatient(editingId, { ...originalPatient, ...dataToSave as Patient });
     } else {
-      if (patients.some(p => p.id === formData.id)) return alert("File Number already exists in database.");
-      
+      if (patients.some(p => p.id === formData.id)) return alert("File Number already exists.");
       if (originatingAppointmentId) {
-        // Convert appointment using the new atomic function
         await convertAppointment(originatingAppointmentId, dataToSave as any);
       } else {
-        // New walk-in registration
         await addPatient(dataToSave as any);
       }
     }
@@ -307,82 +210,34 @@ export const FrontOfficeDashboard: React.FC = () => {
     resetForm();
   };
 
-  // OPD History: Only display patients with status Arrived (Registered Files)
-  const filteredPatients = patients
-    .filter(p => {
-      if (p.status !== 'Arrived') return false;
+  const filteredPatients = patients.filter(p => {
+    if (p.status !== 'Arrived') return false;
+    if (opdStartDate || opdEndDate) {
+      const pDate = formatDate(p.entry_date);
+      if (opdStartDate && pDate < opdStartDate) return false;
+      if (opdEndDate && pDate > opdEndDate) return false;
+    }
+    const sTerm = searchTerm.toLowerCase();
+    return !sTerm || p.name.toLowerCase().includes(sTerm) || p.id.toLowerCase().includes(sTerm) || p.mobile.includes(sTerm);
+  }).sort((a, b) => (b.entry_date || '').localeCompare(a.entry_date || ''));
 
-      // Date range filter for OPD History
-      if (opdStartDate || opdEndDate) {
-          const patientDate = formatDate(p.entry_date);
-          if (!patientDate) {
-              return false; // Exclude if no date and filter is active
-          }
-
-          if (opdStartDate && patientDate < opdStartDate) {
-              return false;
-          }
-          if (opdEndDate && patientDate > opdEndDate) {
-              return false;
-          }
-      }
-      
-      const sTerm = (searchTerm || '').toLowerCase();
-      if (!sTerm) return true; // Keep if it passed date filter
-
-      const pName = (p.name || '').toLowerCase();
-      const pId = (p.id || '').toLowerCase();
-      const pMobile = p.mobile || '';
-
-      return pName.includes(sTerm) || 
-             pId.includes(sTerm) ||
-             pMobile.includes(sTerm);
-    })
-    .sort((a, b) => (b.entry_date || b.registeredAt).localeCompare(a.entry_date || a.registeredAt));
-
-
-  // Scheduled Appointments: Only display leads with status 'Scheduled'
   const filteredAppointments = appointments.filter(a => {
-    const sTerm = (searchTerm || '').toLowerCase();
-    const aName = (a.name || '').toLowerCase();
-    const aMobile = (a.mobile || '');
-    
-    // Appointments list in context already filters for 'Scheduled'
-    return (!apptDate || a.date === apptDate) &&
-    (aName.includes(sTerm) || aMobile.includes(searchTerm));
-  }).sort((a, b) => ((a.date || '') + (a.time || '')).localeCompare((b.date || '') + (b.time || '')));
+    const sTerm = searchTerm.toLowerCase();
+    return (!apptDate || a.date === apptDate) && (a.name.toLowerCase().includes(sTerm) || a.mobile.includes(sTerm));
+  }).sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
 
   const combinedHistoryData = [
-    ...patients.map(p => ({
-      ...p,
-      recordType: 'Registration' as const,
-      displayDate: p.registeredAt,
-      displayEntryDate: p.entry_date,
-      displayStatus: p.status === 'Arrived' ? getHistoryStatus(p) : 'Lead'
-    })),
-    ...appointments.map(a => ({
-      id: '---', name: a.name, mobile: a.mobile, condition: a.condition, source: a.source,
-      registeredAt: a.createdAt, entry_date: a.date, recordType: 'Appointment' as const,
-      displayDate: a.date + 'T' + (a.time || '00:00') + ':00', displayEntryDate: a.date,
-      displayStatus: 'Upcoming Appt'
-    }))
+    ...patients.map(p => ({ ...p, recordType: 'Registration' as const, displayDate: p.registeredAt, displayEntryDate: p.entry_date, displayStatus: p.status === 'Arrived' ? getHistoryStatus(p) : 'Lead' })),
+    ...appointments.map(a => ({ id: '---', name: a.name, mobile: a.mobile, condition: a.condition, source: a.source, registeredAt: a.createdAt, entry_date: a.date, recordType: 'Appointment' as const, displayDate: a.date + 'T' + (a.time || '00:00') + ':00', displayEntryDate: a.date, displayStatus: 'Upcoming Appt' }))
   ].filter(item => {
-    const sTerm = (searchTerm || '').toLowerCase();
-    const iName = (item.name || '').toLowerCase();
-    const iId = (item.id || '').toLowerCase();
-    const iMobile = item.mobile || '';
-
-    const matchesSearch = iName.includes(sTerm) || 
-                         iId.includes(sTerm) ||
-                         iMobile.includes(searchTerm);
-    if (!matchesSearch) return false;
+    const sTerm = searchTerm.toLowerCase();
+    const matches = item.name.toLowerCase().includes(sTerm) || item.id.toLowerCase().includes(sTerm) || item.mobile.includes(sTerm);
+    if (!matches) return false;
     if (historyFilters.type !== 'ALL' && item.recordType !== historyFilters.type) return false;
     return true;
   }).sort((a, b) => new Date(b.displayDate).getTime() - new Date(a.displayDate).getTime());
 
-  const displayData = activeTab === 'REGISTRATION' ? filteredPatients 
-                   : activeTab === 'APPOINTMENTS' ? filteredAppointments 
-                   : combinedHistoryData;
+  const displayData = activeTab === 'REGISTRATION' ? filteredPatients : activeTab === 'APPOINTMENTS' ? filteredAppointments : combinedHistoryData;
 
   return (
     <div className="space-y-6">
@@ -411,61 +266,19 @@ export const FrontOfficeDashboard: React.FC = () => {
           <div className="flex flex-1 gap-4 items-center w-full">
             <div className="relative flex-1 md:max-w-96">
               <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-              <input 
-                type="text" 
-                placeholder={
-                  activeTab === 'REGISTRATION' ? "Search OPD by name, ID, mobile..." :
-                  activeTab === 'APPOINTMENTS' ? "Search appointments by name, mobile..." :
-                  "Global search by name, ID, mobile..."
-                } 
-                className="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-100 rounded-xl focus:ring-2 focus:ring-hospital-500 outline-none font-medium text-sm" 
-                value={searchTerm} 
-                onChange={e => setSearchTerm(e.target.value)} 
-              />
+              <input type="text" placeholder="Search..." className="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-100 rounded-xl focus:ring-2 focus:ring-hospital-500 outline-none font-medium text-sm" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
             </div>
             {activeTab === 'REGISTRATION' && (
                 <div className="flex items-center gap-2 animate-in fade-in duration-300">
-                    <span className="text-[10px] font-black uppercase text-slate-400 tracking-tight">Start Date</span>
-                    <input 
-                        type="date" 
-                        className="bg-slate-50 border border-slate-100 rounded-xl px-3 py-2 text-xs font-bold outline-none focus:ring-2 focus:ring-hospital-500" 
-                        value={opdStartDate} 
-                        onChange={e => setOpdStartDate(e.target.value)} 
-                    />
-                    <span className="text-[10px] font-black uppercase text-slate-400 tracking-tight">End Date</span>
-                    <input 
-                        type="date" 
-                        className="bg-slate-50 border border-slate-100 rounded-xl px-3 py-2 text-xs font-bold outline-none focus:ring-2 focus:ring-hospital-500" 
-                        value={opdEndDate} 
-                        onChange={e => setOpdEndDate(e.target.value)} 
-                    />
+                    <input type="date" className="bg-slate-50 border border-slate-100 rounded-xl px-3 py-2 text-xs font-bold" value={opdStartDate} onChange={e => setOpdStartDate(e.target.value)} />
+                    <span className="text-[10px] font-black uppercase text-slate-400">TO</span>
+                    <input type="date" className="bg-slate-50 border border-slate-100 rounded-xl px-3 py-2 text-xs font-bold" value={opdEndDate} onChange={e => setOpdEndDate(e.target.value)} />
                 </div>
             )}
             {activeTab === 'APPOINTMENTS' && (
                 <div className="flex items-center gap-2 animate-in fade-in duration-300">
                     <Calendar className="w-4 h-4 text-slate-400" />
-                    <input 
-                        type="date" 
-                        className="bg-slate-50 border border-slate-100 rounded-xl px-3 py-2 text-xs font-bold outline-none focus:ring-2 focus:ring-hospital-500" 
-                        value={apptDate} 
-                        onChange={e => setApptDate(e.target.value)} 
-                    />
-                    <span className="text-[10px] font-black uppercase text-slate-400 tracking-tight whitespace-nowrap">Filter Date</span>
-                </div>
-            )}
-            {activeTab === 'GLOBAL_SEARCH' && (
-                <div className="flex items-center gap-2 bg-slate-100 p-1 rounded-xl animate-in fade-in duration-300">
-                    {(['ALL', 'Registration', 'Appointment'] as const).map(type => (
-                       <button 
-                         key={type}
-                         onClick={() => setHistoryFilters({...historyFilters, type})}
-                         className={`px-4 py-2 text-[10px] font-black uppercase rounded-lg transition-all ${
-                            historyFilters.type === type ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400'
-                         }`}
-                       >
-                         {type}S
-                       </button>
-                    ))}
+                    <input type="date" className="bg-slate-50 border border-slate-100 rounded-xl px-3 py-2 text-xs font-bold" value={apptDate} onChange={e => setApptDate(e.target.value)} />
                 </div>
             )}
           </div>
@@ -485,7 +298,7 @@ export const FrontOfficeDashboard: React.FC = () => {
           <table className="w-full text-left border-collapse">
             <thead className="bg-slate-50 text-slate-500 text-[10px] font-black uppercase tracking-widest border-b">
               <tr>
-                <th className="p-5">{activeTab === 'APPOINTMENTS' ? 'Appt Time' : 'File ID / Reg. Date'}</th>
+                <th className="p-5">{activeTab === 'APPOINTMENTS' ? 'Appt Time' : 'File ID / Date'}</th>
                 <th className="p-5">Patient Details</th>
                 <th className="p-5">Contact</th>
                 <th className="p-5">Complaint</th>
@@ -498,36 +311,17 @@ export const FrontOfficeDashboard: React.FC = () => {
                 <tr key={item.id} className="hover:bg-slate-50/50 transition-colors">
                   <td className="p-5">
                     {activeTab === 'APPOINTMENTS' ? (
-                      <div className="flex items-center gap-2 font-mono font-black text-slate-500">
-                        <Clock className="w-4 h-4 text-hospital-400" />
-                        {item.time}
-                      </div>
+                      <div className="font-mono font-black text-slate-500 flex items-center gap-2"><Clock className="w-4 h-4 text-hospital-400" /> {item.time}</div>
                     ) : (
-                      <div className='flex items-center gap-3'>
-                        {activeTab === 'GLOBAL_SEARCH' && (
-                           item.recordType === 'Registration'
-                             // FIX: Removed invalid `title` prop. Lucide icons do not accept a `title` prop for tooltips.
-                             ? <FileText className="w-4 h-4 text-slate-300" />
-                             // FIX: Removed invalid `title` prop. Lucide icons do not accept a `title` prop for tooltips.
-                             : <Calendar className="w-4 h-4 text-indigo-300" />
-                        )}
-                        <div>
-                          <div className="font-mono font-black text-slate-500">{item.id}</div>
-                          { (item.entry_date || item.displayEntryDate) &&
-                             <div className="text-[10px] text-slate-400 font-medium uppercase mt-1 flex items-center gap-1">
-                                <Calendar className="w-3 h-3" />
-                                {formatDate(item.entry_date || item.displayEntryDate)}
-                             </div>
-                          }
-                        </div>
+                      <div className="flex flex-col">
+                        <span className="font-mono font-black text-slate-500">{item.id}</span>
+                        <span className="text-[10px] text-slate-400 font-bold uppercase mt-1">{formatDate(item.entry_date || item.displayEntryDate)}</span>
                       </div>
                     )}
                   </td>
                   <td className="p-5">
                     <div className="font-bold text-slate-900">{item.name}</div>
-                    <div className="text-[10px] text-slate-500 font-medium uppercase">
-                      {item.age ? `${item.age}Y • ${item.gender}` : item.source}
-                    </div>
+                    <div className="text-[10px] text-slate-500 font-medium uppercase">{item.age ? `${item.age}Y • ${item.gender}` : item.source}</div>
                   </td>
                   <td className="p-5 text-sm font-medium text-slate-600 flex items-center gap-2"><Phone className="w-3 h-3 text-slate-300" /> {item.mobile}</td>
                   <td className="p-5">
@@ -536,333 +330,137 @@ export const FrontOfficeDashboard: React.FC = () => {
                   <td className="p-5">
                     {activeTab === 'APPOINTMENTS' ? (
                       <div className="flex items-center gap-2">
-                         <select 
-                            className={`text-[10px] font-black uppercase px-2 py-1 rounded-lg border focus:ring-2 focus:ring-hospital-500 outline-none transition-all ${
-                              item.bookingType === 'OPD' ? 'bg-blue-50 text-blue-700 border-blue-100' : 'bg-purple-50 text-purple-700 border-purple-100'
-                            }`}
-                            value={item.bookingType || 'OPD'}
-                            onChange={(e) => handleBookingTypeChange(item, e.target.value as any)}
-                         >
-                            <option value="OPD">OPD</option>
-                            <option value="Follow Up">Follow Up</option>
-                         </select>
-                         <span className="text-[8px] text-slate-400 font-black uppercase tracking-widest">{item.status}</span>
+                        <select className="text-[10px] font-black uppercase px-2 py-1 rounded-lg border bg-white" value={item.bookingType || 'OPD'} onChange={(e) => handleBookingTypeChange(item, e.target.value as any)}>
+                          <option value="OPD">OPD</option>
+                          <option value="Follow Up">Follow Up</option>
+                        </select>
+                        <span className="text-[9px] font-black uppercase bg-emerald-50 text-emerald-600 px-2 py-1 rounded-lg">OPD Fixed</span>
                       </div>
                     ) : (
-                      <span className={`text-[9px] font-black uppercase px-2 py-1 rounded-full ${getStatusClass(item.displayStatus || getPatientStatus(item))}`}>
-                        {item.displayStatus || getPatientStatus(item)}
+                      <span className={`text-[9px] font-black uppercase px-2 py-1 rounded-full ${getStatusClass(item.displayStatus || getHistoryStatus(item))}`}>
+                        {item.displayStatus || getHistoryStatus(item)}
                       </span>
                     )}
                   </td>
                   <td className="p-5 text-right">
                     <div className="flex justify-end gap-1">
                       {activeTab === 'APPOINTMENTS' && (
-                        <button onClick={() => handleArrived(item)} className="px-3 py-1 bg-emerald-50 text-emerald-600 rounded-lg text-[10px] font-black uppercase hover:bg-emerald-100 transition-colors mr-2">
-                          Arrived
+                        <button onClick={() => handleArrived(item)} className="px-4 py-2 bg-emerald-500 text-white rounded-xl text-[10px] font-black uppercase hover:bg-emerald-600 shadow-sm flex items-center gap-1">
+                          <CheckCircle className="w-3 h-3" /> Arrived
                         </button>
                       )}
-                      <button onClick={() => handleEdit(item)} className="p-2 text-slate-400 hover:text-blue-600 transition-colors"><Pencil className="w-4 h-4" /></button>
-                      <button onClick={() => deletePatient(item.id)} className="p-2 text-slate-300 hover:text-red-500 transition-colors"><Trash2 className="w-4 h-4" /></button>
+                      <button onClick={() => handleEdit(item)} className="p-2 text-slate-400 hover:text-blue-600"><Pencil className="w-4 h-4" /></button>
+                      <button onClick={() => deletePatient(item.id)} className="p-2 text-slate-300 hover:text-red-500"><Trash2 className="w-4 h-4" /></button>
                     </div>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
-          {displayData.length === 0 && (
-            <div className="p-20 text-center text-slate-300 font-black uppercase tracking-[0.2em] text-xs">
-              No records found for this view
-            </div>
-          )}
         </div>
       </div>
 
-      {/* Appointment Booking Modal */}
       {showBookingForm && (
-        <div className="fixed inset-0 z-[120] bg-slate-900/60 backdrop-blur-xl flex items-center justify-center p-0 md:p-6 animate-in fade-in duration-300">
-          <div className="bg-white w-full max-w-4xl h-full md:h-auto md:max-h-[90vh] md:rounded-[2.5rem] shadow-2xl flex flex-col md:flex-row overflow-hidden border border-white/20">
-            <div className="hidden md:flex w-72 bg-slate-900 text-white p-8 flex-col justify-between relative">
-               <div className="relative z-10">
-                 <h2 className="text-3xl font-black mb-10 leading-tight">Book Appointment</h2>
-                 <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest leading-relaxed">
-                   Schedule patient visits to optimize clinic workflow.
-                 </p>
-               </div>
-               <button onClick={() => setShowBookingForm(false)} className="relative z-10 flex items-center gap-2 text-white/50 font-black uppercase text-[10px] hover:text-white transition-colors">
-                 <ArrowLeft className="w-4 h-4" /> Close
-               </button>
+        <div className="fixed inset-0 z-[120] bg-slate-900/60 backdrop-blur-xl flex items-center justify-center p-6 animate-in fade-in duration-300">
+          <div className="bg-white w-full max-w-4xl rounded-[2.5rem] shadow-2xl overflow-hidden border border-white/20 flex flex-col md:flex-row">
+            <div className="hidden md:flex w-72 bg-slate-900 text-white p-8 flex-col justify-between">
+               <h2 className="text-3xl font-black mb-10 leading-tight">Book Appointment</h2>
+               <button onClick={() => setShowBookingForm(false)} className="flex items-center gap-2 text-white/50 font-black uppercase text-[10px]"><ArrowLeft className="w-4 h-4" /> Close</button>
             </div>
-
-            <div className="flex-1 bg-white flex flex-col overflow-hidden">
-               <header className="p-8 border-b flex justify-between items-center bg-slate-50/50">
-                 <h3 className="text-xl font-black text-slate-800 uppercase tracking-tight">Appointment Details</h3>
-                 <button onClick={() => setShowBookingForm(false)} className="md:hidden p-2 text-slate-400"><X className="w-6 h-6" /></button>
-              </header>
-
-              <div className="flex-1 overflow-y-auto p-10">
-                <form onSubmit={handleBookingSubmit} className="max-w-2xl mx-auto space-y-10">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
+            <div className="flex-1 p-10 bg-white">
+               <form onSubmit={handleBookingSubmit} className="space-y-6">
+                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="md:col-span-2">
-                      <label className="block text-[10px] font-black uppercase text-slate-400 mb-2 tracking-widest">Full Name</label>
-                      <input required className="w-full text-2xl font-black border-b-2 border-slate-100 p-2 outline-none focus:border-hospital-500 transition-all placeholder-slate-200" value={bookingData.name || ''} onChange={e => setBookingData({...bookingData, name: e.target.value})} placeholder="Patient Name" />
+                       <label className="block text-[10px] font-black uppercase text-slate-400 mb-2">Full Name</label>
+                       <input required className="w-full text-2xl font-black border-b-2 border-slate-100 p-2 outline-none focus:border-hospital-500" value={bookingData.name || ''} onChange={e => setBookingData({...bookingData, name: e.target.value})} placeholder="Patient Name" />
                     </div>
-                    <div>
-                      <label className="block text-[10px] font-black uppercase text-slate-400 mb-2 tracking-widest">Mobile Number</label>
-                      <input required type="tel" className="w-full text-xl font-mono border-b-2 border-slate-100 p-2 outline-none focus:border-hospital-500" value={bookingData.mobile || ''} onChange={e => setBookingData({...bookingData, mobile: e.target.value})} placeholder="Phone" />
+                    <input required type="tel" className="w-full text-xl font-mono border-b-2 border-slate-100 p-2 outline-none focus:border-hospital-500" value={bookingData.mobile || ''} onChange={e => setBookingData({...bookingData, mobile: e.target.value})} placeholder="Mobile" />
+                    <select required className="w-full border-b-2 border-slate-100 p-2 outline-none focus:border-hospital-500 text-sm font-bold bg-white" value={bookingData.condition || ''} onChange={e => setBookingData({...bookingData, condition: e.target.value as Condition})}>
+                      <option value="">Condition</option>
+                      {Object.values(Condition).map(c => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                    <input required type="date" className="w-full border-b-2 border-slate-100 p-2 text-sm font-bold" value={bookingData.date || ''} onChange={e => setBookingData({...bookingData, date: e.target.value})} />
+                    <input required type="time" className="w-full border-b-2 border-slate-100 p-2 text-sm font-bold" value={bookingData.time || ''} onChange={e => setBookingData({...bookingData, time: e.target.value})} />
+                    <select required className="w-full border-b-2 border-slate-100 p-2 text-sm font-bold bg-white" value={bookingData.source || ''} onChange={e => setBookingData({...bookingData, source: e.target.value})}>
+                      <option value="">Source</option>
+                      {sourceConfig.map(s => <option key={s.name} value={s.name}>{s.name}</option>)}
+                    </select>
+                    <div className="flex gap-2">
+                      {['OPD', 'Follow Up'].map(type => (
+                        <button key={type} type="button" onClick={() => setBookingData({...bookingData, bookingType: type as any})} className={`flex-1 py-2 rounded-lg border-2 text-[10px] font-black uppercase ${bookingData.bookingType === type ? 'bg-hospital-600 text-white border-hospital-600' : 'bg-white text-slate-400'}`}>{type}</button>
+                      ))}
                     </div>
-                    <div>
-                      <label className="block text-[10px] font-black uppercase text-slate-400 mb-2 tracking-widest">Complaint</label>
-                      <select required className="w-full border-b-2 border-slate-100 p-2 outline-none focus:border-hospital-500 text-sm font-bold bg-white" value={bookingData.condition || ''} onChange={e => setBookingData({...bookingData, condition: e.target.value as Condition})}>
-                        <option value="">Select Condition</option>
-                        {Object.values(Condition).map(c => <option key={c} value={c}>{c}</option>)}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-[10px] font-black uppercase text-slate-400 mb-2 tracking-widest">Appt Date</label>
-                      <div className="relative">
-                        <Calendar className="absolute left-0 top-1/2 -translate-y-1/2 text-slate-300 w-4 h-4" />
-                        <input required type="date" className="w-full pl-8 py-2 border-b-2 border-slate-100 text-sm font-bold outline-none focus:border-hospital-500" value={bookingData.date || ''} onChange={e => setBookingData({...bookingData, date: e.target.value})} />
-                      </div>
-                    </div>
-                    <div>
-                      <label className="block text-[10px] font-black uppercase text-slate-400 mb-2 tracking-widest">Appt Time</label>
-                      <div className="relative">
-                        <Clock3 className="absolute left-0 top-1/2 -translate-y-1/2 text-slate-300 w-4 h-4" />
-                        <input required type="time" className="w-full pl-8 py-2 border-b-2 border-slate-100 text-sm font-bold outline-none focus:border-hospital-500" value={bookingData.time || ''} onChange={e => setBookingData({...bookingData, time: e.target.value})} />
-                      </div>
-                    </div>
-                    <div>
-                      <label className="block text-[10px] font-black uppercase text-slate-400 mb-2 tracking-widest">How did you know?</label>
-                      <select required className="w-full border-b-2 border-slate-100 p-2 outline-none focus:border-hospital-500 text-sm font-bold bg-white" value={bookingData.source || ''} onChange={e => setBookingData({...bookingData, source: e.target.value})}>
-                        <option value="">Select an option...</option>
-                        {sourceConfig.map(s => <option key={s.name} value={s.name}>{s.name}</option>)}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-[10px] font-black uppercase text-slate-400 mb-3 tracking-widest">Booking Type</label>
-                      <div className="flex gap-2">
-                        {['OPD', 'Follow Up'].map(type => (
-                          <button key={type} type="button" onClick={() => setBookingData({...bookingData, bookingType: type as any})} className={`flex-1 py-2 rounded-lg border-2 text-[9px] font-black uppercase transition-all ${bookingData.bookingType === type ? 'bg-hospital-600 text-white border-hospital-600 shadow-md' : 'bg-white text-slate-400 border-slate-100'}`}>{type}</button>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                </form>
-              </div>
-
-              <footer className="p-8 border-t flex justify-end gap-4 bg-slate-50/30">
-                 <button onClick={() => setShowBookingForm(false)} className="px-6 py-3 text-xs font-black uppercase text-slate-400 hover:text-slate-900">Cancel</button>
-                 <button onClick={handleBookingSubmit} className="px-12 py-4 bg-hospital-600 text-white rounded-2xl font-black text-xs uppercase shadow-xl hover:scale-105 transition-all">Create Appointment</button>
-              </footer>
+                 </div>
+                 <button type="submit" className="w-full py-4 bg-hospital-600 text-white rounded-2xl font-black text-xs uppercase shadow-xl hover:scale-105 transition-all">Create Appointment</button>
+               </form>
             </div>
           </div>
         </div>
       )}
 
-      {/* Patient Registration Modal */}
       {showForm && (
-        <div className="fixed inset-0 z-[120] bg-slate-900/60 backdrop-blur-xl flex items-center justify-center p-0 md:p-6 animate-in fade-in duration-300">
-          <div className="bg-white w-full max-w-5xl h-full md:h-[95vh] md:rounded-[2.5rem] shadow-2xl flex flex-col md:flex-row overflow-hidden border border-white/20">
-            <div className="hidden md:flex w-72 bg-slate-900 text-white p-8 flex-col justify-between relative">
-               <div className="relative z-10">
-                 <h2 className="text-3xl font-black mb-10 leading-tight">{editingId || originatingAppointmentId ? 'Update' : 'New'} Record</h2>
-                 <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest leading-relaxed">
-                   Enter patient data carefully to ensure smooth clinical transition.
-                 </p>
-               </div>
-               <button onClick={() => { setShowForm(false); resetForm(); }} className="relative z-10 flex items-center gap-2 text-white/50 font-black uppercase text-[10px] hover:text-white transition-colors">
-                 <ArrowLeft className="w-4 h-4" /> Discard
-               </button>
+        <div className="fixed inset-0 z-[120] bg-slate-900/60 backdrop-blur-xl flex items-center justify-center p-6 animate-in fade-in duration-300">
+          <div className="bg-white w-full max-w-5xl rounded-[2.5rem] shadow-2xl overflow-hidden border border-white/20 flex flex-col md:flex-row">
+            <div className="hidden md:flex w-72 bg-slate-900 text-white p-8 flex-col justify-between">
+               <h2 className="text-3xl font-black mb-10 leading-tight">Patient Registration</h2>
+               <button onClick={() => { setShowForm(false); resetForm(); }} className="flex items-center gap-2 text-white/50 font-black uppercase text-[10px]"><ArrowLeft className="w-4 h-4" /> Discard</button>
             </div>
-
-            <div className="flex-1 bg-white flex flex-col h-full overflow-hidden">
+            <div className="flex-1 bg-white flex flex-col overflow-hidden h-[90vh]">
               <header className="p-8 border-b flex justify-between items-center bg-slate-50/50">
-                 <h3 className="text-xl font-black text-slate-800 uppercase tracking-tight">Registration Step {step}</h3>
+                 <h3 className="text-xl font-black text-slate-800 uppercase tracking-tight">Step {step} of 2</h3>
                  <button onClick={() => setShowForm(false)} className="md:hidden p-2 text-slate-400"><X className="w-6 h-6" /></button>
               </header>
-
               <div className="flex-1 overflow-y-auto p-10">
                 <form onSubmit={handleSubmit} className="max-w-3xl mx-auto space-y-12">
                   {step === 1 ? (
                     <div className="space-y-10">
-                       <section className="space-y-6">
-                         <div className="flex items-center gap-2 text-[10px] font-black uppercase text-hospital-600 tracking-widest mb-4">
-                           <User className="w-4 h-4" /> Personal Information
+                       <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-8">
+                         <div className="md:col-span-2">
+                           <label className="block text-[10px] font-black uppercase text-slate-400 mb-2 tracking-widest">Full Name</label>
+                           <input required className="w-full text-3xl font-black border-b-4 border-slate-100 p-2 outline-none focus:border-hospital-500 transition-all placeholder-slate-200" value={formData.name || ''} onChange={e => setFormData({...formData, name: e.target.value})} placeholder="Patient Name" />
                          </div>
-                         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-8">
-                           <div className="md:col-span-2">
-                             <label className="block text-[10px] font-black uppercase text-slate-400 mb-2 tracking-widest">Full Name</label>
-                             <input required className="w-full text-3xl font-black border-b-4 border-slate-100 p-2 outline-none focus:border-hospital-500 transition-all placeholder-slate-200" value={formData.name || ''} onChange={e => setFormData({...formData, name: e.target.value})} placeholder="Patient Name" />
-                           </div>
-                           <div>
-                             <label className="block text-[10px] font-black uppercase text-slate-400 mb-2 tracking-widest">Age</label>
-                             <input 
-                               type="number" 
-                               required 
-                               className="w-full text-xl font-bold border-b-2 border-slate-100 p-2 outline-none focus:border-hospital-500" 
-                               value={formData.age ?? ''} 
-                               onChange={e => {
-                                 const val = parseInt(e.target.value, 10);
-                                 setFormData({...formData, age: isNaN(val) ? undefined : val });
-                               }}
-                             />
-                           </div>
-                           <div>
-                             <label className="block text-[10px] font-black uppercase text-slate-400 mb-3 tracking-widest">Sex</label>
-                             <div className="flex gap-4">
-                               {Object.values(Gender).map(g => (
-                                 <button key={g} type="button" onClick={() => setFormData({...formData, gender: g as Gender})} className={`flex-1 py-3 rounded-xl border-2 text-[10px] font-black uppercase transition-all ${formData.gender === g ? 'bg-hospital-600 text-white border-hospital-600 shadow-md' : 'bg-white text-slate-400 border-slate-100'}`}>{g}</button>
-                               ))}
-                             </div>
-                           </div>
-                           <div>
-                             <label className="block text-[10px] font-black uppercase text-slate-400 mb-2 tracking-widest">Mobile</label>
-                             <input required type="tel" className="w-full text-xl font-mono border-b-2 border-slate-100 p-2 outline-none focus:border-hospital-500" value={formData.mobile || ''} onChange={e => setFormData({...formData, mobile: e.target.value})} placeholder="Phone Number" />
-                           </div>
-                           <div>
-                             <label className="block text-[10px] font-black uppercase text-slate-400 mb-2 tracking-widest">Occupation</label>
-                             <input required className="w-full text-xl font-bold border-b-2 border-slate-100 p-2 outline-none focus:border-hospital-500" value={formData.occupation || ''} onChange={e => setFormData({...formData, occupation: e.target.value})} placeholder="Occupation" />
+                         <div>
+                           <label className="block text-[10px] font-black uppercase text-slate-400 mb-2 tracking-widest">Age</label>
+                           <input type="number" required className="w-full text-xl font-bold border-b-2 border-slate-100 p-2 outline-none focus:border-hospital-500" value={formData.age ?? ''} onChange={e => setFormData({...formData, age: parseInt(e.target.value, 10) || undefined})} />
+                         </div>
+                         <div>
+                           <label className="block text-[10px] font-black uppercase text-slate-400 mb-3 tracking-widest">Sex</label>
+                           <div className="flex gap-4">
+                             {Object.values(Gender).map(g => (
+                               <button key={g} type="button" onClick={() => setFormData({...formData, gender: g as Gender})} className={`flex-1 py-3 rounded-xl border-2 text-[10px] font-black uppercase transition-all ${formData.gender === g ? 'bg-hospital-600 text-white border-hospital-600 shadow-md' : 'bg-white text-slate-400 border-slate-100'}`}>{g}</button>
+                             ))}
                            </div>
                          </div>
-                       </section>
-
-                       <section className="space-y-6">
-                         <div className="flex items-center gap-2 text-[10px] font-black uppercase text-hospital-600 tracking-widest mb-4">
-                           <BadgeInfo className="w-4 h-4" /> Clinical Context
-                         </div>
-                         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-8">
-                           <div>
-                             <label className="block text-[10px] font-black uppercase text-slate-400 mb-2 tracking-widest">Complaint</label>
-                             <select required className="w-full border-b-2 border-slate-100 p-2 outline-none focus:border-hospital-500 text-sm font-bold bg-white" value={formData.condition || ''} onChange={e => setFormData({...formData, condition: e.target.value as Condition})}>
-                               <option value="">Select Condition</option>
-                               {Object.values(Condition).map(c => <option key={c} value={c}>{c}</option>)}
-                             </select>
-                           </div>
-                         </div>
-                       </section>
-
-                       <section className="space-y-6">
-                         <div className="flex items-center gap-2 text-[10px] font-black uppercase text-hospital-600 tracking-widest mb-4">
-                           <Share2 className="w-4 h-4" /> How did you know?
-                         </div>
-                         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
-                            {sourceConfig.map(src => (
-                              <button
-                                key={src.name}
-                                type="button"
-                                onClick={() => setFormData({...formData, source: src.name})}
-                                className={`flex flex-col items-center justify-center p-4 rounded-2xl border-2 transition-all gap-2 ${
-                                  formData.source === src.name 
-                                    ? 'bg-hospital-50 border-hospital-500 shadow-sm' 
-                                    : 'bg-white border-slate-100 hover:border-slate-200'
-                                }`}
-                              >
-                                {src.icon}
-                                <span className={`text-[8px] font-black uppercase text-center ${formData.source === src.name ? 'text-hospital-700' : 'text-slate-400'}`}>
-                                  {src.name}
-                                </span>
-                              </button>
-                            ))}
-                         </div>
-                         {formData.source === 'Doctor Recommend' && (
-                            <div className="pt-4 mt-4 border-t border-slate-100 space-y-6 animate-in fade-in">
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-8">
-                                    <div>
-                                        <label className="block text-[10px] font-black uppercase text-slate-400 mb-2 tracking-widest">Recommending Doctor's Name</label>
-                                        <input 
-                                            required 
-                                            className="w-full text-xl font-bold border-b-2 border-slate-100 p-2 outline-none focus:border-hospital-500" 
-                                            value={formData.sourceDoctorName || ''} 
-                                            onChange={e => setFormData({...formData, sourceDoctorName: e.target.value})} 
-                                            placeholder="Dr. John Doe" 
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-[10px] font-black uppercase text-slate-400 mb-2 tracking-widest">Notes from Doctor</label>
-                                        <input 
-                                            className="w-full text-xl font-bold border-b-2 border-slate-100 p-2 outline-none focus:border-hospital-500" 
-                                            value={formData.sourceDoctorNotes || ''} 
-                                            onChange={e => setFormData({...formData, sourceDoctorNotes: e.target.value})} 
-                                            placeholder="Optional notes" 
-                                        />
-                                    </div>
-                                </div>
-                            </div>
-                         )}
-                         {formData.source === 'Other' && (
-                            <div className="pt-4 mt-4 border-t border-slate-100 space-y-6 animate-in fade-in">
-                                <div className="grid grid-cols-1">
-                                    <div>
-                                        <label className="block text-[10px] font-black uppercase text-slate-400 mb-2 tracking-widest">Please Specify Other Source</label>
-                                        <input 
-                                            required 
-                                            className="w-full text-xl font-bold border-b-2 border-slate-100 p-2 outline-none focus:border-hospital-500" 
-                                            value={formData.sourceOtherDetails || ''} 
-                                            onChange={e => setFormData({...formData, sourceOtherDetails: e.target.value})} 
-                                            placeholder="e.g. Newspaper Ad" 
-                                        />
-                                    </div>
-                                </div>
-                            </div>
-                         )}
-                       </section>
-
-                       <section className="space-y-6">
-                         <div className="flex items-center gap-2 text-[10px] font-black uppercase text-hospital-600 tracking-widest mb-4">
-                           <CreditCard className="w-4 h-4" /> Insurance Verification
-                         </div>
-                         <div className="bg-slate-50 p-6 rounded-3xl border border-slate-100 space-y-6">
-                           <div>
-                             <label className="block text-[10px] font-black uppercase text-slate-400 mb-3 tracking-widest">Has Insurance?</label>
-                             <div className="flex gap-3">
-                               {['Yes', 'No', 'Not Sure'].map(val => (
-                                 <button
-                                   key={val}
-                                   type="button"
-                                   onClick={() => setFormData({...formData, hasInsurance: val as any})}
-                                   className={`flex-1 py-3 rounded-xl border-2 text-[10px] font-black uppercase transition-all ${
-                                     formData.hasInsurance === val 
-                                       ? 'bg-slate-900 text-white border-slate-900 shadow-lg' 
-                                       : 'bg-white text-slate-400 border-slate-200'
-                                   }`}
-                                 >
-                                   {val}
-                                 </button>
-                               ))}
-                             </div>
-                           </div>
-                           {formData.hasInsurance === 'Yes' && (
-                             <div className="animate-in fade-in slide-in-from-top-2">
-                               <label className="block text-[10px] font-black uppercase text-slate-400 mb-2 tracking-widest">Insurance Provider Name</label>
-                               <input 
-                                 type="text" 
-                                 className="w-full p-4 bg-white border-2 border-slate-200 rounded-2xl text-sm font-bold focus:border-hospital-500 outline-none transition-all"
-                                 placeholder="e.g. TPA Name, Star Health, etc."
-                                 value={formData.insuranceName || ''}
-                                 onChange={e => setFormData({...formData, insuranceName: e.target.value})}
-                               />
-                             </div>
-                           )}
-                         </div>
-                       </section>
+                         <input required type="tel" className="w-full text-xl font-mono border-b-2 border-slate-100 p-2 outline-none focus:border-hospital-500" value={formData.mobile || ''} onChange={e => setFormData({...formData, mobile: e.target.value})} placeholder="Mobile" />
+                         <input required className="w-full text-xl font-bold border-b-2 border-slate-100 p-2 outline-none focus:border-hospital-500" value={formData.occupation || ''} onChange={e => setFormData({...formData, occupation: e.target.value})} placeholder="Occupation" />
+                         <select required className="w-full border-b-2 border-slate-100 p-2 outline-none focus:border-hospital-500 text-sm font-bold bg-white" value={formData.condition || ''} onChange={e => setFormData({...formData, condition: e.target.value as Condition})}>
+                           <option value="">Select Condition</option>
+                           {Object.values(Condition).map(c => <option key={c} value={c}>{c}</option>)}
+                         </select>
+                         <select required className="w-full border-b-2 border-slate-100 p-2 text-sm font-bold bg-white" value={formData.source || ''} onChange={e => setFormData({...formData, source: e.target.value})}>
+                           <option value="">Source</option>
+                           {sourceConfig.map(s => <option key={s.name} value={s.name}>{s.name}</option>)}
+                         </select>
+                         <select required className="w-full border-b-2 border-slate-100 p-2 text-sm font-bold bg-white" value={formData.hasInsurance || 'No'} onChange={e => setFormData({...formData, hasInsurance: e.target.value as any})}>
+                            <option value="No">No Insurance</option>
+                            <option value="Yes">Yes, Has Insurance</option>
+                            <option value="Not Sure">Not Sure</option>
+                         </select>
+                       </div>
                     </div>
                   ) : (
-                    <div className="py-20 flex flex-col items-center space-y-10 animate-in zoom-in-95">
+                    <div className="py-20 flex flex-col items-center space-y-10">
                        <h2 className="text-4xl font-black text-slate-900 uppercase tracking-tighter">Assign Case Number</h2>
-                       <p className="text-slate-400 font-bold text-xs uppercase tracking-widest">This becomes the permanent file identification</p>
-                       <input required className="text-5xl font-mono text-center border-4 border-slate-100 p-10 rounded-[2.5rem] w-full focus:border-hospital-500 outline-none uppercase font-black bg-slate-50/30" value={formData.id || ''} onChange={e => setFormData({...formData, id: e.target.value.toUpperCase().trim()})} placeholder="HMS-000" />
+                       <input required className="text-5xl font-mono text-center border-4 border-slate-100 p-10 rounded-[2.5rem] w-full focus:border-hospital-500 outline-none uppercase font-black" value={formData.id || ''} onChange={e => setFormData({...formData, id: e.target.value.toUpperCase().trim()})} placeholder="HMS-000" />
                     </div>
                   )}
                 </form>
               </div>
-
               <footer className="p-8 border-t flex justify-between items-center bg-slate-50/30">
-                 <button onClick={() => step === 2 ? setStep(1) : setShowForm(false)} className="px-8 py-4 text-xs font-black uppercase text-slate-400 hover:text-slate-900 transition-all">{step === 2 ? 'Back' : 'Cancel'}</button>
-                 {step === 1 ? (
-                   <button onClick={() => { if(validateStep1()) setStep(2); }} className="px-12 py-5 bg-slate-900 text-white rounded-2xl font-black text-xs uppercase shadow-xl hover:scale-105 transition-all">Next Step</button>
-                 ) : (
-                   <button onClick={handleSubmit} className="px-14 py-5 bg-hospital-600 text-white rounded-2xl font-black text-xs uppercase shadow-xl hover:scale-105 transition-all">Save Patient</button>
-                 )}
+                 <button onClick={() => step === 2 ? setStep(1) : setShowForm(false)} className="px-8 py-4 text-xs font-black uppercase text-slate-400">{step === 2 ? 'Back' : 'Cancel'}</button>
+                 <button onClick={handleSubmit} className="px-14 py-5 bg-hospital-600 text-white rounded-2xl font-black text-xs uppercase shadow-xl hover:scale-105 transition-all">
+                    {step === 1 ? 'Next Step' : 'Save Patient'}
+                 </button>
               </footer>
             </div>
           </div>
