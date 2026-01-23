@@ -25,20 +25,27 @@ const formatDate = (dateString: string | undefined | null): string => {
 };
 
 const getHistoryStatus = (p: Patient): string => {
+  // 1. Package Team Outcomes (The Final Stage)
   if (p.packageProposal?.outcome) {
     switch (p.packageProposal.outcome) {
       case 'Scheduled': return 'Surgery Scheduled';
-      case 'Follow-Up': return 'Package Follow-up';
+      case 'Follow-Up': return 'Follow-Up Surgery';
       case 'Lost': return 'Surgery Lost';
-      default: return p.packageProposal.outcome;
     }
   }
+
+  // 2. Doctor Assessment Stage
   if (p.doctorAssessment) {
-    if (p.doctorAssessment.quickCode === SurgeonCode.M1) return 'Medication';
-    if (p.doctorAssessment.quickCode === SurgeonCode.S1) return 'Surgery';
-    return 'Consulted';
+    if (p.doctorAssessment.quickCode === SurgeonCode.S1) return 'Package Proposal';
+    if (p.doctorAssessment.quickCode === SurgeonCode.M1) return 'Medication Done';
+    return 'Doctor Done';
   }
-  return p.visitType === 'Follow Up' ? 'Follow-up' : 'New OPD';
+
+  // 3. Front Office Arrival Stage
+  if (p.status === 'Arrived') return 'Arrived';
+
+  // 4. Appointment/Lead Stage (Fallback)
+  return p.visitType === 'Follow Up' ? 'Follow Up' : 'Scheduled';
 };
 
 export const FrontOfficeDashboard: React.FC = () => {
@@ -100,14 +107,14 @@ export const FrontOfficeDashboard: React.FC = () => {
   const getStatusClass = (status?: string): string => {
     if (!status) return 'bg-slate-50 text-slate-400';
     if (status === 'Surgery Scheduled') return 'bg-emerald-50 text-emerald-600';
-    if (status === 'Package Follow-up') return 'bg-blue-50 text-blue-600';
+    if (status === 'Follow-Up Surgery') return 'bg-blue-50 text-blue-600';
     if (status === 'Surgery Lost') return 'bg-rose-50 text-rose-600';
-    if (status === 'Medication') return 'bg-purple-50 text-purple-600';
-    if (status === 'Surgery') return 'bg-amber-50 text-amber-600';
-    if (status === 'Follow-up' || status === 'Follow Up') return 'bg-cyan-50 text-cyan-600';
-    if (status === 'Upcoming Appt') return 'bg-indigo-50 text-indigo-600';
-    if (status === 'Lead') return 'bg-slate-100 text-slate-500';
-    if (status === 'Scheduled' || status === 'OPD Fixed') return 'bg-emerald-50 text-emerald-600';
+    if (status === 'Medication Done') return 'bg-purple-50 text-purple-600';
+    if (status === 'Package Proposal') return 'bg-amber-50 text-amber-600';
+    if (status === 'Doctor Done') return 'bg-indigo-50 text-indigo-600';
+    if (status === 'Arrived') return 'bg-cyan-50 text-cyan-600';
+    if (status === 'Follow Up') return 'bg-blue-50 text-blue-500';
+    if (status === 'Scheduled') return 'bg-slate-100 text-slate-500';
     return 'bg-slate-50 text-slate-400';
   };
 
@@ -278,11 +285,29 @@ export const FrontOfficeDashboard: React.FC = () => {
   }).sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
 
   const combinedHistoryData = [
-    ...patients.map(p => ({ ...p, recordType: 'Registration' as const, displayDate: p.registeredAt, displayEntryDate: p.entry_date, displayStatus: p.status === 'Arrived' ? getHistoryStatus(p) : 'Lead' })),
-    ...appointments.map(a => ({ id: '---', name: a.name, mobile: a.mobile, condition: a.condition, source: a.source, registeredAt: a.createdAt, entry_date: a.date, recordType: 'Appointment' as const, displayDate: a.date + 'T' + (a.time || '00:00') + ':00', displayEntryDate: a.date, displayStatus: 'Upcoming Appt' }))
+    ...patients.map(p => ({ 
+        ...p, 
+        recordType: 'Registration' as const, 
+        displayDate: p.registeredAt, 
+        displayEntryDate: p.entry_date, 
+        displayStatus: getHistoryStatus(p) 
+    })),
+    ...appointments.map(a => ({ 
+        id: '---', 
+        name: a.name, 
+        mobile: a.mobile, 
+        condition: a.condition, 
+        source: a.source, 
+        registeredAt: a.createdAt, 
+        entry_date: a.date, 
+        recordType: 'Appointment' as const, 
+        displayDate: a.date + 'T' + (a.time || '00:00') + ':00', 
+        displayEntryDate: a.date, 
+        displayStatus: a.bookingType || 'Scheduled'
+    }))
   ].filter(item => {
     const sTerm = searchTerm.toLowerCase();
-    const matches = item.name.toLowerCase().includes(sTerm) || item.id.toLowerCase().includes(sTerm) || item.mobile.includes(sTerm);
+    const matches = item.name.toLowerCase().includes(sTerm) || (item.id && item.id.toLowerCase().includes(sTerm)) || item.mobile.includes(sTerm);
     if (!matches) return false;
     if (historyFilters.type !== 'ALL' && item.recordType !== historyFilters.type) return false;
     return true;
@@ -359,7 +384,7 @@ export const FrontOfficeDashboard: React.FC = () => {
             </thead>
             <tbody className="divide-y divide-slate-100">
               {displayData.map((item: any) => (
-                <tr key={item.id} className="hover:bg-slate-50/50 transition-colors">
+                <tr key={item.id + (item.registeredAt || item.displayDate)} className="hover:bg-slate-50/50 transition-colors">
                   <td className="p-5">
                     {activeTab === 'APPOINTMENTS' ? (
                       <div className="font-mono font-black text-slate-500 flex items-center gap-2"><Clock className="w-4 h-4 text-hospital-400" /> {item.time}</div>
@@ -404,7 +429,9 @@ export const FrontOfficeDashboard: React.FC = () => {
                         </button>
                       )}
                       <button onClick={() => handleEdit(item)} className="p-2 text-slate-400 hover:text-blue-600"><Pencil className="w-4 h-4" /></button>
-                      <button onClick={() => deletePatient(item.id)} className="p-2 text-slate-300 hover:text-red-500"><Trash2 className="w-4 h-4" /></button>
+                      {item.id !== '---' && (
+                        <button onClick={() => deletePatient(item.id)} className="p-2 text-slate-300 hover:text-red-500"><Trash2 className="w-4 h-4" /></button>
+                      )}
                     </div>
                   </td>
                 </tr>
