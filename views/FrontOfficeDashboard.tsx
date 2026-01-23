@@ -118,6 +118,26 @@ export const FrontOfficeDashboard: React.FC = () => {
     return 'bg-slate-50 text-slate-400';
   };
 
+  const calculateVisitType = (item: any, allPatients: Patient[]): 'New' | 'Revisit' => {
+    // If it's an appointment lead, it's not yet a visit in history context
+    if (item.recordType === 'Appointment') return 'New';
+    
+    const patientMobile = item.mobile;
+    if (!patientMobile) return 'New';
+
+    // Find all registered visits (Patient objects) for this mobile
+    const visits = allPatients
+      .filter(p => p.mobile === patientMobile)
+      .sort((a, b) => new Date(a.registeredAt).getTime() - new Date(b.registeredAt).getTime());
+
+    // If this record is the earliest chronologically, it's a 'New' visit.
+    // Otherwise, it's a 'Revisit'.
+    if (visits.length > 0 && visits[0].id === item.id) {
+      return 'New';
+    }
+    return 'Revisit';
+  };
+
   const resetForm = () => {
     setFormData({ 
       id: '', name: '', dob: '', gender: undefined, age: undefined, 
@@ -182,6 +202,19 @@ export const FrontOfficeDashboard: React.FC = () => {
     setOriginatingAppointmentId(appt.id);
     setStep(1);
     setShowForm(true);
+  };
+
+  const handleRevisit = (item: any) => {
+    // If we have a case number, use it; otherwise use mobile or name
+    const idToSearch = (item.id && item.id !== '---') ? item.id : (item.mobile || item.name);
+    setSearchTerm(idToSearch);
+    
+    // Clear registration date filters to ensure the revisit is found regardless of date
+    setOpdStartDate('');
+    setOpdEndDate('');
+    
+    // Redirect to OPD History tab
+    setActiveTab('REGISTRATION');
   };
 
   const handleBookingSubmit = async (e: React.FormEvent) => {
@@ -377,6 +410,7 @@ export const FrontOfficeDashboard: React.FC = () => {
                 <th className="p-5">{activeTab === 'APPOINTMENTS' ? 'Appt Time' : 'File ID / Date'}</th>
                 <th className="p-5">Patient Details</th>
                 <th className="p-5">Contact</th>
+                {(activeTab === 'REGISTRATION' || activeTab === 'GLOBAL_SEARCH') && <th className="p-5">Visit Type</th>}
                 <th className="p-5">Complaint</th>
                 <th className="p-5">Status</th>
                 <th className="p-5 text-right">Actions</th>
@@ -400,6 +434,22 @@ export const FrontOfficeDashboard: React.FC = () => {
                     <div className="text-[10px] text-slate-500 font-medium uppercase">{item.age ? `${item.age}Y • ${item.gender}` : item.source}</div>
                   </td>
                   <td className="p-5 text-sm font-medium text-slate-600 flex items-center gap-2"><Phone className="w-3 h-3 text-slate-300" /> {item.mobile}</td>
+                  {(activeTab === 'REGISTRATION' || activeTab === 'GLOBAL_SEARCH') && (
+                    <td className="p-5">
+                      {(() => {
+                        const visitType = calculateVisitType(item, patients);
+                        return (
+                          <span className={`text-[9px] font-black uppercase px-2 py-1 rounded-lg border ${
+                            visitType === 'New' 
+                              ? 'bg-teal-50 text-teal-700 border-teal-100' 
+                              : 'bg-orange-50 text-orange-700 border-orange-100'
+                          }`}>
+                            {visitType}
+                          </span>
+                        );
+                      })()}
+                    </td>
+                  )}
                   <td className="p-5">
                     <span className="text-[10px] font-black uppercase bg-slate-100 text-slate-600 px-2 py-1 rounded-full">{item.condition}</span>
                   </td>
@@ -423,14 +473,22 @@ export const FrontOfficeDashboard: React.FC = () => {
                   </td>
                   <td className="p-5 text-right">
                     <div className="flex justify-end gap-1">
+                      {activeTab === 'GLOBAL_SEARCH' && (
+                        <button 
+                          onClick={() => handleRevisit(item)} 
+                          className="px-3 py-1.5 bg-indigo-50 text-indigo-600 rounded-lg text-[10px] font-black uppercase hover:bg-indigo-100 transition-colors flex items-center gap-1 shadow-sm border border-indigo-100"
+                        >
+                          <History className="w-3.5 h-3.5" /> Revisit
+                        </button>
+                      )}
                       {activeTab === 'APPOINTMENTS' && (
                         <button onClick={() => handleArrived(item)} className="px-4 py-2 bg-emerald-500 text-white rounded-xl text-[10px] font-black uppercase hover:bg-emerald-600 shadow-sm flex items-center gap-1">
                           <CheckCircle className="w-3 h-3" /> Arrived
                         </button>
                       )}
-                      <button onClick={() => handleEdit(item)} className="p-2 text-slate-400 hover:text-blue-600"><Pencil className="w-4 h-4" /></button>
+                      <button onClick={() => handleEdit(item)} className="p-2 text-slate-400 hover:text-blue-600 transition-colors"><Pencil className="w-4 h-4" /></button>
                       {item.id !== '---' && (
-                        <button onClick={() => deletePatient(item.id)} className="p-2 text-slate-300 hover:text-red-500"><Trash2 className="w-4 h-4" /></button>
+                        <button onClick={() => deletePatient(item.id)} className="p-2 text-slate-300 hover:text-red-500 transition-colors"><Trash2 className="w-4 h-4" /></button>
                       )}
                     </div>
                   </td>
