@@ -1,15 +1,3 @@
-
-
-
-
-
-
-
-
-
-
-
-
 import React, { useState, useEffect } from 'react';
 import { useHospital } from '../context/HospitalContext';
 import { ExportButtons } from '../components/ExportButtons';
@@ -181,7 +169,16 @@ export const PackageTeamDashboard: React.FC = () => {
 
     await updatePackageProposal(selectedPatient.id, updatedProposal);
     setOutcomeModal({ ...outcomeModal, show: false });
-    setSelectedPatient(null);
+
+    // FIX: Improve UX by switching to the correct list after finalizing an outcome.
+    // This prevents the patient from "disappearing" from the UI.
+    if (outcomeModal.type === 'Scheduled') {
+      setListCategory('SCHEDULED');
+    } else if (outcomeModal.type === 'Follow-Up') {
+      setListCategory('FOLLOWUP');
+    } else if (outcomeModal.type === 'Lost') {
+      setListCategory('LOST');
+    }
   };
 
   const handleGenerateAIStrategy = async () => {

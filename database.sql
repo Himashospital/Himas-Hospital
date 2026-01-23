@@ -1,4 +1,25 @@
--- Main consolidated table for all patient and appointment data
+-- =================================================================
+-- HIMAS HOSPITAL MANAGEMENT DATABASE SCHEMA
+-- Version: 2.0 (Consolidated)
+--
+-- ARCHITECTURE OVERVIEW:
+-- This database is designed with two primary tables:
+--
+-- 1. `himas_appointments`: This is the SINGLE CONSOLIDATED TABLE for the entire
+--    patient journey. It stores everything from initial appointment leads,
+--    to registered patient details, doctor assessments, and package proposals.
+--    Using a single table simplifies data management and real-time updates.
+--
+-- 2. `staff_users`: This table is strictly for managing application access.
+--    It is kept separate from patient data for security and to handle
+--    role-based permissions for the different dashboards.
+--
+-- This setup ensures that all patient data is in one place, as requested,
+-- while maintaining a secure and functional login system.
+-- =================================================================
+
+-- Create the single, consolidated table for all patient and appointment data.
+-- This table tracks a patient from a "Scheduled" lead to an "Arrived" patient and beyond.
 CREATE TABLE IF NOT EXISTS public.himas_appointments (
     id TEXT PRIMARY KEY,
     hospital_id TEXT DEFAULT 'himas_facility_01',
@@ -17,14 +38,14 @@ CREATE TABLE IF NOT EXISTS public.himas_appointments (
     entry_date DATE,
     booking_time TIME,
     arrival_time TIME,
-    booking_status TEXT DEFAULT 'Scheduled',
+    booking_status TEXT DEFAULT 'Scheduled', -- Key field to differentiate leads from registered patients
     is_follow_up BOOLEAN DEFAULT FALSE,
     
-    -- Stores all data from the Package & Counseling Team
-    package_proposal JSONB,
-
-    -- Doctor's assessment as a structured JSON object
-    doctor_assessment JSONB
+    -- Doctor's assessment data is stored here as a structured JSON object
+    doctor_assessment JSONB,
+    
+    -- All data from the Package & Counseling Team is stored here
+    package_proposal JSONB
 );
 
 -- Staff Users Table for managing application access
@@ -46,77 +67,32 @@ VALUES
 ('demo-3', 'Package Admin', 'team@himas.com', 'PACKAGE_TEAM', 'Team8131@')
 ON CONFLICT (email) DO NOTHING;
 
--- Enable Row Level Security (RLS) for the tables
+-- =================================================================
+-- ROW LEVEL SECURITY (RLS) CONFIGURATION
+-- This section ensures the application has the correct permissions to read/write data.
+-- =================================================================
+
+-- Step 1: Enable Row Level Security on the tables.
 ALTER TABLE public.himas_appointments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.staff_users ENABLE ROW LEVEL SECURITY;
 
--- Create broad policies to allow access (as per original app structure)
-CREATE POLICY "Allow All Access on Appointments" ON public.himas_appointments FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Allow All Access on Staff" ON public.staff_users FOR ALL USING (true) WITH CHECK (true);
+-- Step 2: Clean up any old policies to ensure a fresh setup.
+DROP POLICY IF EXISTS "Allow Public Access on Appointments" ON public.himas_appointments;
+DROP POLICY IF EXISTS "Allow Public Access on Staff" ON public.staff_users;
 
+-- Step 3: Create permissive policies for the application environment.
+-- This allows the app, using its anonymous key, to perform all necessary operations.
+CREATE POLICY "Allow Public Access on Appointments" 
+ON public.himas_appointments 
+FOR ALL TO public USING (true) WITH CHECK (true);
 
--- =================================================================
--- VIEWS FOR DASHBOARDS
--- =================================================================
-
--- 1. View for Scheduled Appointments (Front Office)
--- Shows all patients who have a booking but haven't arrived yet.
-CREATE OR REPLACE VIEW public.view_scheduled_appointments AS
-SELECT 
-    id,
-    name,
-    mobile,
-    condition,
-    source,
-    entry_date AS appointment_date,
-    booking_time AS appointment_time,
-    is_follow_up,
-    created_at
-FROM public.himas_appointments
-WHERE booking_status = 'Scheduled'
-ORDER BY entry_date ASC, booking_time ASC;
-
--- 2. View for Counseling Dashboard / Package Team (Active Surgery Leads)
--- Shows patients who have arrived and were recommended for surgery, but aren't scheduled/lost yet.
-CREATE OR REPLACE VIEW public.view_counseling_active_leads AS
-SELECT 
-    id,
-    name,
-    age,
-    gender,
-    condition,
-    source,
-    (doctor_assessment->>'quickCode') as doctor_recommendation,
-    (doctor_assessment->>'painSeverity') as pain_level,
-    (doctor_assessment->>'affordability') as affordability,
-    (doctor_assessment->>'conversionReadiness') as readiness,
-    (package_proposal->>'status') as current_counseling_status,
-    (package_proposal->>'packageAmount') as proposed_amount,
-    entry_date as arrival_date
-FROM public.himas_appointments
-WHERE booking_status = 'Arrived'
-  AND doctor_assessment->>'quickCode' = 'S1 - Surgery Recommended'
-  AND (package_proposal->>'status' IS NULL OR package_proposal->>'status' NOT IN ('Surgery Fixed', 'Lost'))
-ORDER BY created_at DESC;
-
--- 3. View for Overall Surgery Conversion Funnel
--- Useful for management to see how many recommendations turn into surgeries.
-CREATE OR REPLACE VIEW public.view_surgery_funnel AS
-SELECT 
-    id,
-    name,
-    condition,
-    doctor_assessment->>'quickCode' as doc_recommendation,
-    COALESCE(package_proposal->>'status', 'Counselling Pending') as current_status,
-    package_proposal->>'packageAmount' as package_value,
-    package_proposal->>'outcomeDate' as surgery_date,
-    package_proposal->>'lostReason' as rejection_reason
-FROM public.himas_appointments
-WHERE doctor_assessment->>'quickCode' = 'S1 - Surgery Recommended';
-
+CREATE POLICY "Allow Public Access on Staff" 
+ON public.staff_users 
+FOR ALL TO public USING (true) WITH CHECK (true);
 
 -- =================================================================
 -- SAMPLE DATA FOR 'himas_appointments'
+-- This section seeds the database with realistic patient data.
 -- =================================================================
 
 INSERT INTO public.himas_appointments (id, name, mobile, age, gender, occupation, source, condition, has_insurance, entry_date, booking_status, booking_time, doctor_assessment, package_proposal)
@@ -225,8 +201,7 @@ ON CONFLICT (id) DO NOTHING;
 
 -- =================================================================
 -- DATABASE TRIGGER FOR DATA INTEGRITY
--- Automatically trims whitespace from the 'id' column before insert
--- to prevent issues with user input errors.
+-- Automatically trims whitespace from the 'id' column before insert.
 -- =================================================================
 CREATE OR REPLACE FUNCTION trim_id_on_insert()
 RETURNS TRIGGER AS $$
