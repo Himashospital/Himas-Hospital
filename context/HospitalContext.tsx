@@ -1,6 +1,6 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { Patient, DoctorAssessment, PackageProposal, Role, StaffUser, Appointment, Condition, SurgeonCode, PainSeverity, Affordability, ConversionReadiness, ProposalOutcome, Gender } from '../types';
+import { Patient, DoctorAssessment, PackageProposal, Role, StaffUser, Appointment, Condition, SurgeonCode, PainSeverity, Affordability, ConversionReadiness, ProposalOutcome, Gender, FullAssessmentPayload } from '../types';
 import { supabase } from '../services/supabaseClient';
 
 interface PatientFilters {
@@ -22,7 +22,7 @@ interface HospitalContextType {
   addPatient: (patientData: Omit<Patient, 'registeredAt' | 'hospital_id'>) => Promise<void>; 
   updatePatient: (targetId: string, patient: Patient) => Promise<void>;
   deletePatient: (id: string) => Promise<void>;
-  updateDoctorAssessment: (patientId: string, assessment: DoctorAssessment) => Promise<void>;
+  updateDoctorAssessment: (patientId: string, payload: FullAssessmentPayload) => Promise<void>;
   updatePackageProposal: (patientId: string, proposal: PackageProposal) => Promise<void>;
   getPatientById: (id: string) => Patient | undefined;
   fetchFilteredPatients: (filters: PatientFilters, page: number, pageSize: number) => Promise<{ data: Patient[], count: number }>;
@@ -68,6 +68,8 @@ const mapRowToPatient = (row: any): Patient => ({
   status: row.booking_status || 'Scheduled',
   doctorAssessment: row.doctor_assessment,
   packageProposal: row.package_proposal,
+  clinicalFindingsNotes: row.clinical_findings_notes,
+  digitalSignature: row.digital_signature,
   sourceTable: 'himas_appointments'
 });
 
@@ -187,7 +189,9 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
         entry_date: nullify(patient.entry_date) || new Date().toISOString().split('T')[0],
         booking_status: patient.status === 'Scheduled' ? 'Scheduled' : 'Arrived',
         doctor_assessment: patient.doctorAssessment,
-        package_proposal: patient.packageProposal
+        package_proposal: patient.packageProposal,
+        clinical_findings_notes: patient.clinicalFindingsNotes,
+        digital_signature: patient.digitalSignature
       };
       
       const { error } = await supabase.from('himas_appointments').update(updateData).eq('id', targetId);
@@ -211,9 +215,16 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
     }
   };
 
-  const updateDoctorAssessment = async (patientId: string, assessment: DoctorAssessment) => {
+  const updateDoctorAssessment = async (patientId: string, payload: FullAssessmentPayload) => {
     const patient = patients.find(p => p.id === patientId);
-    if (patient) await updatePatient(patientId, { ...patient, doctorAssessment: assessment });
+    if (patient) {
+      await updatePatient(patientId, { 
+        ...patient, 
+        doctorAssessment: payload.assessment,
+        clinicalFindingsNotes: payload.notes,
+        digitalSignature: payload.signature,
+      });
+    }
   };
 
   const updatePackageProposal = async (patientId: string, proposal: PackageProposal) => {

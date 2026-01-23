@@ -55,8 +55,8 @@ export const ExportButtons: React.FC<ExportButtonsProps> = ({ patients, role }) 
       'Affordability',
       'Readiness',
       'Surgery Date',
-      'Doctor Signature',
-      'Doctor Note',
+      'Digital Signature',
+      'Clinical Findings & Notes',
       // Package Data
       'Proposal Created', 
       'Decision Pattern',
@@ -86,8 +86,8 @@ export const ExportButtons: React.FC<ExportButtonsProps> = ({ patients, role }) 
       p.doctorAssessment?.affordability || '',
       p.doctorAssessment?.conversionReadiness || '',
       p.doctorAssessment?.tentativeSurgeryDate || '',
-      p.doctorAssessment?.doctorSignature || '',
-      p.doctorAssessment?.doctorNote || '',
+      p.digitalSignature || '',
+      p.clinicalFindingsNotes || '',
 
       // Package
       p.packageProposal ? 'Yes' : 'No',

@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { useHospital } from "../context/HospitalContext";
 import { supabase } from "../services/supabaseClient";
@@ -163,35 +162,6 @@ export const Login: React.FC = () => {
               )}
             </button>
           </form>
-
-          <div className="mt-12">
-             <div className="relative mb-8">
-               <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-slate-100"></div></div>
-               <div className="relative flex justify-center text-[10px] uppercase tracking-[0.3em] font-black text-slate-300">
-                 <span className="bg-white px-4">Demo Profiles</span>
-               </div>
-             </div>
-             
-             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                {[
-                  { label: 'Office', email: 'office@himas.com', pass: 'Himas1984@', icon: Users, color: 'text-emerald-500', bg: 'bg-emerald-50' },
-                  { label: 'Doctor', email: 'doctor@himas.com', pass: 'Doctor8419@', icon: Stethoscope, color: 'text-rose-500', bg: 'bg-rose-50' },
-                  { label: 'Admin', email: 'team@himas.com', pass: 'Team8131@', icon: Briefcase, color: 'text-violet-500', bg: 'bg-violet-50' }
-                ].map((item) => (
-                  <button 
-                    key={item.email} 
-                    type="button" 
-                    className="group flex flex-col items-center gap-2 p-4 rounded-[2rem] hover:bg-slate-50 transition-all border border-slate-50 hover:border-slate-200 hover:-translate-y-1 active:scale-95" 
-                    onClick={() => { setEmail(item.email); setPassword(item.pass); }}
-                  >
-                     <div className={`p-4 rounded-2xl ${item.bg} ${item.color} group-hover:scale-110 transition-transform shadow-sm`}>
-                       <item.icon className="w-5 h-5" />
-                     </div>
-                     <span className="text-[10px] font-black text-slate-800 uppercase tracking-wider">{item.label}</span>
-                  </button>
-                ))}
-             </div>
-          </div>
         </div>
       </div>
       

@@ -48,9 +48,13 @@ export interface DoctorAssessment {
   affordability: Affordability;
   conversionReadiness: ConversionReadiness;
   tentativeSurgeryDate: string; // YYYY-MM-DD
-  doctorSignature: string;
   assessedAt: string;
-  doctorNote?: string;
+}
+
+export interface FullAssessmentPayload {
+  assessment: DoctorAssessment;
+  notes: string;
+  signature: string;
 }
 
 export type ProposalOutcome = 'Scheduled' | 'Follow-Up' | 'Lost';
@@ -100,6 +104,8 @@ export interface Patient {
   // Role Specific Data
   doctorAssessment?: DoctorAssessment;
   packageProposal?: PackageProposal;
+  clinicalFindingsNotes?: string;
+  digitalSignature?: string;
 }
 
 export interface Appointment {

@@ -320,7 +320,7 @@ export const PackageTeamDashboard: React.FC = () => {
                       </div>
                       <div className="text-[10px] text-slate-400 font-bold uppercase tracking-tight flex items-center gap-2">
                         <Stethoscope className="w-3 h-3 text-hospital-400" />
-                        {p.doctorAssessment?.doctorSignature || 'Unassigned Surgeon'}
+                        {p.digitalSignature || 'Unassigned Surgeon'}
                       </div>
                       <div className="mt-2 text-[9px] text-slate-400 font-black uppercase tracking-widest flex items-center gap-2">
                         {p.condition}
@@ -380,7 +380,7 @@ export const PackageTeamDashboard: React.FC = () => {
                          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                             <div className="bg-white p-3 rounded-2xl border border-blue-50 shadow-sm">
                               <div className="text-[7px] font-black text-slate-400 uppercase tracking-widest mb-1">Evaluating Surgeon</div>
-                              <div className="text-[10px] font-black text-blue-700 truncate">{selectedPatient.doctorAssessment?.doctorSignature || 'Not Signed'}</div>
+                              <div className="text-[10px] font-black text-blue-700 truncate">{selectedPatient.digitalSignature || 'Not Signed'}</div>
                             </div>
                             <div className="bg-white p-3 rounded-2xl border border-blue-50 shadow-sm">
                               <div className="text-[7px] font-black text-slate-400 uppercase tracking-widest mb-1">Pain Level</div>
@@ -401,7 +401,7 @@ export const PackageTeamDashboard: React.FC = () => {
                               <FileText className="w-3 h-3" /> Clinical Observation
                             </div>
                             <p className="text-xs font-medium text-slate-700 leading-relaxed italic">
-                              {selectedPatient.doctorAssessment?.doctorNote ? `"${selectedPatient.doctorAssessment.doctorNote}"` : "No specific surgeon notes provided for this evaluation."}
+                              {selectedPatient.clinicalFindingsNotes ? `"${selectedPatient.clinicalFindingsNotes}"` : "No specific surgeon notes provided for this evaluation."}
                             </p>
                          </div>
                       </div>
@@ -537,7 +537,7 @@ export const PackageTeamDashboard: React.FC = () => {
                         <td className="p-5">
                           <div className="flex items-center gap-2 text-sm font-medium text-slate-600">
                             <Stethoscope className="w-4 h-4 text-blue-400" />
-                            {p.doctorAssessment?.doctorSignature || '---'}
+                            {p.digitalSignature || '---'}
                           </div>
                         </td>
                         <td className="p-5">

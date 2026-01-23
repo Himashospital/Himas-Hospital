@@ -1,4 +1,3 @@
-
 -- Consolidated Table Schema based on user image
 CREATE TABLE IF NOT EXISTS public.himas_appointments (
     id TEXT PRIMARY KEY,
@@ -23,7 +22,9 @@ CREATE TABLE IF NOT EXISTS public.himas_appointments (
     booking_status TEXT DEFAULT 'Scheduled',
     booking_time TIME,
     arrival_time TIME,
-    follow_up_control TEXT
+    follow_up_control TEXT,
+    clinical_findings_notes TEXT,
+    digital_signature TEXT
 );
 
 -- Staff Users Table
