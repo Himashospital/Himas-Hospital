@@ -1,5 +1,6 @@
 
 
+
 // FIX: Corrected the import of `useState` from `react`.
 import React, { useState } from 'react';
 import { useHospital } from '../context/HospitalContext';
@@ -70,7 +71,7 @@ export const FrontOfficeDashboard: React.FC = () => {
     appointments, addAppointment, updateAppointment
   } = useHospital();
   
-  const [activeTab, setActiveTab] = useState<'REGISTRATION' | 'APPOINTMENTS' | 'HISTORY'>('REGISTRATION');
+  const [activeTab, setActiveTab] = useState<'REGISTRATION' | 'APPOINTMENTS' | 'GLOBAL_SEARCH'>('REGISTRATION');
   const [showForm, setShowForm] = useState(false);
   const [showBookingForm, setShowBookingForm] = useState(false);
   const [step, setStep] = useState(1);
@@ -80,7 +81,14 @@ export const FrontOfficeDashboard: React.FC = () => {
   const [opdEndDate, setOpdEndDate] = useState('');
   const [apptDate, setApptDate] = useState(new Date().toISOString().split('T')[0]);
 
-  const [historyFilters, setHistoryFilters] = useState({
+  const [historyFilters, setHistoryFilters] = useState<{
+    startDate: string;
+    endDate: string;
+    source: string;
+    condition: string;
+    status: string;
+    type: 'ALL' | 'Registration' | 'Appointment';
+  }>({
     startDate: '',
     endDate: '',
     source: '',
@@ -135,6 +143,8 @@ export const FrontOfficeDashboard: React.FC = () => {
     if (status === 'Medication') return 'bg-purple-50 text-purple-600';
     if (status === 'Surgery') return 'bg-amber-50 text-amber-600';
     if (status === 'Follow-up') return 'bg-cyan-50 text-cyan-600';
+    if (status === 'Upcoming Appt') return 'bg-indigo-50 text-indigo-600';
+    if (status === 'Lead') return 'bg-slate-100 text-slate-500';
     
     // OPD History tab statuses
     if (status === 'Scheduled') return 'bg-emerald-50 text-emerald-600';
@@ -288,12 +298,12 @@ export const FrontOfficeDashboard: React.FC = () => {
       if (patients.some(p => p.id === formData.id)) return alert("File Number already exists in database.");
       
       if (originatingAppointmentId) {
-        await updatePatient(originatingAppointmentId, { 
-          ...dataToSave as Patient,
-          status: 'Arrived',
-          entry_date: new Date().toISOString().split('T')[0]
-        });
+        // Convert appointment: Create a new patient record from form data...
+        await addPatient(dataToSave as any);
+        // ...and delete the old temporary appointment record.
+        await deletePatient(originatingAppointmentId);
       } else {
+        // New walk-in registration
         await addPatient(dataToSave as any);
       }
     }
@@ -385,7 +395,7 @@ export const FrontOfficeDashboard: React.FC = () => {
           <h2 className="text-2xl font-bold text-gray-800 tracking-tight">Front Office</h2>
           <p className="text-gray-500 text-sm">Patient Registration & Management</p>
         </div>
-        <ExportButtons patients={activeTab === 'HISTORY' ? (combinedHistoryData as any) : patients} role="front_office" />
+        <ExportButtons patients={activeTab === 'GLOBAL_SEARCH' ? (combinedHistoryData as any) : patients} role="front_office" />
       </div>
 
       <div className="flex bg-white p-1 rounded-xl border w-fit shadow-sm overflow-x-auto">
@@ -395,8 +405,8 @@ export const FrontOfficeDashboard: React.FC = () => {
         <button onClick={() => setActiveTab('APPOINTMENTS')} className={`px-6 py-2.5 rounded-lg font-bold text-xs transition-all flex items-center gap-2 whitespace-nowrap ${activeTab === 'APPOINTMENTS' ? 'bg-hospital-600 text-white shadow-md' : 'text-gray-500 hover:bg-gray-50'}`}>
           <CalendarCheck className="w-4 h-4" /> Scheduled Appointments
         </button>
-        <button onClick={() => setActiveTab('HISTORY')} className={`px-6 py-2.5 rounded-lg font-bold text-xs transition-all flex items-center gap-2 whitespace-nowrap ${activeTab === 'HISTORY' ? 'bg-hospital-600 text-white shadow-md' : 'text-gray-500 hover:bg-gray-50'}`}>
-          <History className="w-4 h-4" /> Patients History
+        <button onClick={() => setActiveTab('GLOBAL_SEARCH')} className={`px-6 py-2.5 rounded-lg font-bold text-xs transition-all flex items-center gap-2 whitespace-nowrap ${activeTab === 'GLOBAL_SEARCH' ? 'bg-hospital-600 text-white shadow-md' : 'text-gray-500 hover:bg-gray-50'}`}>
+          <Search className="w-4 h-4" /> Global Search
         </button>
       </div>
 
@@ -410,7 +420,7 @@ export const FrontOfficeDashboard: React.FC = () => {
                 placeholder={
                   activeTab === 'REGISTRATION' ? "Search OPD by name, ID, mobile..." :
                   activeTab === 'APPOINTMENTS' ? "Search appointments by name, mobile..." :
-                  "Search history by name, ID, mobile..."
+                  "Global search by name, ID, mobile..."
                 } 
                 className="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-100 rounded-xl focus:ring-2 focus:ring-hospital-500 outline-none font-medium text-sm" 
                 value={searchTerm} 
@@ -445,6 +455,21 @@ export const FrontOfficeDashboard: React.FC = () => {
                         onChange={e => setApptDate(e.target.value)} 
                     />
                     <span className="text-[10px] font-black uppercase text-slate-400 tracking-tight whitespace-nowrap">Filter Date</span>
+                </div>
+            )}
+            {activeTab === 'GLOBAL_SEARCH' && (
+                <div className="flex items-center gap-2 bg-slate-100 p-1 rounded-xl animate-in fade-in duration-300">
+                    {(['ALL', 'Registration', 'Appointment'] as const).map(type => (
+                       <button 
+                         key={type}
+                         onClick={() => setHistoryFilters({...historyFilters, type})}
+                         className={`px-4 py-2 text-[10px] font-black uppercase rounded-lg transition-all ${
+                            historyFilters.type === type ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400'
+                         }`}
+                       >
+                         {type}S
+                       </button>
+                    ))}
                 </div>
             )}
           </div>
@@ -482,14 +507,21 @@ export const FrontOfficeDashboard: React.FC = () => {
                         {item.time}
                       </div>
                     ) : (
-                      <div>
-                        <div className="font-mono font-black text-slate-500">{item.id}</div>
-                        { (item.entry_date || item.displayEntryDate) &&
-                           <div className="text-[10px] text-slate-400 font-medium uppercase mt-1 flex items-center gap-1">
-                              <Calendar className="w-3 h-3" />
-                              {formatDate(item.entry_date || item.displayEntryDate)}
-                           </div>
-                        }
+                      <div className='flex items-center gap-3'>
+                        {activeTab === 'GLOBAL_SEARCH' && (
+                           item.recordType === 'Registration'
+                             ? <FileText className="w-4 h-4 text-slate-300" title="Registration" />
+                             : <Calendar className="w-4 h-4 text-indigo-300" title="Appointment" />
+                        )}
+                        <div>
+                          <div className="font-mono font-black text-slate-500">{item.id}</div>
+                          { (item.entry_date || item.displayEntryDate) &&
+                             <div className="text-[10px] text-slate-400 font-medium uppercase mt-1 flex items-center gap-1">
+                                <Calendar className="w-3 h-3" />
+                                {formatDate(item.entry_date || item.displayEntryDate)}
+                             </div>
+                          }
+                        </div>
                       </div>
                     )}
                   </td>

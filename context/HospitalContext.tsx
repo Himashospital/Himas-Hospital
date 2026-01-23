@@ -48,28 +48,62 @@ const nullify = (val: any) => {
   return val;
 };
 
-// Map database row to internal Patient type using image-specific columns
-const mapRowToPatient = (row: any): Patient => ({
-  id: row.id || '',
-  hospital_id: row.hospital_id || '',
-  name: row.name || '',
-  dob: row.dob || '',
-  gender: (row.gender || Gender.Other) as Gender,
-  age: row.age || 0,
-  mobile: row.mobile || '',
-  occupation: row.occupation || '',
-  hasInsurance: row.has_insurance || 'No',
-  insuranceName: row.insurance_name || '',
-  source: row.source || 'Other',
-  sourceDoctorName: row.source_doctor_name || '',
-  condition: (row.condition || Condition.Other) as Condition,
-  visitType: row.is_follow_up ? 'Follow Up' : 'OPD',
-  registeredAt: row.created_at || new Date().toISOString(),
-  entry_date: row.entry_date || '',
-  status: row.booking_status || 'Scheduled',
-  packageProposal: row.package_proposal,
-  sourceTable: 'himas_appointments'
-});
+// Map database row to internal Patient type, transforming package_proposal JSON
+const mapRowToPatient = (row: any): Patient => {
+  const dbProposal = row.package_proposal;
+  let uiProposal: PackageProposal | undefined = undefined;
+
+  if (dbProposal) {
+    uiProposal = {
+      // Mappings from DB format to UI format
+      outcome: dbProposal.status === 'Surgery Fixed' ? 'Scheduled' : dbProposal.status,
+      modeOfPayment: dbProposal.paymentMode,
+      surgeryDate: dbProposal.outcomeDate,
+      outcomeDate: dbProposal.outcomeDate,
+
+      // Type and structure transformations
+      packageAmount: dbProposal.packageAmount != null ? String(dbProposal.packageAmount) : undefined,
+      equipment: (dbProposal.equipment && Array.isArray(dbProposal.equipment) && dbProposal.equipment.length > 0) ? 'Included' : 'Excluded',
+
+      // Direct mappings
+      roomType: dbProposal.roomType,
+      stayDays: dbProposal.stayDays,
+      icuCharges: dbProposal.icuCharges,
+      followUpDate: dbProposal.followUpDate,
+      decisionPattern: dbProposal.decisionPattern,
+      surgeryMedicines: dbProposal.surgeryMedicines,
+      proposalCreatedAt: dbProposal.proposalCreatedAt,
+      counselingStrategy: dbProposal.counselingStrategy,
+      preOpInvestigation: dbProposal.preOpInvestigation,
+      objectionIdentified: dbProposal.objectionIdentified,
+      lostReason: dbProposal.lostReason,
+      remarks: dbProposal.remarks,
+      postFollowUp: dbProposal.postOpFollowUp,
+    };
+  }
+
+  return {
+    id: row.id || '',
+    hospital_id: row.hospital_id || '',
+    name: row.name || '',
+    dob: row.dob || '',
+    gender: (row.gender || Gender.Other) as Gender,
+    age: row.age || 0,
+    mobile: row.mobile || '',
+    occupation: row.occupation || '',
+    hasInsurance: row.has_insurance || 'No',
+    insuranceName: row.insurance_name || '',
+    source: row.source || 'Other',
+    sourceDoctorName: row.source_doctor_name || '',
+    condition: (row.condition || Condition.Other) as Condition,
+    visitType: row.is_follow_up ? 'Follow Up' : 'OPD',
+    registeredAt: row.created_at || new Date().toISOString(),
+    entry_date: row.entry_date || '',
+    status: row.booking_status || 'Scheduled',
+    packageProposal: uiProposal,
+    sourceTable: 'himas_appointments'
+  };
+};
 
 export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [currentUserRole, setCurrentUserRoleState] = useState<Role>(null);
@@ -124,9 +158,34 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
       });
       
       setPatients(allRecords);
+      
+      const arrivedPatientIdentifiers = new Set<string>();
+      allRecords.forEach(p => {
+        if (p.status === 'Arrived' && p.name && p.mobile) {
+          arrivedPatientIdentifiers.add(`${p.name.toLowerCase()}|${p.mobile}`);
+        }
+      });
 
       const scheduledOnly = (apptRows || [])
-        .filter((r: any) => r.booking_status === 'Scheduled')
+        .filter((r: any) => {
+            // Condition 1: Must be scheduled to even be considered.
+            if (r.booking_status !== 'Scheduled') {
+                return false;
+            }
+
+            // Condition 2: If an appointment is not for a follow-up, check if a patient with the same
+            // name and mobile has already been marked as 'Arrived'. If so, this is a stale appointment
+            // that should be hidden from the 'Scheduled' list.
+            if (!r.is_follow_up) {
+                const identifier = `${(r.name || '').toLowerCase()}|${r.mobile || ''}`;
+                if (arrivedPatientIdentifiers.has(identifier)) {
+                    return false;
+                }
+            }
+            
+            // Show all other scheduled items, including all follow-ups.
+            return true;
+        })
         .map((r: any) => ({
           id: r.id || '',
           hospital_id: r.hospital_id || '',
@@ -190,6 +249,31 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
   const updatePatient = async (targetId: string, patient: Patient) => {
     setSaveStatus('saving');
     try {
+      let dbPackageProposal = null;
+      if (patient.packageProposal) {
+        const uiProposal = patient.packageProposal;
+        dbPackageProposal = {
+          status: uiProposal.outcome ? (uiProposal.outcome === 'Scheduled' ? 'Surgery Fixed' : uiProposal.outcome) : null,
+          paymentMode: nullify(uiProposal.modeOfPayment),
+          outcomeDate: nullify(uiProposal.surgeryDate || uiProposal.outcomeDate),
+          roomType: nullify(uiProposal.roomType),
+          stayDays: nullify(uiProposal.stayDays),
+          icuCharges: nullify(uiProposal.icuCharges),
+          followUpDate: nullify(uiProposal.followUpDate),
+          decisionPattern: nullify(uiProposal.decisionPattern),
+          surgeryMedicines: nullify(uiProposal.surgeryMedicines),
+          proposalCreatedAt: uiProposal.proposalCreatedAt,
+          counselingStrategy: nullify(uiProposal.counselingStrategy),
+          preOpInvestigation: nullify(uiProposal.preOpInvestigation),
+          objectionIdentified: nullify(uiProposal.objectionIdentified),
+          lostReason: nullify(uiProposal.lostReason),
+          remarks: nullify(uiProposal.remarks),
+          postOpFollowUp: nullify(uiProposal.postFollowUp),
+          packageAmount: uiProposal.packageAmount ? parseInt(uiProposal.packageAmount.replace(/,/g, ''), 10) : null,
+          equipment: uiProposal.equipment === 'Included' ? [uiProposal.equipment] : [],
+        };
+      }
+
       const updateData = {
         id: patient.id,
         name: patient.name,
@@ -205,7 +289,7 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
         source_doctor_name: patient.sourceDoctorName,
         entry_date: nullify(patient.entry_date) || new Date().toISOString().split('T')[0],
         booking_status: patient.status === 'Scheduled' ? 'Scheduled' : 'Arrived',
-        package_proposal: patient.packageProposal,
+        package_proposal: dbPackageProposal,
       };
       
       const { error } = await supabase.from('himas_appointments').update(updateData).eq('id', targetId);

@@ -72,7 +72,8 @@ export interface PackageProposal {
   equipment?: 'Included' | 'Excluded';
   icuCharges?: 'Included' | 'Excluded';
   roomType?: 'Private' | 'Deluxe' | 'Semi';
-  postFollowUp?: 'None' | 'Single' | 'Double';
+  stayDays?: number;
+  postFollowUp?: 'None' | 'Single' | 'Double' | 'Excluded';
   surgeryDate?: string;
   remarks?: string;
   outcome?: ProposalOutcome;

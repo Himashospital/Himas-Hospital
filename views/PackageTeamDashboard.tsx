@@ -65,6 +65,7 @@ export const PackageTeamDashboard: React.FC = () => {
     equipment: undefined,
     icuCharges: undefined,
     roomType: undefined,
+    stayDays: undefined,
     postFollowUp: undefined,
     surgeryDate: '',
     remarks: '',
@@ -126,6 +127,7 @@ export const PackageTeamDashboard: React.FC = () => {
         equipment: undefined,
         icuCharges: undefined,
         roomType: undefined,
+        stayDays: undefined,
         postFollowUp: undefined,
         surgeryDate: '',
         remarks: '',
@@ -177,7 +179,7 @@ export const PackageTeamDashboard: React.FC = () => {
     if (selectedPatient) {
       updatePackageProposal(selectedPatient.id, {
         ...proposal as PackageProposal,
-        proposalCreatedAt: new Date().toISOString()
+        proposalCreatedAt: proposal.proposalCreatedAt || new Date().toISOString()
       });
       alert("Basic proposal details saved.");
     }
@@ -208,7 +210,7 @@ export const PackageTeamDashboard: React.FC = () => {
   const ToggleButton = ({ label, value, current, onClick }: { label: string, value: string, current: string | undefined, onClick: (v: any) => void }) => (
     <button
       type="button"
-      onClick={() => onClick(value)}
+      onClick={() => onClick(current === 'Included' ? 'Excluded' : 'Included')}
       className={`flex-1 py-2 text-[10px] font-black uppercase rounded-lg border transition-all ${
         current === value 
           ? 'bg-hospital-600 text-white border-hospital-600 shadow-sm' 
@@ -430,8 +432,8 @@ export const PackageTeamDashboard: React.FC = () => {
                          <div className="flex items-center gap-2 text-[10px] font-black uppercase text-hospital-600 tracking-[0.2em]">
                            <Banknote className="w-4 h-4" /> Package & Financials
                          </div>
-                         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                           <div>
+                         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                           <div className="md:col-span-1">
                               <label className="block text-[10px] font-black uppercase text-slate-400 mb-3 tracking-widest">Mode of Payment</label>
                               <div className="flex flex-wrap gap-2">
                                  {['Cash', 'Insurance', 'Partly', 'Insurance Approved'].map(mode => (
@@ -439,11 +441,18 @@ export const PackageTeamDashboard: React.FC = () => {
                                  ))}
                               </div>
                            </div>
-                           <div>
+                           <div className="md:col-span-1">
                               <label className="block text-[10px] font-black uppercase text-slate-400 mb-3 tracking-widest">Package Amount (₹)</label>
                               <div className="relative">
                                  <Banknote className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 w-4 h-4" />
                                  <input type="text" placeholder="e.g. 45,000" className="w-full pl-12 pr-4 py-3 bg-slate-50 border-2 border-transparent rounded-xl text-sm font-black focus:bg-white focus:border-hospital-500 outline-none transition-all" value={proposal.packageAmount} onChange={e => setProposal({...proposal, packageAmount: e.target.value})} />
+                              </div>
+                           </div>
+                            <div className="md:col-span-1">
+                              <label className="block text-[10px] font-black uppercase text-slate-400 mb-3 tracking-widest">Stay (Days)</label>
+                              <div className="relative">
+                                 <Bed className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 w-4 h-4" />
+                                 <input type="number" placeholder="e.g. 2" className="w-full pl-12 pr-4 py-3 bg-slate-50 border-2 border-transparent rounded-xl text-sm font-black focus:bg-white focus:border-hospital-500 outline-none transition-all" value={proposal.stayDays || ''} onChange={e => setProposal({...proposal, stayDays: e.target.value ? parseInt(e.target.value, 10) : undefined})} />
                               </div>
                            </div>
                          </div>
