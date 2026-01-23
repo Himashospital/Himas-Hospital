@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useHospital } from '../context/HospitalContext';
 import { ExportButtons } from '../components/ExportButtons';
@@ -239,6 +240,36 @@ export const PackageTeamDashboard: React.FC = () => {
     </button>
   );
 
+  const getStatusBadge = (p: Patient) => {
+    const outcome = p.packageProposal?.outcome;
+    if (outcome === 'Scheduled') {
+      return {
+        text: 'Surgery Scheduled',
+        classes: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+        icon: <CheckCircle2 className="w-4 h-4" />
+      };
+    }
+    if (outcome === 'Follow-Up') {
+      return {
+        text: 'Follow-Up Surgery',
+        classes: 'bg-blue-50 text-blue-700 border-blue-200',
+        icon: <Clock className="w-4 h-4" />
+      };
+    }
+    if (outcome === 'Lost') {
+      return {
+        text: 'Surgery Lost',
+        classes: 'bg-rose-50 text-rose-700 border-rose-200',
+        icon: <X className="w-4 h-4" />
+      };
+    }
+    return {
+      text: 'Package Proposal Pending',
+      classes: 'bg-amber-50 text-amber-700 border-amber-200',
+      icon: <AlertTriangle className="w-4 h-4" />
+    };
+  };
+
   return (
     <div className="space-y-6">
       {/* Header & Tabs */}
@@ -393,11 +424,27 @@ export const PackageTeamDashboard: React.FC = () => {
                             <span className="flex items-center gap-1.5"><Share2 className="w-3 h-3" /> {selectedPatient.source}</span>
                           </div>
                         </div>
-                        <div className="text-right">
-                          <div className="text-[10px] text-slate-400 font-black uppercase tracking-widest mb-1.5">Lead Priority</div>
-                          <div className="bg-white border-2 border-slate-100 px-4 py-1.5 rounded-xl shadow-sm inline-flex items-center gap-2">
-                            <Activity className="w-4 h-4 text-hospital-600" />
-                            <span className="font-black text-slate-800 text-xs uppercase">{selectedPatient.doctorAssessment?.conversionReadiness || 'LEAD'}</span>
+                        <div className="text-right flex flex-col items-end gap-3">
+                          {/* NEW: Counseling Status Badge */}
+                          <div className="flex flex-col items-end">
+                            <div className="text-[9px] text-slate-400 font-black uppercase tracking-[0.2em] mb-1.5">Counseling Status</div>
+                            {(() => {
+                              const badge = getStatusBadge(selectedPatient);
+                              return (
+                                <div className={`px-4 py-1.5 rounded-xl border-2 shadow-sm inline-flex items-center gap-2 ${badge.classes}`}>
+                                  {badge.icon}
+                                  <span className="font-black text-[10px] uppercase">{badge.text}</span>
+                                </div>
+                              );
+                            })()}
+                          </div>
+
+                          <div className="flex flex-col items-end">
+                            <div className="text-[9px] text-slate-400 font-black uppercase tracking-[0.2em] mb-1.5">Lead Priority</div>
+                            <div className="bg-white border-2 border-slate-100 px-4 py-1.5 rounded-xl shadow-sm inline-flex items-center gap-2">
+                              <Activity className="w-4 h-4 text-hospital-600" />
+                              <span className="font-black text-slate-800 text-[10px] uppercase">{selectedPatient.doctorAssessment?.conversionReadiness || 'LEAD'}</span>
+                            </div>
                           </div>
                         </div>
                       </div>

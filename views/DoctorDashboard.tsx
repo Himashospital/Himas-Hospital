@@ -1,5 +1,4 @@
 
-
 import React, { useState, useEffect } from 'react';
 import { useHospital } from '../context/HospitalContext';
 import { SurgeonCode, PainSeverity, Affordability, ConversionReadiness, Patient, DoctorAssessment } from '../types';
@@ -55,7 +54,11 @@ export const DoctorDashboard: React.FC = () => {
     setSelectedPatient(null);
   };
 
-  const allPatients = [...patients].sort((a, b) => new Date(b.registeredAt).getTime() - new Date(a.registeredAt).getTime());
+  // Doctors directory should only show Arrived patients OR those they've already assessed.
+  const allPatients = [...patients]
+    .filter(p => p.status === 'Arrived' || p.doctorAssessment !== undefined)
+    .sort((a, b) => new Date(b.registeredAt).getTime() - new Date(a.registeredAt).getTime());
+    
   const isSurgery = formState.quickCode === SurgeonCode.S1;
 
   return (

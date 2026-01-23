@@ -152,16 +152,25 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
 
       if (apptError) throw apptError;
 
-      // Patients are strictly Arrived
-      const arrivedPatients = (apptRows || [])
-        .filter((r: any) => r.booking_status === 'Arrived')
+      // Patients list: Include all who have Arrived, OR have been Assessed, OR have a Proposal.
+      // This ensures the Package Team sees the full counseling journey from the single table.
+      const consolidatedPatients = (apptRows || [])
+        .filter((r: any) => 
+          r.booking_status === 'Arrived' || 
+          r.doctor_assessment !== null || 
+          r.package_proposal !== null
+        )
         .map(row => mapRowToPatient(row));
       
-      setPatients(arrivedPatients);
+      setPatients(consolidatedPatients);
       
-      // Appointments include both 'Scheduled' and 'Follow Up' statuses to prevent items disappearing on change
+      // Appointment Leads: Strictly Scheduled or Follow Up leads that HAVEN'T been assessed yet.
       const appointmentLeads = (apptRows || [])
-        .filter((r: any) => ['Scheduled', 'Follow Up'].includes(r.booking_status))
+        .filter((r: any) => 
+          ['Scheduled', 'Follow Up'].includes(r.booking_status) && 
+          r.doctor_assessment === null &&
+          r.package_proposal === null
+        )
         .map((r: any) => ({
           id: r.id || '',
           hospital_id: r.hospital_id || '',
@@ -268,6 +277,7 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
         entry_date: nullify(patient.entry_date) || new Date().toISOString().split('T')[0],
         booking_status: patient.status || 'Arrived',
         package_proposal: dbPackageProposal,
+        // Fixed: Use camelCase 'doctorAssessment' as defined in types.ts. Removed invalid 'doctor_assessment' property access.
         doctor_assessment: patient.doctorAssessment || null
       };
       
