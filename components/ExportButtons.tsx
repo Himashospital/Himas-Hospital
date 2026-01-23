@@ -1,4 +1,5 @@
 
+
 import React, { useState } from 'react';
 import { Download, Printer, Calendar as CalendarIcon, X, FileSpreadsheet } from 'lucide-react';
 import { Patient } from '../types';
@@ -103,12 +104,12 @@ export const ExportButtons: React.FC<ExportButtonsProps> = ({ patients, role }) 
       
       // Doctor
       p.doctorAssessment ? 'Yes' : 'No',
-      p.doctorAssessment?.quick_code || '',
-      p.doctorAssessment?.pain_severity || '',
+      p.doctorAssessment?.quickCode || '',
+      p.doctorAssessment?.painSeverity || '',
       p.doctorAssessment?.affordability || '',
-      p.doctorAssessment?.conversion_readiness || '',
-      formatDate(p.doctorAssessment?.tentative_surgery_date),
-      p.doctorAssessment?.doctor_signature || '',
+      p.doctorAssessment?.conversionReadiness || '',
+      formatDate(p.doctorAssessment?.tentativeSurgeryDate),
+      p.doctorAssessment?.doctorSignature || '',
       p.doctorAssessment?.notes || '',
 
       // Package

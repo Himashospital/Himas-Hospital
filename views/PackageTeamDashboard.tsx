@@ -1,5 +1,16 @@
 
-import React, { useState } from 'react';
+
+
+
+
+
+
+
+
+
+
+
+import React, { useState, useEffect } from 'react';
 import { useHospital } from '../context/HospitalContext';
 import { ExportButtons } from '../components/ExportButtons';
 import { generateCounselingStrategy } from '../services/geminiService';
@@ -53,7 +64,7 @@ export const PackageTeamDashboard: React.FC = () => {
     reason: ''
   });
 
-  const [proposal, setProposal] = useState<Partial<PackageProposal>>({
+  const initialProposalState: Partial<PackageProposal> = {
     decisionPattern: 'Standard',
     objectionIdentified: '',
     counselingStrategy: '',
@@ -72,7 +83,35 @@ export const PackageTeamDashboard: React.FC = () => {
     outcome: undefined,
     outcomeDate: '',
     lostReason: ''
-  });
+  };
+
+  const [proposal, setProposal] = useState<Partial<PackageProposal>>(initialProposalState);
+
+  // --- State Synchronization Effects ---
+  useEffect(() => {
+    // This effect keeps the selectedPatient object in sync with the master list.
+    // When the `patients` array updates after a save, this finds the fresh data.
+    if (selectedPatient?.id) {
+      const freshPatient = patients.find(p => p.id === selectedPatient.id);
+      if (freshPatient) {
+        // Avoid re-render if object is identical
+        if (JSON.stringify(freshPatient) !== JSON.stringify(selectedPatient)) {
+          setSelectedPatient(freshPatient);
+        }
+      } else {
+        // Patient was removed from the list (e.g. filtered out)
+        setSelectedPatient(null);
+      }
+    }
+  }, [patients, selectedPatient?.id]);
+
+  useEffect(() => {
+    // This effect syncs the local `proposal` form state with the `selectedPatient`.
+    // It runs whenever a new patient is selected or when the selected patient's data is updated.
+    if (selectedPatient) {
+      setProposal(selectedPatient.packageProposal || initialProposalState);
+    }
+  }, [selectedPatient]);
 
   const lostReasons = [
     "Cost / Financial Constraints",
@@ -87,7 +126,7 @@ export const PackageTeamDashboard: React.FC = () => {
   // --- Logic ---
   const allPatients = [...patients].filter(p => {
     // 1. Must be surgery recommended
-    if (p.doctorAssessment?.quick_code !== SurgeonCode.S1) return false;
+    if (p.doctorAssessment?.quickCode !== SurgeonCode.S1) return false;
 
     // 2. Filter by Outcome Category
     const outcome = p.packageProposal?.outcome;
@@ -103,7 +142,7 @@ export const PackageTeamDashboard: React.FC = () => {
 
     // 3. Filter by Conversion Readiness (only for Pending)
     if (listCategory === 'PENDING' && filter !== 'ALL') {
-      return p.doctorAssessment?.conversion_readiness?.startsWith(filter);
+      return p.doctorAssessment?.conversionReadiness?.startsWith(filter);
     }
     
     return true;
@@ -112,30 +151,7 @@ export const PackageTeamDashboard: React.FC = () => {
   const handlePatientSelect = (p: Patient) => {
     setSelectedPatient(p);
     setViewMode('split'); // Always switch back to split view for editing
-    if (p.packageProposal) {
-      setProposal({ ...p.packageProposal });
-    } else {
-      setProposal({
-        decisionPattern: 'Standard',
-        objectionIdentified: '',
-        counselingStrategy: '',
-        followUpDate: '',
-        modeOfPayment: undefined,
-        packageAmount: '',
-        preOpInvestigation: undefined,
-        surgeryMedicines: undefined,
-        equipment: undefined,
-        icuCharges: undefined,
-        roomType: undefined,
-        stayDays: undefined,
-        postFollowUp: undefined,
-        surgeryDate: '',
-        remarks: '',
-        outcome: undefined,
-        outcomeDate: '',
-        lostReason: ''
-      });
-    }
+    setProposal(p.packageProposal || initialProposalState);
   };
 
   const handleOpenOutcomeModal = (type: ProposalOutcome) => {
@@ -147,18 +163,23 @@ export const PackageTeamDashboard: React.FC = () => {
     });
   };
 
-  const handleConfirmOutcome = () => {
+  const handleConfirmOutcome = async () => {
     if (!selectedPatient) return;
     
+    const newOutcomeDate = outcomeModal.type !== 'Lost' ? outcomeModal.date : undefined;
+
     const updatedProposal: PackageProposal = {
       ...proposal as PackageProposal,
       outcome: outcomeModal.type!,
-      outcomeDate: outcomeModal.type !== 'Lost' ? outcomeModal.date : undefined,
+      outcomeDate: newOutcomeDate,
+      // Sync surgeryDate with outcomeDate to ensure the correct date is saved.
+      // The database mapping logic prioritizes surgeryDate.
+      surgeryDate: newOutcomeDate,
       lostReason: outcomeModal.type === 'Lost' ? outcomeModal.reason : undefined,
       proposalCreatedAt: proposal.proposalCreatedAt || new Date().toISOString()
     };
 
-    updatePackageProposal(selectedPatient.id, updatedProposal);
+    await updatePackageProposal(selectedPatient.id, updatedProposal);
     setOutcomeModal({ ...outcomeModal, show: false });
     setSelectedPatient(null);
   };
@@ -174,10 +195,10 @@ export const PackageTeamDashboard: React.FC = () => {
     }
   };
 
-  const handleSaveProposal = (e: React.FormEvent) => {
+  const handleSaveProposal = async (e: React.FormEvent) => {
     e.preventDefault();
     if (selectedPatient) {
-      updatePackageProposal(selectedPatient.id, {
+      await updatePackageProposal(selectedPatient.id, {
         ...proposal as PackageProposal,
         proposalCreatedAt: proposal.proposalCreatedAt || new Date().toISOString()
       });
@@ -259,7 +280,7 @@ export const PackageTeamDashboard: React.FC = () => {
                 <Activity className="w-4 h-4" /> Active Leads
               </button>
               <button onClick={() => setListCategory('SCHEDULED')} className={`px-5 py-2.5 rounded-xl text-[10px] font-black uppercase transition-all flex items-center gap-2 ${listCategory === 'SCHEDULED' ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-500 hover:text-slate-700'}`}>
-                <Calendar className="w-4 h-4" /> Scheduled
+                <Calendar className="w-4 h-4" /> Schedule Surgery
               </button>
               <button onClick={() => setListCategory('FOLLOWUP')} className={`px-5 py-2.5 rounded-xl text-[10px] font-black uppercase transition-all flex items-center gap-2 ${listCategory === 'FOLLOWUP' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-500 hover:text-slate-700'}`}>
                 <Clock className="w-4 h-4" /> Follow-Up
@@ -341,12 +362,12 @@ export const PackageTeamDashboard: React.FC = () => {
                       </div>
                       <div className="text-[10px] text-slate-400 font-bold uppercase tracking-tight flex items-center gap-2">
                         <Stethoscope className="w-3 h-3 text-hospital-400" />
-                        {p.doctorAssessment?.doctor_signature || 'Unassigned Surgeon'}
+                        {p.doctorAssessment?.doctorSignature || 'Unassigned Surgeon'}
                       </div>
                       <div className="mt-2 text-[9px] text-slate-400 font-black uppercase tracking-widest flex items-center gap-2">
                         {p.condition}
                         <span className="w-1 h-1 bg-slate-200 rounded-full"></span>
-                        {p.doctorAssessment?.conversion_readiness || 'LEAD'}
+                        {p.doctorAssessment?.conversionReadiness || 'LEAD'}
                       </div>
                     </div>
                   ))}
@@ -379,7 +400,7 @@ export const PackageTeamDashboard: React.FC = () => {
                           <div className="text-[10px] text-slate-400 font-black uppercase tracking-widest mb-1.5">Lead Priority</div>
                           <div className="bg-white border-2 border-slate-100 px-4 py-1.5 rounded-xl shadow-sm inline-flex items-center gap-2">
                             <Activity className="w-4 h-4 text-hospital-600" />
-                            <span className="font-black text-slate-800 text-xs uppercase">{selectedPatient.doctorAssessment?.conversion_readiness || 'LEAD'}</span>
+                            <span className="font-black text-slate-800 text-xs uppercase">{selectedPatient.doctorAssessment?.conversionReadiness || 'LEAD'}</span>
                           </div>
                         </div>
                       </div>
@@ -394,18 +415,18 @@ export const PackageTeamDashboard: React.FC = () => {
                              <Stethoscope className="w-4 h-4" /> Surgeon's Recommendation
                            </div>
                            <div className="flex items-center gap-1.5 text-[9px] font-black text-slate-400 uppercase">
-                             Assessed: {selectedPatient.doctorAssessment?.assessed_at ? formatDate(selectedPatient.doctorAssessment.assessed_at) : 'N/A'}
+                             Assessed: {selectedPatient.doctorAssessment?.assessedAt ? formatDate(selectedPatient.doctorAssessment.assessedAt) : 'N/A'}
                            </div>
                          </div>
 
                          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                             <div className="bg-white p-3 rounded-2xl border border-blue-50 shadow-sm">
                               <div className="text-[7px] font-black text-slate-400 uppercase tracking-widest mb-1">Evaluating Surgeon</div>
-                              <div className="text-[10px] font-black text-blue-700 truncate">{selectedPatient.doctorAssessment?.doctor_signature || 'Not Signed'}</div>
+                              <div className="text-[10px] font-black text-blue-700 truncate">{selectedPatient.doctorAssessment?.doctorSignature || 'Not Signed'}</div>
                             </div>
                             <div className="bg-white p-3 rounded-2xl border border-blue-50 shadow-sm">
                               <div className="text-[7px] font-black text-slate-400 uppercase tracking-widest mb-1">Pain Level</div>
-                              <div className="text-[10px] font-black text-slate-700">{selectedPatient.doctorAssessment?.pain_severity || 'N/A'}</div>
+                              <div className="text-[10px] font-black text-slate-700">{selectedPatient.doctorAssessment?.painSeverity || 'N/A'}</div>
                             </div>
                             <div className="bg-white p-3 rounded-2xl border border-blue-50 shadow-sm">
                               <div className="text-[7px] font-black text-slate-400 uppercase tracking-widest mb-1">Affordability</div>
@@ -413,7 +434,7 @@ export const PackageTeamDashboard: React.FC = () => {
                             </div>
                             <div className="bg-white p-3 rounded-2xl border border-blue-50 shadow-sm">
                               <div className="text-[7px] font-black text-slate-400 uppercase tracking-widest mb-1">Readiness</div>
-                              <div className="text-[10px] font-black text-slate-700">{selectedPatient.doctorAssessment?.conversion_readiness || 'N/A'}</div>
+                              <div className="text-[10px] font-black text-slate-700">{selectedPatient.doctorAssessment?.conversionReadiness || 'N/A'}</div>
                             </div>
                          </div>
 
@@ -445,7 +466,7 @@ export const PackageTeamDashboard: React.FC = () => {
                               <label className="block text-[10px] font-black uppercase text-slate-400 mb-3 tracking-widest">Package Amount (₹)</label>
                               <div className="relative">
                                  <Banknote className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 w-4 h-4" />
-                                 <input type="text" placeholder="e.g. 45,000" className="w-full pl-12 pr-4 py-3 bg-slate-50 border-2 border-transparent rounded-xl text-sm font-black focus:bg-white focus:border-hospital-500 outline-none transition-all" value={proposal.packageAmount} onChange={e => setProposal({...proposal, packageAmount: e.target.value})} />
+                                 <input type="text" placeholder="e.g. 45,000" className="w-full pl-12 pr-4 py-3 bg-slate-50 border-2 border-transparent rounded-xl text-sm font-black focus:bg-white focus:border-hospital-500 outline-none transition-all" value={proposal.packageAmount || ''} onChange={e => setProposal({...proposal, packageAmount: e.target.value})} />
                               </div>
                            </div>
                             <div className="md:col-span-1">
@@ -490,13 +511,13 @@ export const PackageTeamDashboard: React.FC = () => {
                             <button type="button" onClick={handleGenerateAIStrategy} disabled={aiLoading} className="absolute right-4 top-4 z-10 text-[10px] font-black uppercase tracking-widest bg-slate-900 text-white px-5 py-2 rounded-full flex items-center gap-2 hover:bg-hospital-600 disabled:opacity-50 transition-all">
                                {aiLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Wand2 className="w-3 h-3" />} AI Strategy
                             </button>
-                            <textarea className="w-full border-2 border-slate-100 rounded-[2rem] p-6 pt-16 min-h-[140px] text-sm font-medium leading-relaxed bg-white focus:border-hospital-500 outline-none" value={proposal.counselingStrategy} onChange={e => setProposal({...proposal, counselingStrategy: e.target.value})} placeholder="AI generated strategy or manual notes..." />
+                            <textarea className="w-full border-2 border-slate-100 rounded-[2rem] p-6 pt-16 min-h-[140px] text-sm font-medium leading-relaxed bg-white focus:border-hospital-500 outline-none" value={proposal.counselingStrategy || ''} onChange={e => setProposal({...proposal, counselingStrategy: e.target.value})} placeholder="AI generated strategy or manual notes..." />
                          </div>
                       </div>
 
                       {/* Final Action Buttons */}
                       <div className="pt-8 border-t border-slate-100 space-y-6">
-                        <div className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-4">Set Counseling Outcome</div>
+                        <div className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-4">status</div>
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                           <button 
                             type="button" 
@@ -565,7 +586,7 @@ export const PackageTeamDashboard: React.FC = () => {
                         <td className="p-5">
                           <div className="flex items-center gap-2 text-sm font-medium text-slate-600">
                             <Stethoscope className="w-4 h-4 text-blue-400" />
-                            {p.doctorAssessment?.doctor_signature || '---'}
+                            {p.doctorAssessment?.doctorSignature || '---'}
                           </div>
                         </td>
                         <td className="p-5">
@@ -587,11 +608,11 @@ export const PackageTeamDashboard: React.FC = () => {
                         </td>
                         <td className="p-5">
                           <span className={`text-[9px] font-black uppercase px-2 py-1 rounded-lg ${
-                            p.doctorAssessment?.conversion_readiness?.startsWith('CR1') ? 'bg-emerald-50 text-emerald-600' :
-                            p.doctorAssessment?.conversion_readiness?.startsWith('CR2') ? 'bg-blue-50 text-blue-600' :
+                            p.doctorAssessment?.conversionReadiness?.startsWith('CR1') ? 'bg-emerald-50 text-emerald-600' :
+                            p.doctorAssessment?.conversionReadiness?.startsWith('CR2') ? 'bg-blue-50 text-blue-600' :
                             'bg-amber-50 text-amber-600'
                           }`}>
-                            {p.doctorAssessment?.conversion_readiness || 'LEAD'}
+                            {p.doctorAssessment?.conversionReadiness || 'LEAD'}
                           </span>
                         </td>
                         <td className="p-5">

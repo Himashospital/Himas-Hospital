@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect } from 'react';
 import { useHospital } from '../context/HospitalContext';
 import { SurgeonCode, PainSeverity, Affordability, ConversionReadiness, Patient, DoctorAssessment } from '../types';
@@ -9,25 +10,25 @@ export const DoctorDashboard: React.FC = () => {
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
 
   const [formState, setFormState] = useState<Partial<DoctorAssessment>>({
-    quick_code: undefined,
-    pain_severity: undefined,
+    quickCode: undefined,
+    painSeverity: undefined,
     affordability: undefined,
-    conversion_readiness: undefined,
-    tentative_surgery_date: '',
+    conversionReadiness: undefined,
+    tentativeSurgeryDate: '',
     notes: '',
-    doctor_signature: ''
+    doctorSignature: ''
   });
 
   useEffect(() => {
     if (selectedPatient) {
       setFormState(selectedPatient.doctorAssessment || {
-        quick_code: undefined,
-        pain_severity: undefined,
+        quickCode: undefined,
+        painSeverity: undefined,
         affordability: undefined,
-        conversion_readiness: undefined,
-        tentative_surgery_date: '',
+        conversionReadiness: undefined,
+        tentativeSurgeryDate: '',
         notes: '',
-        doctor_signature: ''
+        doctorSignature: ''
       });
     }
   }, [selectedPatient]);
@@ -36,31 +37,26 @@ export const DoctorDashboard: React.FC = () => {
     e.preventDefault();
     if (!selectedPatient) return;
 
-    const { quick_code, doctor_signature, pain_severity, affordability, conversion_readiness } = formState;
+    const { quickCode, doctorSignature, painSeverity, affordability, conversionReadiness } = formState;
 
-    if (!quick_code || !doctor_signature) {
+    if (!quickCode || !doctorSignature) {
       alert("Please select a Quick Code and provide your signature.");
       return;
     }
 
-    if (quick_code === SurgeonCode.S1) {
-      if (!pain_severity || !affordability || !conversion_readiness) {
+    if (quickCode === SurgeonCode.S1) {
+      if (!painSeverity || !affordability || !conversionReadiness) {
         alert("Please complete all additional surgery fields before saving.");
         return;
       }
     }
 
-    const payload: Partial<DoctorAssessment> = {
-      ...formState,
-      assessed_at: new Date().toISOString()
-    };
-
-    updateDoctorAssessment(selectedPatient.id, payload);
+    updateDoctorAssessment(selectedPatient.id, formState);
     setSelectedPatient(null);
   };
 
   const allPatients = [...patients].sort((a, b) => new Date(b.registeredAt).getTime() - new Date(a.registeredAt).getTime());
-  const isSurgery = formState.quick_code === SurgeonCode.S1;
+  const isSurgery = formState.quickCode === SurgeonCode.S1;
 
   return (
     <div className="flex h-[calc(100vh-100px)] gap-6">
@@ -108,11 +104,11 @@ export const DoctorDashboard: React.FC = () => {
               <div>
                 <label className="block text-xs font-bold text-gray-500 uppercase mb-3">Quick Code Assessment</label>
                 <div className="flex gap-4">
-                  <button type="button" onClick={() => setFormState(s => ({...s, quick_code: SurgeonCode.M1}))} className={`flex-1 p-4 rounded-lg border-2 text-left transition-all ${formState.quick_code === SurgeonCode.M1 ? 'bg-blue-50 border-blue-500' : 'bg-white border-gray-200 hover:border-blue-300'}`}>
+                  <button type="button" onClick={() => setFormState(s => ({...s, quickCode: SurgeonCode.M1}))} className={`flex-1 p-4 rounded-lg border-2 text-left transition-all ${formState.quickCode === SurgeonCode.M1 ? 'bg-blue-50 border-blue-500' : 'bg-white border-gray-200 hover:border-blue-300'}`}>
                     <div className="font-bold">{SurgeonCode.M1}</div>
                     <div className="text-xs text-gray-600">Patient requires medication only. No surgery needed.</div>
                   </button>
-                  <button type="button" onClick={() => setFormState(s => ({...s, quick_code: SurgeonCode.S1}))} className={`flex-1 p-4 rounded-lg border-2 text-left transition-all ${formState.quick_code === SurgeonCode.S1 ? 'bg-green-50 border-green-500' : 'bg-white border-gray-200 hover:border-green-300'}`}>
+                  <button type="button" onClick={() => setFormState(s => ({...s, quickCode: SurgeonCode.S1}))} className={`flex-1 p-4 rounded-lg border-2 text-left transition-all ${formState.quickCode === SurgeonCode.S1 ? 'bg-green-50 border-green-500' : 'bg-white border-gray-200 hover:border-green-300'}`}>
                     <div className="font-bold">{SurgeonCode.S1}</div>
                     <div className="text-xs text-gray-600">Patient is a candidate for surgery.</div>
                   </button>
@@ -124,7 +120,7 @@ export const DoctorDashboard: React.FC = () => {
                 <div className="grid grid-cols-2 gap-6 p-6 bg-green-50/50 rounded-lg border border-green-100 animate-in fade-in">
                   <div>
                     <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Pain Severity</label>
-                    <select required={isSurgery} value={formState.pain_severity || ''} onChange={e => setFormState(s => ({...s, pain_severity: e.target.value as PainSeverity}))} className="w-full p-2 border border-gray-300 rounded-md">
+                    <select required={isSurgery} value={formState.painSeverity || ''} onChange={e => setFormState(s => ({...s, painSeverity: e.target.value as PainSeverity}))} className="w-full p-2 border border-gray-300 rounded-md">
                       <option value="">Select...</option>
                       {Object.values(PainSeverity).map(v => <option key={v} value={v}>{v}</option>)}
                     </select>
@@ -138,14 +134,14 @@ export const DoctorDashboard: React.FC = () => {
                   </div>
                   <div>
                     <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Conversion Readiness</label>
-                    <select required={isSurgery} value={formState.conversion_readiness || ''} onChange={e => setFormState(s => ({...s, conversion_readiness: e.target.value as ConversionReadiness}))} className="w-full p-2 border border-gray-300 rounded-md">
+                    <select required={isSurgery} value={formState.conversionReadiness || ''} onChange={e => setFormState(s => ({...s, conversionReadiness: e.target.value as ConversionReadiness}))} className="w-full p-2 border border-gray-300 rounded-md">
                       <option value="">Select...</option>
                       {Object.values(ConversionReadiness).map(v => <option key={v} value={v}>{v}</option>)}
                     </select>
                   </div>
                   <div>
                     <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Tentative Surgery Date</label>
-                    <input type="date" value={formState.tentative_surgery_date || ''} onChange={e => setFormState(s => ({...s, tentative_surgery_date: e.target.value}))} className="w-full p-2 border border-gray-300 rounded-md" />
+                    <input type="date" value={formState.tentativeSurgeryDate || ''} onChange={e => setFormState(s => ({...s, tentativeSurgeryDate: e.target.value}))} className="w-full p-2 border border-gray-300 rounded-md" />
                   </div>
                 </div>
               )}
@@ -167,8 +163,8 @@ export const DoctorDashboard: React.FC = () => {
                 <input
                   type="text"
                   required
-                  value={formState.doctor_signature || ''}
-                  onChange={e => setFormState(s => ({...s, doctor_signature: e.target.value}))}
+                  value={formState.doctorSignature || ''}
+                  onChange={e => setFormState(s => ({...s, doctorSignature: e.target.value}))}
                   className="w-full p-2 border border-gray-300 rounded-md font-serif"
                   placeholder="Type your full name to sign"
                 />

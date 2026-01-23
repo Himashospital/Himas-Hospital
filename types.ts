@@ -1,5 +1,8 @@
 
 
+
+
+
 export type Role = 'FRONT_OFFICE' | 'DOCTOR' | 'PACKAGE_TEAM' | null;
 
 export enum Gender {
@@ -45,16 +48,16 @@ export enum ConversionReadiness {
 
 export interface DoctorAssessment {
   id?: string;
-  patient_id: string;
+  patient_id?: string;
   notes?: string;
-  quick_code?: SurgeonCode;
-  assessed_at?: string;
-  pain_severity?: PainSeverity;
+  quickCode?: SurgeonCode;
+  assessedAt?: string;
+  painSeverity?: PainSeverity;
   affordability?: Affordability;
-  doctor_signature?: string;
-  other_surgery_name?: string;
-  conversion_readiness?: ConversionReadiness;
-  tentative_surgery_date?: string; // YYYY-MM-DD
+  doctorSignature?: string;
+  otherSurgeryName?: string;
+  conversionReadiness?: ConversionReadiness;
+  tentativeSurgeryDate?: string; // YYYY-MM-DD
 }
 
 export type ProposalOutcome = 'Scheduled' | 'Follow-Up' | 'Lost';
