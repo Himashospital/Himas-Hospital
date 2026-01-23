@@ -8,7 +8,8 @@ import {
   Calendar, Pencil, Trash2, User, 
   Phone, X, CalendarCheck, Tag, Chrome, MessageCircle, Instagram, 
   Facebook, Youtube, Globe, Clock, Users as UsersIcon,
-  Share2, History, BadgeInfo, FileText, CreditCard, Clock3, Stethoscope
+  Share2, History, BadgeInfo, FileText, CreditCard, Clock3, Stethoscope,
+  Filter
 } from 'lucide-react';
 
 const formatDate = (dateString: string | undefined | null): string => {
@@ -70,9 +71,10 @@ export const FrontOfficeDashboard: React.FC = () => {
     source: string;
     condition: string;
     status: string;
+    visitType: string;
     type: 'ALL' | 'Registration' | 'Appointment';
   }>({
-    startDate: '', endDate: '', source: '', condition: '', status: '', type: 'ALL'
+    startDate: '', endDate: '', source: '', condition: '', status: '', visitType: 'ALL', type: 'ALL'
   });
 
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -102,6 +104,11 @@ export const FrontOfficeDashboard: React.FC = () => {
     { name: "Hospital Billboards", icon: <Tag className="w-4 h-4 text-slate-500" /> },
     { name: "Doctor Recommend", icon: <Stethoscope className="w-4 h-4 text-teal-500" /> },
     { name: "Other", icon: <PlusCircle className="w-4 h-4 text-slate-400" /> }
+  ];
+
+  const statusOptions = [
+    'Arrived', 'Doctor Done', 'Medication Done', 'Package Proposal', 
+    'Surgery Scheduled', 'Follow-Up Surgery', 'Surgery Lost', 'Scheduled', 'Follow Up'
   ];
 
   const getStatusClass = (status?: string): string => {
@@ -196,11 +203,8 @@ export const FrontOfficeDashboard: React.FC = () => {
   };
 
   const handleRevisit = async (item: any) => {
-    // 1. Get the base File ID and append a visit suffix for unique row creation
     const baseId = item.id.split('_V')[0];
     const newVisitId = `${baseId}_V${Date.now()}`;
-
-    // 2. Clone the core patient demographics and set visit type
     const revisitData: Omit<Patient, 'registeredAt' | 'hospital_id'> = {
       id: newVisitId,
       name: item.name,
@@ -218,10 +222,7 @@ export const FrontOfficeDashboard: React.FC = () => {
     };
 
     try {
-      // 3. Create the new OPD record
       await addPatient(revisitData);
-      
-      // 4. Redirect to OPD History and pre-filter by mobile to show the new revisit alongside old ones
       setSearchTerm(item.mobile);
       setOpdStartDate('');
       setOpdEndDate('');
@@ -344,11 +345,41 @@ export const FrontOfficeDashboard: React.FC = () => {
     const sTerm = searchTerm.toLowerCase();
     const matches = item.name.toLowerCase().includes(sTerm) || (item.id && item.id.toLowerCase().includes(sTerm)) || item.mobile.includes(sTerm);
     if (!matches) return false;
-    if (historyFilters.type !== 'ALL' && item.recordType !== historyFilters.type) return false;
+
+    // Advanced Global Search Filters
+    if (activeTab === 'GLOBAL_SEARCH') {
+      if (historyFilters.type !== 'ALL' && item.recordType !== historyFilters.type) return false;
+      
+      // Date Range Filter
+      if (historyFilters.startDate || historyFilters.endDate) {
+        const itemDate = item.displayEntryDate || '';
+        if (historyFilters.startDate && itemDate < historyFilters.startDate) return false;
+        if (historyFilters.endDate && itemDate > historyFilters.endDate) return false;
+      }
+
+      // Source Filter
+      if (historyFilters.source && item.source !== historyFilters.source) return false;
+
+      // Visit Type Filter
+      if (historyFilters.visitType !== 'ALL') {
+        const vType = calculateVisitType(item, patients);
+        if (vType !== historyFilters.visitType) return false;
+      }
+
+      // Status Filter
+      if (historyFilters.status && item.displayStatus !== historyFilters.status) return false;
+
+      // Condition Filter
+      if (historyFilters.condition && item.condition !== historyFilters.condition) return false;
+    }
+
     return true;
   }).sort((a, b) => new Date(b.displayDate).getTime() - new Date(a.displayDate).getTime());
 
   const displayData = activeTab === 'REGISTRATION' ? filteredPatients : activeTab === 'APPOINTMENTS' ? filteredAppointments : combinedHistoryData;
+
+  // Reusable filter input classes for uniform styling
+  const filterInputClasses = "h-10 w-full bg-slate-50 border border-slate-100 rounded-xl px-3 text-[10px] font-bold focus:ring-2 focus:ring-hospital-500 focus:bg-white outline-none transition-all appearance-none";
 
   return (
     <div className="space-y-6">
@@ -402,6 +433,80 @@ export const FrontOfficeDashboard: React.FC = () => {
             </button>
           </div>
         </div>
+
+        {/* Advanced Filters for Global Search */}
+        {activeTab === 'GLOBAL_SEARCH' && (
+          <div className="pt-4 border-t border-slate-50 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4 animate-in slide-in-from-top-2 duration-300 items-end">
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[9px] font-black uppercase text-slate-400 ml-1">Date Range</label>
+              <div className="flex items-center gap-2">
+                <input 
+                  type="date" 
+                  className={filterInputClasses} 
+                  value={historyFilters.startDate} 
+                  onChange={e => setHistoryFilters({...historyFilters, startDate: e.target.value})} 
+                  placeholder="dd-mm-yyyy"
+                />
+                <input 
+                  type="date" 
+                  className={filterInputClasses} 
+                  value={historyFilters.endDate} 
+                  onChange={e => setHistoryFilters({...historyFilters, endDate: e.target.value})} 
+                  placeholder="dd-mm-yyyy"
+                />
+              </div>
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[9px] font-black uppercase text-slate-400 ml-1">Source</label>
+              <div className="relative">
+                <select className={filterInputClasses} value={historyFilters.source} onChange={e => setHistoryFilters({...historyFilters, source: e.target.value})}>
+                  <option value="">All Sources</option>
+                  {sourceConfig.map(s => <option key={s.name} value={s.name}>{s.name}</option>)}
+                </select>
+                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-slate-400">
+                   <svg className="h-3 w-3 fill-current" viewBox="0 0 20 20"><path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" /></svg>
+                </div>
+              </div>
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[9px] font-black uppercase text-slate-400 ml-1">Visit Type</label>
+              <div className="relative">
+                <select className={filterInputClasses} value={historyFilters.visitType} onChange={e => setHistoryFilters({...historyFilters, visitType: e.target.value})}>
+                  <option value="ALL">All Visits</option>
+                  <option value="New">New</option>
+                  <option value="Revisit">Revisit</option>
+                </select>
+                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-slate-400">
+                   <svg className="h-3 w-3 fill-current" viewBox="0 0 20 20"><path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" /></svg>
+                </div>
+              </div>
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[9px] font-black uppercase text-slate-400 ml-1">Status</label>
+              <div className="relative">
+                <select className={filterInputClasses} value={historyFilters.status} onChange={e => setHistoryFilters({...historyFilters, status: e.target.value})}>
+                  <option value="">All Statuses</option>
+                  {statusOptions.map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-slate-400">
+                   <svg className="h-3 w-3 fill-current" viewBox="0 0 20 20"><path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" /></svg>
+                </div>
+              </div>
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[9px] font-black uppercase text-slate-400 ml-1">Condition</label>
+              <div className="relative">
+                <select className={filterInputClasses} value={historyFilters.condition} onChange={e => setHistoryFilters({...historyFilters, condition: e.target.value})}>
+                  <option value="">All Conditions</option>
+                  {Object.values(Condition).map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-slate-400">
+                   <svg className="h-3 w-3 fill-current" viewBox="0 0 20 20"><path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" /></svg>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
