@@ -92,6 +92,7 @@ export interface Patient {
   visitType: 'OPD' | 'Follow Up';
   registeredAt: string;
   entry_date?: string;
+  status?: string;
   
   // Metadata for multi-table support
   sourceTable?: 'himas_data' | 'himas_appointments';

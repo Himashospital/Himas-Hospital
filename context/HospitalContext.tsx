@@ -42,33 +42,18 @@ interface HospitalContextType {
 const HospitalContext = createContext<HospitalContextType | undefined>(undefined);
 const STORAGE_KEY_ROLE = 'himas_hospital_role';
 
-// Helper: Map himas_data (JSONB style) to Patient interface
-const mapHimasDataToPatient = (row: any): Patient => ({
-  id: row.id || '',
-  hospital_id: row.hospital_id || '',
-  name: row.full_name || '',
-  dob: row.dob || '',
-  gender: (row.gender || Gender.Other) as Gender,
-  age: row.age || 0,
-  mobile: row.mobile_number || '',
-  occupation: row.occupation || '',
-  hasInsurance: row.has_insurance || 'No',
-  insuranceName: row.insurance_name || '',
-  source: row.source || 'Other',
-  condition: (row.condition || Condition.Other) as Condition,
-  visitType: row.visit_type || 'OPD',
-  registeredAt: row.created_at || new Date().toISOString(),
-  entry_date: row.entry_date || (row.created_at ? row.created_at.split('T')[0] : ''),
-  doctorAssessment: row.doctor_assessment,
-  packageProposal: row.package_proposal,
-  sourceTable: 'himas_data'
-});
+const nullify = (val: any) => {
+  if (val === undefined || val === null) return null;
+  if (typeof val === 'string' && val.trim() === '') return null;
+  return val;
+};
 
-// Helper: Map himas_appointments (Flat style) to Patient interface
-const mapHimasApptToPatient = (row: any): Patient => ({
+// Map database row to internal Patient type using image-specific columns
+const mapRowToPatient = (row: any): Patient => ({
   id: row.id || '',
   hospital_id: row.hospital_id || '',
   name: row.name || '',
+  dob: row.dob || '',
   gender: (row.gender || Gender.Other) as Gender,
   age: row.age || 0,
   mobile: row.mobile || '',
@@ -76,34 +61,14 @@ const mapHimasApptToPatient = (row: any): Patient => ({
   hasInsurance: row.has_insurance || 'No',
   insuranceName: row.insurance_name || '',
   source: row.source || 'Other',
-  condition: (row.patient_condition || Condition.Other) as Condition,
-  visitType: row.booking_type || 'OPD',
+  condition: (row.condition || Condition.Other) as Condition,
+  visitType: row.is_follow_up ? 'Follow Up' : 'OPD',
   registeredAt: row.created_at || new Date().toISOString(),
-  entry_date: row.appointment_date || '',
-  sourceTable: 'himas_appointments',
-  doctorAssessment: row.doctor_signature ? {
-    quickCode: row.doctor_counseling_status as SurgeonCode,
-    painSeverity: row.pain_severity as PainSeverity,
-    affordability: row.affordability as Affordability,
-    conversionReadiness: row.readiness as ConversionReadiness,
-    doctorSignature: row.doctor_signature,
-    assessedAt: row.assessed_at,
-    doctorNote: row.clinical_findings_notes,
-    tentativeSurgeryDate: ''
-  } : undefined,
-  packageProposal: row.package_status ? {
-    outcome: row.package_status as ProposalOutcome,
-    modeOfPayment: row.mode_of_payment,
-    packageAmount: row.package_amount,
-    roomType: row.room_type,
-    outcomeDate: row.counseling_outcome_date,
-    lostReason: row.lost_reason,
-    counselingStrategy: row.counseling_strategy,
-    proposalCreatedAt: row.created_at,
-    decisionPattern: '',
-    objectionIdentified: '',
-    followUpDate: ''
-  } : undefined
+  entry_date: row.entry_date || '',
+  status: row.booking_status || 'Scheduled',
+  doctorAssessment: row.doctor_assessment,
+  packageProposal: row.package_proposal,
+  sourceTable: 'himas_appointments'
 });
 
 export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
@@ -131,63 +96,40 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
   const refreshData = async () => {
     setIsLoading(true);
     try {
-      // Helper function to handle table fetch errors
-      const safeFetch = async (tableName: string) => {
-        try {
-          const { data, error } = await supabase.from(tableName).select('*');
-          if (error) {
-            // 42P01 is Postgres code for "undefined_table"
-            // PGRST205 is PostgREST code for "Could not find table in schema cache"
-            if (error.code === '42P01' || error.code === 'PGRST205') {
-              console.warn(`[Hospital] Table ${tableName} missing. Run database.sql in Supabase.`);
-              return [];
-            }
-            throw error;
-          }
-          return data || [];
-        } catch (fetchErr) {
-          console.error(`[Hospital] Failed to fetch ${tableName}:`, fetchErr);
-          // If it's a known "missing table" error from the catch block, return empty
-          const err = fetchErr as any;
-          if (err?.code === '42P01' || err?.code === 'PGRST205') {
-            return [];
-          }
-          throw fetchErr;
-        }
-      };
+      const { data: apptRows, error: apptError } = await supabase
+        .from('himas_appointments')
+        .select('*')
+        .order('created_at', { ascending: false });
 
-      // Concurrent fetching
-      const [dataRows, apptRows, staffData] = await Promise.all([
-        safeFetch('himas_data'),
-        safeFetch('himas_appointments'),
-        safeFetch('staff_users')
-      ]);
+      const { data: staffData } = await supabase.from('staff_users').select('*');
 
-      const patientsFromData = dataRows.map(mapHimasDataToPatient);
-      const patientsFromAppts = apptRows.map(mapHimasApptToPatient);
-      setPatients([...patientsFromData, ...patientsFromAppts]);
+      if (apptError) throw apptError;
 
-      const apptsOnly = apptRows
-        .filter((r: any) => r.status === 'Scheduled')
+      const allRecords = (apptRows || []).map(mapRowToPatient);
+      setPatients(allRecords);
+
+      const scheduledOnly = (apptRows || [])
+        .filter((r: any) => r.booking_status === 'Scheduled')
         .map((r: any) => ({
           id: r.id || '',
           hospital_id: r.hospital_id || '',
           name: r.name || '',
           source: r.source || '',
-          condition: (r.patient_condition || Condition.Other) as Condition,
+          condition: (r.condition || Condition.Other) as Condition,
           mobile: r.mobile || '',
-          date: r.appointment_date || '',
-          time: r.appointment_time || '',
-          status: (r.status || 'Scheduled') as any,
-          bookingType: (r.booking_type || 'OPD') as any,
+          date: r.entry_date || '',
+          time: r.booking_time || '',
+          status: 'Scheduled',
+          bookingType: r.is_follow_up ? 'Follow Up' : 'OPD',
           createdAt: r.created_at || new Date().toISOString()
         }));
-      setAppointments(apptsOnly);
+      setAppointments(scheduledOnly as Appointment[]);
 
-      setStaffUsers(staffData);
-      setIsStaffLoaded(true);
+      if (staffData) {
+        setStaffUsers(staffData);
+        setIsStaffLoaded(true);
+      }
       setSaveStatus('saved');
-      setLastSavedAt(new Date());
     } catch (err) {
       console.error('[Hospital] Global Sync Failure:', err);
       setSaveStatus('error');
@@ -201,100 +143,68 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
     try {
       const dbRecord = {
         id: patientData.id,
-        full_name: patientData.name,
-        dob: patientData.dob,
+        name: patientData.name,
+        dob: nullify(patientData.dob),
         gender: patientData.gender,
         age: patientData.age,
-        mobile_number: patientData.mobile,
+        mobile: patientData.mobile,
         occupation: patientData.occupation,
         source: patientData.source,
         condition: patientData.condition,
-        visit_type: patientData.visitType,
+        is_follow_up: patientData.visitType === 'Follow Up',
         has_insurance: patientData.hasInsurance,
         insurance_name: patientData.insuranceName,
-        entry_date: new Date().toISOString().split('T')[0]
+        booking_status: 'Arrived',
+        entry_date: new Date().toISOString().split('T')[0],
+        arrival_time: new Date().toTimeString().split(' ')[0],
+        hospital_id: 'himas_facility_01'
       };
       
-      const { error } = await supabase.from('himas_data').insert(dbRecord);
+      const { error } = await supabase.from('himas_appointments').insert(dbRecord);
       if (error) throw error;
-      
       await refreshData();
       setSaveStatus('saved');
     } catch (err) {
       setSaveStatus('error');
-      console.error(err);
     }
   };
 
   const updatePatient = async (targetId: string, patient: Patient) => {
     setSaveStatus('saving');
     try {
-      const isFromAppts = patient.sourceTable === 'himas_appointments';
+      const updateData = {
+        id: patient.id,
+        name: patient.name,
+        dob: nullify(patient.dob),
+        age: patient.age,
+        gender: patient.gender,
+        mobile: patient.mobile,
+        occupation: patient.occupation,
+        condition: patient.condition,
+        is_follow_up: patient.visitType === 'Follow Up',
+        has_insurance: patient.hasInsurance,
+        insurance_name: patient.insuranceName,
+        entry_date: nullify(patient.entry_date) || new Date().toISOString().split('T')[0],
+        booking_status: patient.status === 'Scheduled' ? 'Scheduled' : 'Arrived',
+        doctor_assessment: patient.doctorAssessment,
+        package_proposal: patient.packageProposal
+      };
       
-      if (isFromAppts) {
-        const updateData = {
-          name: patient.name,
-          age: patient.age,
-          gender: patient.gender,
-          mobile: patient.mobile,
-          patient_condition: patient.condition,
-          booking_type: patient.visitType,
-          has_insurance: patient.hasInsurance,
-          insurance_name: patient.insuranceName,
-          doctor_counseling_status: patient.doctorAssessment?.quickCode,
-          pain_severity: patient.doctorAssessment?.painSeverity,
-          clinical_findings_notes: patient.doctorAssessment?.doctorNote,
-          affordability: patient.doctorAssessment?.affordability,
-          readiness: patient.doctorAssessment?.conversionReadiness,
-          doctor_signature: patient.doctorAssessment?.doctorSignature,
-          assessed_at: patient.doctorAssessment?.assessedAt,
-          package_status: patient.packageProposal?.outcome,
-          mode_of_payment: patient.packageProposal?.modeOfPayment,
-          package_amount: patient.packageProposal?.packageAmount,
-          room_type: patient.packageProposal?.roomType,
-          counseling_outcome_date: patient.packageProposal?.outcomeDate,
-          lost_reason: patient.packageProposal?.lostReason,
-          counseling_strategy: patient.packageProposal?.counselingStrategy
-        };
-        const { error } = await supabase.from('himas_appointments').update(updateData).eq('id', targetId);
-        if (error) throw error;
-      } else {
-        const updateData = {
-          full_name: patient.name,
-          dob: patient.dob,
-          gender: patient.gender,
-          age: patient.age,
-          mobile_number: patient.mobile,
-          occupation: patient.occupation,
-          source: patient.source,
-          condition: patient.condition,
-          visit_type: patient.visitType,
-          has_insurance: patient.hasInsurance,
-          insurance_name: patient.insuranceName,
-          doctor_assessment: patient.doctorAssessment,
-          package_proposal: patient.packageProposal
-        };
-        const { error } = await supabase.from('himas_data').update(updateData).eq('id', targetId);
-        if (error) throw error;
-      }
-      
-      setPatients(prev => prev.map(p => p.id === targetId ? { ...patient } : p));
+      const { error } = await supabase.from('himas_appointments').update(updateData).eq('id', targetId);
+      if (error) throw error;
+      await refreshData();
       setSaveStatus('saved');
-      setLastSavedAt(new Date());
     } catch (err) {
       setSaveStatus('error');
-      console.error(err);
     }
   };
 
   const deletePatient = async (id: string) => {
     setSaveStatus('saving');
     try {
-      const patient = patients.find(p => p.id === id);
-      const table = patient?.sourceTable === 'himas_appointments' ? 'himas_appointments' : 'himas_data';
-      const { error } = await supabase.from(table).delete().eq('id', id);
+      const { error } = await supabase.from('himas_appointments').delete().eq('id', id);
       if (error) throw error;
-      setPatients(prev => prev.filter(p => p.id !== id));
+      await refreshData();
       setSaveStatus('saved');
     } catch (err) {
       setSaveStatus('error');
@@ -325,15 +235,17 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
         name: appointmentData.name,
         mobile: appointmentData.mobile,
         source: appointmentData.source,
-        patient_condition: appointmentData.condition,
-        appointment_date: appointmentData.date,
-        appointment_time: appointmentData.time,
-        booking_type: appointmentData.bookingType,
-        status: 'Scheduled'
+        condition: appointmentData.condition,
+        entry_date: nullify(appointmentData.date),
+        booking_time: nullify(appointmentData.time),
+        is_follow_up: appointmentData.bookingType === 'Follow Up',
+        booking_status: 'Scheduled',
+        hospital_id: 'himas_facility_01'
       };
       const { error } = await supabase.from('himas_appointments').insert(dbRecord);
       if (error) throw error;
       await refreshData();
+      setSaveStatus('saved');
     } catch (err) {
       setSaveStatus('error');
     }
@@ -343,14 +255,15 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
     setSaveStatus('saving');
     try {
       const updateData = {
-        appointment_date: appointment.date,
-        appointment_time: appointment.time,
-        status: appointment.status,
-        booking_type: appointment.bookingType
+        entry_date: nullify(appointment.date),
+        booking_time: nullify(appointment.time),
+        booking_status: appointment.status,
+        is_follow_up: appointment.bookingType === 'Follow Up'
       };
       const { error } = await supabase.from('himas_appointments').update(updateData).eq('id', appointment.id);
       if (error) throw error;
       await refreshData();
+      setSaveStatus('saved');
     } catch (err) {
       setSaveStatus('error');
     }
@@ -362,6 +275,7 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
       const { error } = await supabase.from('himas_appointments').delete().eq('id', id);
       if (error) throw error;
       await refreshData();
+      setSaveStatus('saved');
     } catch (err) {
       setSaveStatus('error');
     }
@@ -370,10 +284,14 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
   const registerStaff = async (staffData: Omit<StaffUser, 'id' | 'registeredAt'>) => {
     setSaveStatus('saving');
     try {
-      const newStaff = { ...staffData, id: Math.random().toString(36).substr(2, 9), registeredAt: new Date().toISOString() };
+      const newStaff = { 
+        ...staffData, 
+        id: Math.random().toString(36).substr(2, 9), 
+        registered_at: new Date().toISOString() 
+      };
       const { error } = await supabase.from('staff_users').insert(newStaff);
       if (error) throw error;
-      setStaffUsers(prev => [...prev, newStaff as StaffUser]);
+      await refreshData();
       setSaveStatus('saved');
     } catch (err) {
       setSaveStatus('error');

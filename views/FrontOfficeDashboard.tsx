@@ -161,10 +161,15 @@ export const FrontOfficeDashboard: React.FC = () => {
        }
     } else {
       if (patients.some(p => p.id === formData.id)) return alert("File Number already exists in database.");
-      await addPatient(formData as any);
+      
       if (originatingAppointmentId) {
-        const appt = appointments.find(a => a.id === originatingAppointmentId);
-        if (appt) await updateAppointment({ ...appt, status: 'Arrived' });
+        await updatePatient(originatingAppointmentId, { 
+          ...formData as Patient,
+          status: 'Arrived',
+          entry_date: new Date().toISOString().split('T')[0]
+        });
+      } else {
+        await addPatient(formData as any);
       }
     }
     setShowForm(false);
@@ -172,12 +177,15 @@ export const FrontOfficeDashboard: React.FC = () => {
   };
 
   const getPatientStatus = (p: Patient) => {
-    if (p.packageProposal) return 'Counseled';
+    if (p.packageProposal?.outcome) return p.packageProposal.outcome;
     if (p.doctorAssessment) return 'Consulted';
-    return 'New Registration';
+    return 'New OPD';
   };
 
+  // OPD History: Only display patients with status Arrived (Registered Files)
   const filteredPatients = patients.filter(p => {
+    if (p.status !== 'Arrived') return false;
+    
     const sTerm = (searchTerm || '').toLowerCase();
     const pName = (p.name || '').toLowerCase();
     const pId = (p.id || '').toLowerCase();
@@ -186,9 +194,21 @@ export const FrontOfficeDashboard: React.FC = () => {
     const matchesSearch = pName.includes(sTerm) || 
                          pId.includes(sTerm) ||
                          pMobile.includes(searchTerm);
+    
     const regDate = p.entry_date || (p.registeredAt ? p.registeredAt.split('T')[0] : '');
     return matchesSearch && (!opdDate || regDate === opdDate);
   });
+
+  // Scheduled Appointments: Only display leads with status 'Scheduled'
+  const filteredAppointments = appointments.filter(a => {
+    const sTerm = (searchTerm || '').toLowerCase();
+    const aName = (a.name || '').toLowerCase();
+    const aMobile = a.mobile || '';
+    
+    // Appointments list in context already filters for 'Scheduled'
+    return (!apptDate || a.date === apptDate) &&
+    (aName.includes(sTerm) || aMobile.includes(searchTerm));
+  }).sort((a, b) => ((a.date || '') + (a.time || '')).localeCompare((b.date || '') + (b.time || '')));
 
   const combinedHistoryData = [
     ...patients.map(p => ({
@@ -196,13 +216,13 @@ export const FrontOfficeDashboard: React.FC = () => {
       recordType: 'Registration' as const,
       displayDate: p.registeredAt,
       displayEntryDate: p.entry_date,
-      displayStatus: getPatientStatus(p)
+      displayStatus: p.status === 'Arrived' ? getPatientStatus(p) : 'Lead'
     })),
     ...appointments.map(a => ({
       id: '---', name: a.name, mobile: a.mobile, condition: a.condition, source: a.source,
       registeredAt: a.createdAt, entry_date: a.date, recordType: 'Appointment' as const,
-      displayDate: a.date + 'T' + a.time + ':00', displayEntryDate: a.date,
-      displayStatus: a.status === 'Scheduled' ? 'Upcoming Appt' : a.status
+      displayDate: a.date + 'T' + (a.time || '00:00') + ':00', displayEntryDate: a.date,
+      displayStatus: 'Upcoming Appt'
     }))
   ].filter(item => {
     const sTerm = (searchTerm || '').toLowerCase();
@@ -217,15 +237,6 @@ export const FrontOfficeDashboard: React.FC = () => {
     if (historyFilters.type !== 'ALL' && item.recordType !== historyFilters.type) return false;
     return true;
   }).sort((a, b) => new Date(b.displayDate).getTime() - new Date(a.displayDate).getTime());
-
-  const filteredAppointments = appointments.filter(a => {
-    const sTerm = (searchTerm || '').toLowerCase();
-    const aName = (a.name || '').toLowerCase();
-    const aMobile = a.mobile || '';
-    
-    return a.status === 'Scheduled' && (!apptDate || a.date === apptDate) &&
-    (aName.includes(sTerm) || aMobile.includes(searchTerm))
-  }).sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
 
   const displayData = activeTab === 'REGISTRATION' ? filteredPatients 
                    : activeTab === 'APPOINTMENTS' ? filteredAppointments 
@@ -293,7 +304,7 @@ export const FrontOfficeDashboard: React.FC = () => {
                 <th className="p-5">Patient Details</th>
                 <th className="p-5">Contact</th>
                 <th className="p-5">Findings</th>
-                <th className="p-5">Visit Type</th>
+                <th className="p-5">Status</th>
                 <th className="p-5 text-right">Actions</th>
               </tr>
             </thead>
@@ -336,7 +347,11 @@ export const FrontOfficeDashboard: React.FC = () => {
                          <span className="text-[8px] text-slate-400 font-black uppercase tracking-widest">{item.status}</span>
                       </div>
                     ) : (
-                      <span className="text-xs font-bold text-slate-400 uppercase">{item.displayStatus || item.status || 'New'}</span>
+                      <span className={`text-[9px] font-black uppercase px-2 py-1 rounded-full ${
+                        getPatientStatus(item) === 'Scheduled' ? 'bg-emerald-50 text-emerald-600' :
+                        getPatientStatus(item) === 'Follow-Up' ? 'bg-blue-50 text-blue-600' :
+                        'bg-slate-50 text-slate-400'
+                      }`}>{item.displayStatus || getPatientStatus(item)}</span>
                     )}
                   </td>
                   <td className="p-5 text-right">
@@ -450,7 +465,7 @@ export const FrontOfficeDashboard: React.FC = () => {
           <div className="bg-white w-full max-w-5xl h-full md:h-[95vh] md:rounded-[2.5rem] shadow-2xl flex flex-col md:flex-row overflow-hidden border border-white/20">
             <div className="hidden md:flex w-72 bg-slate-900 text-white p-8 flex-col justify-between relative">
                <div className="relative z-10">
-                 <h2 className="text-3xl font-black mb-10 leading-tight">{editingId ? 'Update' : 'New'} Record</h2>
+                 <h2 className="text-3xl font-black mb-10 leading-tight">{editingId || originatingAppointmentId ? 'Update' : 'New'} Record</h2>
                  <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest leading-relaxed">
                    Enter patient data carefully to ensure smooth clinical transition.
                  </p>

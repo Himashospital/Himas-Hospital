@@ -4,7 +4,6 @@ import { createClient } from '@supabase/supabase-js';
 /**
  * Access environment variables using direct dot notation.
  * This is CRITICAL for Vite's `define` plugin to perform literal string replacement.
- * Dynamic access like process.env[key] will fail in the browser.
  */
 const supabaseUrl = 
   (typeof process !== 'undefined' && process.env?.VITE_SUPABASE_URL) || 
@@ -19,10 +18,7 @@ const supabaseAnonKey =
   "sb_publishable_7oLgId9S_lriwXxrETiHuQ_WbecTVK5";
 
 if (!supabaseUrl || !supabaseAnonKey) {
-  console.error('CRITICAL: Supabase credentials could not be resolved from environment or fallbacks.');
+  console.error('CRITICAL: Supabase credentials could not be resolved.');
 }
 
-/**
- * Singleton Supabase client.
- */
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);

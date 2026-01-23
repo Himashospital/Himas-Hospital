@@ -1,56 +1,53 @@
--- Consolidated table for Himas Hospital Management System
--- This table tracks the complete patient lifecycle from Front Office to Package Counseling
 
-CREATE TABLE IF NOT EXISTS himas_appointments (
-    -- ==========================================
-    -- 1. FRONT OFFICE FIELDS
-    -- ==========================================
-    id VARCHAR(255) PRIMARY KEY,               -- Case/File Number (e.g., HMS-001)
-    hospital_id VARCHAR(255) NOT NULL DEFAULT 'himas_facility_01',
-    name VARCHAR(255) NOT NULL,
+-- Consolidated Table Schema based on user image
+CREATE TABLE IF NOT EXISTS public.himas_appointments (
+    id TEXT PRIMARY KEY,
+    hospital_id TEXT DEFAULT 'himas_facility_01',
+    name TEXT NOT NULL,
+    dob DATE,
+    entry_date DATE,
+    gender TEXT,
     age INTEGER,
-    gender VARCHAR(20),
-    mobile VARCHAR(50) NOT NULL,
-    occupation VARCHAR(255),
-    source VARCHAR(100),                       -- Marketing Source
-    patient_condition VARCHAR(100),            -- Complaint/Condition
-    booking_type VARCHAR(50) DEFAULT 'OPD',    -- OPD or Follow Up
-    appointment_date DATE,                     -- Date of visit
-    appointment_time TIME,                     -- Time of visit
-    status VARCHAR(50) DEFAULT 'Scheduled',    -- Arrival Status
-    has_insurance VARCHAR(20) DEFAULT 'No',
-    insurance_name VARCHAR(255),
-
-    -- ==========================================
-    -- 2. DOCTOR COUNSELING FIELDS
-    -- ==========================================
-    doctor_counseling_status VARCHAR(100),     -- (Requested: Doctor Counseling Status)
-    pain_severity VARCHAR(50),                 -- (Requested: Pain Severity)
-    clinical_findings_notes TEXT,              -- (Requested: Clinical Findings & Notes)
-    affordability VARCHAR(50),                 -- (Requested: Affordability)
-    readiness VARCHAR(50),                     -- (Requested: Readiness)
-    doctor_signature VARCHAR(255),             -- Evaluating Surgeon Name
-    assessed_at DATETIME,                      -- Timestamp of clinical completion
-
-    -- ==========================================
-    -- 3. COUNSELING PACKAGE & FINANCIALS
-    -- ==========================================
-    package_status VARCHAR(50),                -- (Requested: Counseling Package Status)
-    mode_of_payment VARCHAR(100),              -- (Requested: Mode of Payment)
-    package_amount VARCHAR(100),               -- (Requested: Package Amount ₹)
-    inclusions TEXT,                           -- (Requested: Inclusions)
-    room_type VARCHAR(50),                     -- (Requested: Room Type)
-    counseling_outcome_date DATE,              -- (Requested: Set Counseling Outcome date)
-    lost_reason TEXT,                          -- Reason if lead is marked Lost
-    counseling_strategy TEXT,                  -- AI-generated strategy notes
-    
-    -- METADATA
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    mobile TEXT NOT NULL,
+    occupation TEXT,
+    has_insurance TEXT DEFAULT 'No',
+    insurance_name TEXT,
+    source TEXT,
+    source_doctor_name TEXT,
+    condition TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    doctor_assessment JSONB,
+    package_proposal JSONB,
+    is_follow_up BOOLEAN DEFAULT FALSE,
+    last_follow_up_visit_date DATE,
+    booking_status TEXT DEFAULT 'Scheduled',
+    booking_time TIME,
+    arrival_time TIME,
+    follow_up_control TEXT
 );
 
--- PERFORMANCE INDEXES
-CREATE INDEX idx_himas_mobile ON himas_appointments(mobile);
-CREATE INDEX idx_himas_date ON himas_appointments(appointment_date);
-CREATE INDEX idx_himas_readiness ON himas_appointments(readiness);
-CREATE INDEX idx_himas_pkg_status ON himas_appointments(package_status);
+-- Staff Users Table
+CREATE TABLE IF NOT EXISTS public.staff_users (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    email TEXT UNIQUE,
+    mobile TEXT,
+    role TEXT,
+    password TEXT,
+    registered_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Default Demo Users
+INSERT INTO public.staff_users (id, name, email, role, password)
+VALUES 
+('demo-1', 'Front Office', 'office@himas.com', 'FRONT_OFFICE', 'Himas1984@'),
+('demo-2', 'Surgeon', 'doctor@himas.com', 'DOCTOR', 'Doctor8419@'),
+('demo-3', 'Package Admin', 'team@himas.com', 'PACKAGE_TEAM', 'Team8131@')
+ON CONFLICT (email) DO NOTHING;
+
+-- RLS Policies
+ALTER TABLE public.himas_appointments ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.staff_users ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Allow All" ON public.himas_appointments FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow All" ON public.staff_users FOR ALL USING (true) WITH CHECK (true);
