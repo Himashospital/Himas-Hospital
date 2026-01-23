@@ -119,22 +119,13 @@ export const FrontOfficeDashboard: React.FC = () => {
   };
 
   const calculateVisitType = (item: any, allPatients: Patient[]): 'New' | 'Revisit' => {
-    // If it's an appointment lead, it's not yet a visit in history context
     if (item.recordType === 'Appointment') return 'New';
-    
     const patientMobile = item.mobile;
     if (!patientMobile) return 'New';
-
-    // Find all registered visits (Patient objects) for this mobile
     const visits = allPatients
       .filter(p => p.mobile === patientMobile)
       .sort((a, b) => new Date(a.registeredAt).getTime() - new Date(b.registeredAt).getTime());
-
-    // If this record is the earliest chronologically, it's a 'New' visit.
-    // Otherwise, it's a 'Revisit'.
-    if (visits.length > 0 && visits[0].id === item.id) {
-      return 'New';
-    }
+    if (visits.length > 0 && visits[0].id === item.id) return 'New';
     return 'Revisit';
   };
 
@@ -204,47 +195,64 @@ export const FrontOfficeDashboard: React.FC = () => {
     setShowForm(true);
   };
 
-  const handleRevisit = (item: any) => {
-    // If we have a case number, use it; otherwise use mobile or name
-    const idToSearch = (item.id && item.id !== '---') ? item.id : (item.mobile || item.name);
-    setSearchTerm(idToSearch);
-    
-    // Clear registration date filters to ensure the revisit is found regardless of date
-    setOpdStartDate('');
-    setOpdEndDate('');
-    
-    // Redirect to OPD History tab
-    setActiveTab('REGISTRATION');
+  const handleRevisit = async (item: any) => {
+    // 1. Get the base File ID and append a visit suffix for unique row creation
+    const baseId = item.id.split('_V')[0];
+    const newVisitId = `${baseId}_V${Date.now()}`;
+
+    // 2. Clone the core patient demographics and set visit type
+    const revisitData: Omit<Patient, 'registeredAt' | 'hospital_id'> = {
+      id: newVisitId,
+      name: item.name,
+      dob: item.dob || null,
+      gender: item.gender || Gender.Other,
+      age: item.age || 0,
+      mobile: item.mobile,
+      occupation: item.occupation || '',
+      condition: item.condition,
+      source: item.source || 'Other',
+      hasInsurance: item.hasInsurance || 'No',
+      insuranceName: item.insuranceName || '',
+      sourceDoctorName: item.sourceDoctorName || '',
+      visitType: 'Follow Up',
+    };
+
+    try {
+      // 3. Create the new OPD record
+      await addPatient(revisitData);
+      
+      // 4. Redirect to OPD History and pre-filter by mobile to show the new revisit alongside old ones
+      setSearchTerm(item.mobile);
+      setOpdStartDate('');
+      setOpdEndDate('');
+      setActiveTab('REGISTRATION');
+    } catch (error) {
+      console.error("Automated revisit record creation failed:", error);
+      alert("Failed to create a new record for this visit.");
+    }
   };
 
   const handleBookingSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    // Comprehensive Mandatory Field Check
     const isBasicValid = bookingData.name && bookingData.mobile && bookingData.date && bookingData.time && bookingData.bookingType && bookingData.source && bookingData.condition;
-    
     let isExtraValid = true;
     if (bookingData.source === 'Doctor Recommend') {
         isExtraValid = !!bookingData.sourceDoctorName;
     } else if (bookingData.source === 'Other') {
         isExtraValid = !!bookingData.sourceOtherDetails;
     }
-
     if (!isBasicValid || !isExtraValid) {
       return alert("All fields are mandatory. Please provide all details before booking.");
     }
-
     const payload = { ...bookingData };
     if (payload.source === 'Other' && payload.sourceOtherDetails) {
         payload.source = `Other: ${payload.sourceOtherDetails}`;
     }
-
     if (editingId && activeTab === 'APPOINTMENTS') {
       await updateAppointment({ ...payload, id: editingId } as Appointment);
     } else {
       await addAppointment(payload as any);
     }
-    
     setShowBookingForm(false);
     resetBookingForm();
   };
@@ -261,8 +269,6 @@ export const FrontOfficeDashboard: React.FC = () => {
         alert("Please complete all mandatory fields.");
         return;
       }
-      
-      // Dynamic source validation for registration
       if (formData.source === 'Doctor Recommend' && !formData.sourceDoctorName) {
         alert("Please enter the recommending doctor's name.");
         return;
@@ -271,13 +277,10 @@ export const FrontOfficeDashboard: React.FC = () => {
         alert("Please specify the lead source details.");
         return;
       }
-
       setStep(2);
       return;
     }
-
     if (!formData.id) return alert("Case Number is required.");
-
     const dataToSave: Partial<Patient> & { sourceDoctorNotes?: string; sourceOtherDetails?: string } = { ...formData };
     if (dataToSave.source === 'Doctor Recommend' && dataToSave.sourceDoctorName) {
         dataToSave.sourceDoctorName = dataToSave.sourceDoctorNotes ? `${dataToSave.sourceDoctorName} (Notes: ${dataToSave.sourceDoctorNotes})` : dataToSave.sourceDoctorName;
@@ -285,7 +288,6 @@ export const FrontOfficeDashboard: React.FC = () => {
     if (dataToSave.source === 'Other' && dataToSave.sourceOtherDetails) {
       dataToSave.source = `Other: ${dataToSave.sourceOtherDetails}`;
     }
-
     if (editingId) {
        const originalPatient = patients.find(p => p.id === editingId);
        if (originalPatient) await updatePatient(editingId, { ...originalPatient, ...dataToSave as Patient });
@@ -424,7 +426,7 @@ export const FrontOfficeDashboard: React.FC = () => {
                       <div className="font-mono font-black text-slate-500 flex items-center gap-2"><Clock className="w-4 h-4 text-hospital-400" /> {item.time}</div>
                     ) : (
                       <div className="flex flex-col">
-                        <span className="font-mono font-black text-slate-500">{item.id}</span>
+                        <span className="font-mono font-black text-slate-500">{item.id.split('_V')[0]}</span>
                         <span className="text-[10px] text-slate-400 font-bold uppercase mt-1">{formatDate(item.entry_date || item.displayEntryDate)}</span>
                       </div>
                     )}
@@ -473,7 +475,7 @@ export const FrontOfficeDashboard: React.FC = () => {
                   </td>
                   <td className="p-5 text-right">
                     <div className="flex justify-end gap-1">
-                      {activeTab === 'GLOBAL_SEARCH' && (
+                      {activeTab === 'GLOBAL_SEARCH' && item.recordType === 'Registration' && (
                         <button 
                           onClick={() => handleRevisit(item)} 
                           className="px-3 py-1.5 bg-indigo-50 text-indigo-600 rounded-lg text-[10px] font-black uppercase hover:bg-indigo-100 transition-colors flex items-center gap-1 shadow-sm border border-indigo-100"
@@ -550,8 +552,6 @@ export const FrontOfficeDashboard: React.FC = () => {
                         ))}
                       </div>
                     </div>
-
-                    {/* Dynamic Extra Detail Fields */}
                     {bookingData.source === 'Doctor Recommend' && (
                       <div className="md:col-span-2 animate-in slide-in-from-top-2 duration-300">
                         <label className="block text-[10px] font-black uppercase text-hospital-600 mb-2 tracking-widest">Recommending Doctor Name</label>
@@ -646,8 +646,6 @@ export const FrontOfficeDashboard: React.FC = () => {
                               <option value="Not Sure">Status Pending</option>
                            </select>
                          </div>
-
-                         {/* Dynamic Source Details in Registration Form */}
                          {formData.source === 'Doctor Recommend' && (
                            <div className="md:col-span-2 group animate-in slide-in-from-top-2 duration-300">
                              <label className="block text-[10px] font-black uppercase text-hospital-600 mb-2 tracking-[0.2em]">Recommending Doctor Name</label>
