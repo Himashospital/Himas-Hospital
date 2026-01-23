@@ -6,6 +6,25 @@ import { generateCounselingStrategy } from '../services/geminiService';
 import { Patient, PackageProposal, Role, StaffUser, SurgeonCode, ProposalOutcome, ConversionReadiness } from '../types';
 import { Briefcase, Calendar, MessageCircle, AlertTriangle, Wand2, CheckCircle2, UserPlus, Users, BadgeCheck, Mail, Phone, User, Lock, Loader2, Sparkles, Activity, ShieldCheck, FileText, Banknote, CreditCard, Bed, ClipboardList, Info, Trash2, Clock, Check, X, Share2, Stethoscope, LayoutList, Columns } from 'lucide-react';
 
+const formatDate = (dateString: string | undefined | null): string => {
+  if (!dateString) return '';
+
+  const datePart = dateString.split('T')[0];
+  const parts = datePart.split('-');
+
+  if (parts.length === 3) {
+    // Check for DD-MM-YYYY format and convert
+    if (parts[0].length === 2 && parts[2].length === 4) {
+      return `${parts[2]}-${parts[1]}-${parts[0]}`;
+    }
+    // Assume YYYY-MM-DD if not the above, and return the clean date part
+    return datePart;
+  }
+  
+  // Fallback for any other format that isn't dash-separated
+  return dateString;
+};
+
 export const PackageTeamDashboard: React.FC = () => {
   const { patients, updatePackageProposal, staffUsers, registerStaff } = useHospital();
   
@@ -67,7 +86,7 @@ export const PackageTeamDashboard: React.FC = () => {
   // --- Logic ---
   const allPatients = [...patients].filter(p => {
     // 1. Must be surgery recommended
-    if (p.doctorAssessment?.quickCode !== SurgeonCode.S1) return false;
+    if (p.doctorAssessment?.quick_code !== SurgeonCode.S1) return false;
 
     // 2. Filter by Outcome Category
     const outcome = p.packageProposal?.outcome;
@@ -83,7 +102,7 @@ export const PackageTeamDashboard: React.FC = () => {
 
     // 3. Filter by Conversion Readiness (only for Pending)
     if (listCategory === 'PENDING' && filter !== 'ALL') {
-      return p.doctorAssessment?.conversionReadiness?.startsWith(filter);
+      return p.doctorAssessment?.conversion_readiness?.startsWith(filter);
     }
     
     return true;
@@ -320,12 +339,12 @@ export const PackageTeamDashboard: React.FC = () => {
                       </div>
                       <div className="text-[10px] text-slate-400 font-bold uppercase tracking-tight flex items-center gap-2">
                         <Stethoscope className="w-3 h-3 text-hospital-400" />
-                        {p.digitalSignature || 'Unassigned Surgeon'}
+                        {p.doctorAssessment?.doctor_signature || 'Unassigned Surgeon'}
                       </div>
                       <div className="mt-2 text-[9px] text-slate-400 font-black uppercase tracking-widest flex items-center gap-2">
                         {p.condition}
                         <span className="w-1 h-1 bg-slate-200 rounded-full"></span>
-                        {p.doctorAssessment?.conversionReadiness || 'LEAD'}
+                        {p.doctorAssessment?.conversion_readiness || 'LEAD'}
                       </div>
                     </div>
                   ))}
@@ -358,7 +377,7 @@ export const PackageTeamDashboard: React.FC = () => {
                           <div className="text-[10px] text-slate-400 font-black uppercase tracking-widest mb-1.5">Lead Priority</div>
                           <div className="bg-white border-2 border-slate-100 px-4 py-1.5 rounded-xl shadow-sm inline-flex items-center gap-2">
                             <Activity className="w-4 h-4 text-hospital-600" />
-                            <span className="font-black text-slate-800 text-xs uppercase">{selectedPatient.doctorAssessment?.conversionReadiness || 'LEAD'}</span>
+                            <span className="font-black text-slate-800 text-xs uppercase">{selectedPatient.doctorAssessment?.conversion_readiness || 'LEAD'}</span>
                           </div>
                         </div>
                       </div>
@@ -373,18 +392,18 @@ export const PackageTeamDashboard: React.FC = () => {
                              <Stethoscope className="w-4 h-4" /> Surgeon's Recommendation
                            </div>
                            <div className="flex items-center gap-1.5 text-[9px] font-black text-slate-400 uppercase">
-                             Assessed: {selectedPatient.doctorAssessment?.assessedAt ? new Date(selectedPatient.doctorAssessment.assessedAt).toLocaleDateString() : 'N/A'}
+                             Assessed: {selectedPatient.doctorAssessment?.assessed_at ? formatDate(selectedPatient.doctorAssessment.assessed_at) : 'N/A'}
                            </div>
                          </div>
 
                          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                             <div className="bg-white p-3 rounded-2xl border border-blue-50 shadow-sm">
                               <div className="text-[7px] font-black text-slate-400 uppercase tracking-widest mb-1">Evaluating Surgeon</div>
-                              <div className="text-[10px] font-black text-blue-700 truncate">{selectedPatient.digitalSignature || 'Not Signed'}</div>
+                              <div className="text-[10px] font-black text-blue-700 truncate">{selectedPatient.doctorAssessment?.doctor_signature || 'Not Signed'}</div>
                             </div>
                             <div className="bg-white p-3 rounded-2xl border border-blue-50 shadow-sm">
                               <div className="text-[7px] font-black text-slate-400 uppercase tracking-widest mb-1">Pain Level</div>
-                              <div className="text-[10px] font-black text-slate-700">{selectedPatient.doctorAssessment?.painSeverity || 'N/A'}</div>
+                              <div className="text-[10px] font-black text-slate-700">{selectedPatient.doctorAssessment?.pain_severity || 'N/A'}</div>
                             </div>
                             <div className="bg-white p-3 rounded-2xl border border-blue-50 shadow-sm">
                               <div className="text-[7px] font-black text-slate-400 uppercase tracking-widest mb-1">Affordability</div>
@@ -392,7 +411,7 @@ export const PackageTeamDashboard: React.FC = () => {
                             </div>
                             <div className="bg-white p-3 rounded-2xl border border-blue-50 shadow-sm">
                               <div className="text-[7px] font-black text-slate-400 uppercase tracking-widest mb-1">Readiness</div>
-                              <div className="text-[10px] font-black text-slate-700">{selectedPatient.doctorAssessment?.conversionReadiness || 'N/A'}</div>
+                              <div className="text-[10px] font-black text-slate-700">{selectedPatient.doctorAssessment?.conversion_readiness || 'N/A'}</div>
                             </div>
                          </div>
 
@@ -401,7 +420,7 @@ export const PackageTeamDashboard: React.FC = () => {
                               <FileText className="w-3 h-3" /> Clinical Observation
                             </div>
                             <p className="text-xs font-medium text-slate-700 leading-relaxed italic">
-                              {selectedPatient.clinicalFindingsNotes ? `"${selectedPatient.clinicalFindingsNotes}"` : "No specific surgeon notes provided for this evaluation."}
+                              {selectedPatient.doctorAssessment?.notes ? `"${selectedPatient.doctorAssessment.notes}"` : "No specific surgeon notes provided for this evaluation."}
                             </p>
                          </div>
                       </div>
@@ -537,7 +556,7 @@ export const PackageTeamDashboard: React.FC = () => {
                         <td className="p-5">
                           <div className="flex items-center gap-2 text-sm font-medium text-slate-600">
                             <Stethoscope className="w-4 h-4 text-blue-400" />
-                            {p.digitalSignature || '---'}
+                            {p.doctorAssessment?.doctor_signature || '---'}
                           </div>
                         </td>
                         <td className="p-5">
@@ -559,11 +578,11 @@ export const PackageTeamDashboard: React.FC = () => {
                         </td>
                         <td className="p-5">
                           <span className={`text-[9px] font-black uppercase px-2 py-1 rounded-lg ${
-                            p.doctorAssessment?.conversionReadiness?.startsWith('CR1') ? 'bg-emerald-50 text-emerald-600' :
-                            p.doctorAssessment?.conversionReadiness?.startsWith('CR2') ? 'bg-blue-50 text-blue-600' :
+                            p.doctorAssessment?.conversion_readiness?.startsWith('CR1') ? 'bg-emerald-50 text-emerald-600' :
+                            p.doctorAssessment?.conversion_readiness?.startsWith('CR2') ? 'bg-blue-50 text-blue-600' :
                             'bg-amber-50 text-amber-600'
                           }`}>
-                            {p.doctorAssessment?.conversionReadiness || 'LEAD'}
+                            {p.doctorAssessment?.conversion_readiness || 'LEAD'}
                           </span>
                         </td>
                         <td className="p-5">

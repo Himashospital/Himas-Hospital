@@ -1,4 +1,5 @@
 
+
 export type Role = 'FRONT_OFFICE' | 'DOCTOR' | 'PACKAGE_TEAM' | null;
 
 export enum Gender {
@@ -43,18 +44,17 @@ export enum ConversionReadiness {
 }
 
 export interface DoctorAssessment {
-  quickCode: SurgeonCode;
-  painSeverity: PainSeverity;
-  affordability: Affordability;
-  conversionReadiness: ConversionReadiness;
-  tentativeSurgeryDate: string; // YYYY-MM-DD
-  assessedAt: string;
-}
-
-export interface FullAssessmentPayload {
-  assessment: DoctorAssessment;
-  notes: string;
-  signature: string;
+  id?: string;
+  patient_id: string;
+  notes?: string;
+  quick_code?: SurgeonCode;
+  assessed_at?: string;
+  pain_severity?: PainSeverity;
+  affordability?: Affordability;
+  doctor_signature?: string;
+  other_surgery_name?: string;
+  conversion_readiness?: ConversionReadiness;
+  tentative_surgery_date?: string; // YYYY-MM-DD
 }
 
 export type ProposalOutcome = 'Scheduled' | 'Follow-Up' | 'Lost';
@@ -91,7 +91,8 @@ export interface Patient {
   occupation: string;
   hasInsurance: 'Yes' | 'No' | 'Not Sure';
   insuranceName?: string; 
-  source: string; 
+  source: string;
+  sourceDoctorName?: string;
   condition: Condition;
   visitType: 'OPD' | 'Follow Up';
   registeredAt: string;
@@ -104,8 +105,6 @@ export interface Patient {
   // Role Specific Data
   doctorAssessment?: DoctorAssessment;
   packageProposal?: PackageProposal;
-  clinicalFindingsNotes?: string;
-  digitalSignature?: string;
 }
 
 export interface Appointment {

@@ -1,4 +1,5 @@
 
+
 import { GoogleGenAI } from "@google/genai";
 import { Patient } from "../types";
 
@@ -19,10 +20,13 @@ export const generateCounselingStrategy = async (patient: Patient): Promise<stri
       - Condition: ${patient.condition}
       
       Doctor's Assessment:
-      - Recommendation: ${patient.doctorAssessment?.quickCode}
-      - Pain Level: ${patient.doctorAssessment?.painSeverity}
+      // FIX: Corrected property name from quickCode to quick_code to match the DoctorAssessment type.
+      - Recommendation: ${patient.doctorAssessment?.quick_code}
+      // FIX: Corrected property name from painSeverity to pain_severity to match the DoctorAssessment type.
+      - Pain Level: ${patient.doctorAssessment?.pain_severity}
       - Affordability: ${patient.doctorAssessment?.affordability}
-      - Readiness: ${patient.doctorAssessment?.conversionReadiness}
+      // FIX: Corrected property name from conversionReadiness to conversion_readiness to match the DoctorAssessment type.
+      - Readiness: ${patient.doctorAssessment?.conversion_readiness}
       
       Provide a specific conversational approach to address their likely concerns based on readiness and affordability.
     `;

@@ -1,8 +1,10 @@
 
+
+// FIX: Corrected the import of `useState` from `react`.
 import React, { useState } from 'react';
 import { useHospital } from '../context/HospitalContext';
 import { ExportButtons } from '../components/ExportButtons';
-import { Gender, Condition, Patient, Appointment } from '../types';
+import { Gender, Condition, Patient, Appointment, SurgeonCode } from '../types';
 import { 
   PlusCircle, Search, CheckCircle, ArrowLeft, 
   Calendar, Pencil, Trash2, User, 
@@ -10,8 +12,57 @@ import {
   Chrome, MessageCircle, Instagram, Facebook, Youtube, Globe,
   MoreVertical, ShieldCheck, Clock, ChevronRight, Briefcase, Users as UsersIcon,
   Share2, History, Filter, FileSpreadsheet, BadgeInfo, UserPlus, FileText,
-  CreditCard, Info, Clock3
+  CreditCard, Info, Clock3, Stethoscope
 } from 'lucide-react';
+
+const formatDate = (dateString: string | undefined | null): string => {
+  if (!dateString) return '';
+
+  const datePart = dateString.split('T')[0];
+  const parts = datePart.split('-');
+
+  if (parts.length === 3) {
+    // Check for DD-MM-YYYY format and convert
+    if (parts[0].length === 2 && parts[2].length === 4) {
+      return `${parts[2]}-${parts[1]}-${parts[0]}`;
+    }
+    // Assume YYYY-MM-DD if not the above, and return the clean date part
+    return datePart;
+  }
+  
+  // Fallback for any other format that isn't dash-separated
+  return dateString;
+};
+
+// Specific status logic for the detailed "Patients History" tab
+const getHistoryStatus = (p: Patient): string => {
+  if (p.packageProposal?.outcome) {
+    switch (p.packageProposal.outcome) {
+      case 'Scheduled':
+        return 'Surgery Scheduled';
+      case 'Follow-Up':
+        return 'Package Follow-up';
+      case 'Lost':
+        return 'Surgery Lost';
+      default:
+        return p.packageProposal.outcome;
+    }
+  }
+  if (p.doctorAssessment) {
+    if (p.doctorAssessment.quick_code === SurgeonCode.M1) {
+      return 'Medication';
+    }
+    if (p.doctorAssessment.quick_code === SurgeonCode.S1) {
+      return 'Surgery';
+    }
+    return 'Consulted';
+  }
+  if (p.visitType === 'Follow Up') {
+    return 'Follow-up';
+  }
+  return 'New OPD';
+};
+
 
 export const FrontOfficeDashboard: React.FC = () => {
   const { 
@@ -25,7 +76,8 @@ export const FrontOfficeDashboard: React.FC = () => {
   const [step, setStep] = useState(1);
   const [searchTerm, setSearchTerm] = useState('');
   
-  const [opdDate, setOpdDate] = useState(new Date().toISOString().split('T')[0]);
+  const [opdStartDate, setOpdStartDate] = useState('');
+  const [opdEndDate, setOpdEndDate] = useState('');
   const [apptDate, setApptDate] = useState(new Date().toISOString().split('T')[0]);
 
   const [historyFilters, setHistoryFilters] = useState({
@@ -40,10 +92,11 @@ export const FrontOfficeDashboard: React.FC = () => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [originatingAppointmentId, setOriginatingAppointmentId] = useState<string | null>(null);
 
-  const [formData, setFormData] = useState<Partial<Patient>>({
+  const [formData, setFormData] = useState<Partial<Patient> & { sourceDoctorNotes?: string; sourceOtherDetails?: string }>({
     id: '', name: '', dob: '', gender: undefined, age: undefined,
     mobile: '', occupation: '', hasInsurance: undefined, insuranceName: '',
-    source: '', condition: undefined, visitType: undefined
+    source: '', condition: undefined, visitType: undefined,
+    sourceDoctorName: '', sourceDoctorNotes: '', sourceOtherDetails: ''
   });
 
   const [bookingData, setBookingData] = useState<Partial<Appointment>>({
@@ -61,14 +114,43 @@ export const FrontOfficeDashboard: React.FC = () => {
     { name: "Old Patient / Relatives", icon: <UsersIcon className="w-4 h-4 text-amber-600" /> },
     { name: "Friends / Online", icon: <Share2 className="w-4 h-4 text-indigo-500" /> },
     { name: "Hospital Billboards", icon: <Tag className="w-4 h-4 text-slate-500" /> },
+    { name: "Doctor Recommend", icon: <Stethoscope className="w-4 h-4 text-teal-500" /> },
     { name: "Other", icon: <PlusCircle className="w-4 h-4 text-slate-400" /> }
   ];
+
+  // Status logic for the "OPD History" tab
+  const getPatientStatus = (p: Patient) => {
+    if (p.packageProposal?.outcome) return p.packageProposal.outcome;
+    if (p.doctorAssessment) return 'Consulted';
+    return 'New OPD';
+  };
+  
+  // Styling helper for all status types across tabs
+  const getStatusClass = (status?: string): string => {
+    if (!status) return 'bg-slate-50 text-slate-400';
+    // History tab statuses
+    if (status === 'Surgery Scheduled') return 'bg-emerald-50 text-emerald-600';
+    if (status === 'Package Follow-up') return 'bg-blue-50 text-blue-600';
+    if (status === 'Surgery Lost') return 'bg-rose-50 text-rose-600';
+    if (status === 'Medication') return 'bg-purple-50 text-purple-600';
+    if (status === 'Surgery') return 'bg-amber-50 text-amber-600';
+    if (status === 'Follow-up') return 'bg-cyan-50 text-cyan-600';
+    
+    // OPD History tab statuses
+    if (status === 'Scheduled') return 'bg-emerald-50 text-emerald-600';
+    if (status === 'Follow-Up') return 'bg-blue-50 text-blue-600';
+
+    // Defaults
+    return 'bg-slate-50 text-slate-400';
+  };
+
 
   const resetForm = () => {
     setFormData({ 
       id: '', name: '', dob: '', gender: undefined, age: undefined, 
       mobile: '', occupation: '', hasInsurance: undefined, insuranceName: '', 
-      source: '', condition: undefined, visitType: undefined 
+      source: '', condition: undefined, visitType: undefined,
+      sourceDoctorName: '', sourceDoctorNotes: '', sourceOtherDetails: ''
     });
     setEditingId(null);
     setOriginatingAppointmentId(null);
@@ -83,10 +165,29 @@ export const FrontOfficeDashboard: React.FC = () => {
   };
 
   const handleEdit = (p: Patient) => {
+    let sourceDoctorName = p.sourceDoctorName || '';
+    let sourceDoctorNotes = '';
+    const notesMatch = sourceDoctorName.match(/\(Notes: (.*)\)$/);
+    if (notesMatch && notesMatch[1]) {
+        sourceDoctorName = sourceDoctorName.replace(notesMatch[0], '').trim();
+        sourceDoctorNotes = notesMatch[1];
+    }
+    
+    let source = p.source || '';
+    let sourceOtherDetails = '';
+    if (source.startsWith('Other: ')) {
+      sourceOtherDetails = source.substring(7);
+      source = 'Other';
+    }
+
     setFormData({
       ...p,
+      source,
+      sourceOtherDetails,
       visitType: p.visitType || 'OPD',
-      hasInsurance: p.hasInsurance || 'No'
+      hasInsurance: p.hasInsurance || 'No',
+      sourceDoctorName,
+      sourceDoctorNotes
     });
     setEditingId(p.id);
     setStep(1);
@@ -120,7 +221,7 @@ export const FrontOfficeDashboard: React.FC = () => {
       return alert("Please fill in all mandatory booking fields.");
     }
     if (!bookingData.bookingType) return alert("Please select a Visit Type (OPD/Follow Up)");
-    if (!bookingData.source) return alert("Please select a Lead Source");
+    if (!bookingData.source) return alert("Please select an option for 'How did you know?'.");
     if (!bookingData.condition) return alert("Please select a Condition");
     
     await addAppointment(bookingData as any);
@@ -134,9 +235,17 @@ export const FrontOfficeDashboard: React.FC = () => {
   };
 
   const validateStep1 = () => {
-    const { name, age, gender, mobile, occupation, condition, hasInsurance, source } = formData;
+    const { name, age, gender, mobile, occupation, condition, hasInsurance, source, sourceDoctorName, sourceOtherDetails } = formData;
     if (!name || !age || !gender || !mobile || !occupation || !condition || !hasInsurance || !source) {
       alert("All fields are mandatory. Please fill in all details.");
+      return false;
+    }
+    if (source === 'Doctor Recommend' && !sourceDoctorName) {
+      alert("Please enter the recommending doctor's name.");
+      return false;
+    }
+    if (source === 'Other' && !sourceOtherDetails) {
+      alert("Please specify the other source.");
       return false;
     }
     return true;
@@ -154,56 +263,83 @@ export const FrontOfficeDashboard: React.FC = () => {
       return;
     }
 
+    const dataToSave: Partial<Patient> & { sourceDoctorNotes?: string; sourceOtherDetails?: string } = { ...formData };
+    
+    if (dataToSave.source === 'Doctor Recommend' && dataToSave.sourceDoctorName) {
+        dataToSave.sourceDoctorName = dataToSave.sourceDoctorNotes 
+            ? `${dataToSave.sourceDoctorName} (Notes: ${dataToSave.sourceDoctorNotes})`
+            : dataToSave.sourceDoctorName;
+    } else {
+        dataToSave.sourceDoctorName = '';
+    }
+    delete dataToSave.sourceDoctorNotes;
+
+    if (dataToSave.source === 'Other' && dataToSave.sourceOtherDetails) {
+      dataToSave.source = `Other: ${dataToSave.sourceOtherDetails}`;
+    }
+    delete dataToSave.sourceOtherDetails;
+
     if (editingId) {
        const originalPatient = patients.find(p => p.id === editingId);
        if (originalPatient) {
-         await updatePatient(editingId, { ...originalPatient, ...formData as Patient });
+         await updatePatient(editingId, { ...originalPatient, ...dataToSave as Patient });
        }
     } else {
       if (patients.some(p => p.id === formData.id)) return alert("File Number already exists in database.");
       
       if (originatingAppointmentId) {
         await updatePatient(originatingAppointmentId, { 
-          ...formData as Patient,
+          ...dataToSave as Patient,
           status: 'Arrived',
           entry_date: new Date().toISOString().split('T')[0]
         });
       } else {
-        await addPatient(formData as any);
+        await addPatient(dataToSave as any);
       }
     }
     setShowForm(false);
     resetForm();
   };
 
-  const getPatientStatus = (p: Patient) => {
-    if (p.packageProposal?.outcome) return p.packageProposal.outcome;
-    if (p.doctorAssessment) return 'Consulted';
-    return 'New OPD';
-  };
-
   // OPD History: Only display patients with status Arrived (Registered Files)
-  const filteredPatients = patients.filter(p => {
-    if (p.status !== 'Arrived') return false;
-    
-    const sTerm = (searchTerm || '').toLowerCase();
-    const pName = (p.name || '').toLowerCase();
-    const pId = (p.id || '').toLowerCase();
-    const pMobile = p.mobile || '';
+  const filteredPatients = patients
+    .filter(p => {
+      if (p.status !== 'Arrived') return false;
 
-    const matchesSearch = pName.includes(sTerm) || 
-                         pId.includes(sTerm) ||
-                         pMobile.includes(searchTerm);
-    
-    const regDate = p.entry_date || (p.registeredAt ? p.registeredAt.split('T')[0] : '');
-    return matchesSearch && (!opdDate || regDate === opdDate);
-  });
+      // Date range filter for OPD History
+      if (opdStartDate || opdEndDate) {
+          const patientDate = formatDate(p.entry_date);
+          if (!patientDate) {
+              return false; // Exclude if no date and filter is active
+          }
+
+          if (opdStartDate && patientDate < opdStartDate) {
+              return false;
+          }
+          if (opdEndDate && patientDate > opdEndDate) {
+              return false;
+          }
+      }
+      
+      const sTerm = (searchTerm || '').toLowerCase();
+      if (!sTerm) return true; // Keep if it passed date filter
+
+      const pName = (p.name || '').toLowerCase();
+      const pId = (p.id || '').toLowerCase();
+      const pMobile = p.mobile || '';
+
+      return pName.includes(sTerm) || 
+             pId.includes(sTerm) ||
+             pMobile.includes(sTerm);
+    })
+    .sort((a, b) => (b.entry_date || b.registeredAt).localeCompare(a.entry_date || a.registeredAt));
+
 
   // Scheduled Appointments: Only display leads with status 'Scheduled'
   const filteredAppointments = appointments.filter(a => {
     const sTerm = (searchTerm || '').toLowerCase();
     const aName = (a.name || '').toLowerCase();
-    const aMobile = a.mobile || '';
+    const aMobile = (a.mobile || '');
     
     // Appointments list in context already filters for 'Scheduled'
     return (!apptDate || a.date === apptDate) &&
@@ -216,7 +352,7 @@ export const FrontOfficeDashboard: React.FC = () => {
       recordType: 'Registration' as const,
       displayDate: p.registeredAt,
       displayEntryDate: p.entry_date,
-      displayStatus: p.status === 'Arrived' ? getPatientStatus(p) : 'Lead'
+      displayStatus: p.status === 'Arrived' ? getHistoryStatus(p) : 'Lead'
     })),
     ...appointments.map(a => ({
       id: '---', name: a.name, mobile: a.mobile, condition: a.condition, source: a.source,
@@ -266,29 +402,57 @@ export const FrontOfficeDashboard: React.FC = () => {
 
       <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-50 flex flex-col gap-4">
         <div className="flex flex-col md:flex-row gap-4 justify-between items-center">
-          <div className="flex flex-1 gap-4 items-center">
+          <div className="flex flex-1 gap-4 items-center w-full">
             <div className="relative flex-1 md:max-w-96">
               <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-              <input type="text" placeholder={`Search ${activeTab.toLowerCase()}...`} className="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-100 rounded-xl focus:ring-2 focus:ring-hospital-500 outline-none font-medium text-sm" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+              <input 
+                type="text" 
+                placeholder={
+                  activeTab === 'REGISTRATION' ? "Search OPD by name, ID, mobile..." :
+                  activeTab === 'APPOINTMENTS' ? "Search appointments by name, mobile..." :
+                  "Search history by name, ID, mobile..."
+                } 
+                className="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-100 rounded-xl focus:ring-2 focus:ring-hospital-500 outline-none font-medium text-sm" 
+                value={searchTerm} 
+                onChange={e => setSearchTerm(e.target.value)} 
+              />
             </div>
-            {(activeTab === 'REGISTRATION' || activeTab === 'APPOINTMENTS') && (
-              <div className="flex items-center gap-2 animate-in fade-in duration-300">
-                <Calendar className="w-4 h-4 text-slate-400" />
-                <input 
-                  type="date" 
-                  className="bg-slate-50 border border-slate-100 rounded-xl px-3 py-2 text-xs font-bold outline-none focus:ring-2 focus:ring-hospital-500" 
-                  value={activeTab === 'REGISTRATION' ? opdDate : apptDate} 
-                  onChange={e => activeTab === 'REGISTRATION' ? setOpdDate(e.target.value) : setApptDate(e.target.value)} 
-                />
-                <span className="text-[10px] font-black uppercase text-slate-400 tracking-tight whitespace-nowrap">Filter Date</span>
-              </div>
+            {activeTab === 'REGISTRATION' && (
+                <div className="flex items-center gap-2 animate-in fade-in duration-300">
+                    <span className="text-[10px] font-black uppercase text-slate-400 tracking-tight">Start Date</span>
+                    <input 
+                        type="date" 
+                        className="bg-slate-50 border border-slate-100 rounded-xl px-3 py-2 text-xs font-bold outline-none focus:ring-2 focus:ring-hospital-500" 
+                        value={opdStartDate} 
+                        onChange={e => setOpdStartDate(e.target.value)} 
+                    />
+                    <span className="text-[10px] font-black uppercase text-slate-400 tracking-tight">End Date</span>
+                    <input 
+                        type="date" 
+                        className="bg-slate-50 border border-slate-100 rounded-xl px-3 py-2 text-xs font-bold outline-none focus:ring-2 focus:ring-hospital-500" 
+                        value={opdEndDate} 
+                        onChange={e => setOpdEndDate(e.target.value)} 
+                    />
+                </div>
+            )}
+            {activeTab === 'APPOINTMENTS' && (
+                <div className="flex items-center gap-2 animate-in fade-in duration-300">
+                    <Calendar className="w-4 h-4 text-slate-400" />
+                    <input 
+                        type="date" 
+                        className="bg-slate-50 border border-slate-100 rounded-xl px-3 py-2 text-xs font-bold outline-none focus:ring-2 focus:ring-hospital-500" 
+                        value={apptDate} 
+                        onChange={e => setApptDate(e.target.value)} 
+                    />
+                    <span className="text-[10px] font-black uppercase text-slate-400 tracking-tight whitespace-nowrap">Filter Date</span>
+                </div>
             )}
           </div>
-          <div className="flex gap-3">
-            <button onClick={() => { resetBookingForm(); setShowBookingForm(true); }} className="bg-white border-2 border-hospital-600 text-hospital-600 px-6 py-3 rounded-xl hover:bg-hospital-50 flex items-center gap-2 font-bold shadow-sm transition-all">
+          <div className="flex gap-3 w-full md:w-auto">
+            <button onClick={() => { resetBookingForm(); setShowBookingForm(true); }} className="flex-1 md:flex-initial bg-white border-2 border-hospital-600 text-hospital-600 px-6 py-3 rounded-xl hover:bg-hospital-50 flex items-center justify-center gap-2 font-bold shadow-sm transition-all">
               <CalendarCheck className="w-5 h-5" /> Book Appointment
             </button>
-            <button onClick={() => { resetForm(); setShowForm(true); }} className="bg-hospital-600 text-white px-8 py-3 rounded-xl hover:bg-hospital-700 flex items-center gap-2 font-bold shadow-lg shadow-hospital-100 transition-all">
+            <button onClick={() => { resetForm(); setShowForm(true); }} className="flex-1 md:flex-initial bg-hospital-600 text-white px-8 py-3 rounded-xl hover:bg-hospital-700 flex items-center justify-center gap-2 font-bold shadow-lg shadow-hospital-100 transition-all">
               <PlusCircle className="w-5 h-5" /> Register Patient
             </button>
           </div>
@@ -300,10 +464,10 @@ export const FrontOfficeDashboard: React.FC = () => {
           <table className="w-full text-left border-collapse">
             <thead className="bg-slate-50 text-slate-500 text-[10px] font-black uppercase tracking-widest border-b">
               <tr>
-                <th className="p-5">{activeTab === 'APPOINTMENTS' ? 'Appt Time' : 'File ID'}</th>
+                <th className="p-5">{activeTab === 'APPOINTMENTS' ? 'Appt Time' : 'File ID / Reg. Date'}</th>
                 <th className="p-5">Patient Details</th>
                 <th className="p-5">Contact</th>
-                <th className="p-5">Findings</th>
+                <th className="p-5">Complaint</th>
                 <th className="p-5">Status</th>
                 <th className="p-5 text-right">Actions</th>
               </tr>
@@ -311,14 +475,22 @@ export const FrontOfficeDashboard: React.FC = () => {
             <tbody className="divide-y divide-slate-100">
               {displayData.map((item: any) => (
                 <tr key={item.id} className="hover:bg-slate-50/50 transition-colors">
-                  <td className="p-5 font-mono font-black text-slate-500">
+                  <td className="p-5">
                     {activeTab === 'APPOINTMENTS' ? (
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 font-mono font-black text-slate-500">
                         <Clock className="w-4 h-4 text-hospital-400" />
                         {item.time}
                       </div>
                     ) : (
-                      item.id
+                      <div>
+                        <div className="font-mono font-black text-slate-500">{item.id}</div>
+                        { (item.entry_date || item.displayEntryDate) &&
+                           <div className="text-[10px] text-slate-400 font-medium uppercase mt-1 flex items-center gap-1">
+                              <Calendar className="w-3 h-3" />
+                              {formatDate(item.entry_date || item.displayEntryDate)}
+                           </div>
+                        }
+                      </div>
                     )}
                   </td>
                   <td className="p-5">
@@ -347,11 +519,9 @@ export const FrontOfficeDashboard: React.FC = () => {
                          <span className="text-[8px] text-slate-400 font-black uppercase tracking-widest">{item.status}</span>
                       </div>
                     ) : (
-                      <span className={`text-[9px] font-black uppercase px-2 py-1 rounded-full ${
-                        getPatientStatus(item) === 'Scheduled' ? 'bg-emerald-50 text-emerald-600' :
-                        getPatientStatus(item) === 'Follow-Up' ? 'bg-blue-50 text-blue-600' :
-                        'bg-slate-50 text-slate-400'
-                      }`}>{item.displayStatus || getPatientStatus(item)}</span>
+                      <span className={`text-[9px] font-black uppercase px-2 py-1 rounded-full ${getStatusClass(item.displayStatus || getPatientStatus(item))}`}>
+                        {item.displayStatus || getPatientStatus(item)}
+                      </span>
                     )}
                   </td>
                   <td className="p-5 text-right">
@@ -432,9 +602,9 @@ export const FrontOfficeDashboard: React.FC = () => {
                       </div>
                     </div>
                     <div>
-                      <label className="block text-[10px] font-black uppercase text-slate-400 mb-2 tracking-widest">Source</label>
+                      <label className="block text-[10px] font-black uppercase text-slate-400 mb-2 tracking-widest">How did you know?</label>
                       <select required className="w-full border-b-2 border-slate-100 p-2 outline-none focus:border-hospital-500 text-sm font-bold bg-white" value={bookingData.source || ''} onChange={e => setBookingData({...bookingData, source: e.target.value})}>
-                        <option value="">Select Source</option>
+                        <option value="">Select an option...</option>
                         {sourceConfig.map(s => <option key={s.name} value={s.name}>{s.name}</option>)}
                       </select>
                     </div>
@@ -534,7 +704,7 @@ export const FrontOfficeDashboard: React.FC = () => {
 
                        <section className="space-y-6">
                          <div className="flex items-center gap-2 text-[10px] font-black uppercase text-hospital-600 tracking-widest mb-4">
-                           <Share2 className="w-4 h-4" /> Marketing Source
+                           <Share2 className="w-4 h-4" /> How did you know?
                          </div>
                          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
                             {sourceConfig.map(src => (
@@ -555,6 +725,47 @@ export const FrontOfficeDashboard: React.FC = () => {
                               </button>
                             ))}
                          </div>
+                         {formData.source === 'Doctor Recommend' && (
+                            <div className="pt-4 mt-4 border-t border-slate-100 space-y-6 animate-in fade-in">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-8">
+                                    <div>
+                                        <label className="block text-[10px] font-black uppercase text-slate-400 mb-2 tracking-widest">Recommending Doctor's Name</label>
+                                        <input 
+                                            required 
+                                            className="w-full text-xl font-bold border-b-2 border-slate-100 p-2 outline-none focus:border-hospital-500" 
+                                            value={formData.sourceDoctorName || ''} 
+                                            onChange={e => setFormData({...formData, sourceDoctorName: e.target.value})} 
+                                            placeholder="Dr. John Doe" 
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-[10px] font-black uppercase text-slate-400 mb-2 tracking-widest">Notes from Doctor</label>
+                                        <input 
+                                            className="w-full text-xl font-bold border-b-2 border-slate-100 p-2 outline-none focus:border-hospital-500" 
+                                            value={formData.sourceDoctorNotes || ''} 
+                                            onChange={e => setFormData({...formData, sourceDoctorNotes: e.target.value})} 
+                                            placeholder="Optional notes" 
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                         )}
+                         {formData.source === 'Other' && (
+                            <div className="pt-4 mt-4 border-t border-slate-100 space-y-6 animate-in fade-in">
+                                <div className="grid grid-cols-1">
+                                    <div>
+                                        <label className="block text-[10px] font-black uppercase text-slate-400 mb-2 tracking-widest">Please Specify Other Source</label>
+                                        <input 
+                                            required 
+                                            className="w-full text-xl font-bold border-b-2 border-slate-100 p-2 outline-none focus:border-hospital-500" 
+                                            value={formData.sourceOtherDetails || ''} 
+                                            onChange={e => setFormData({...formData, sourceOtherDetails: e.target.value})} 
+                                            placeholder="e.g. Newspaper Ad" 
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                         )}
                        </section>
 
                        <section className="space-y-6">

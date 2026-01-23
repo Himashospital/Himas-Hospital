@@ -1,6 +1,6 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { Patient, DoctorAssessment, PackageProposal, Role, StaffUser, Appointment, Condition, SurgeonCode, PainSeverity, Affordability, ConversionReadiness, ProposalOutcome, Gender, FullAssessmentPayload } from '../types';
+import { Patient, DoctorAssessment, PackageProposal, Role, StaffUser, Appointment, Condition, SurgeonCode, PainSeverity, Affordability, ConversionReadiness, ProposalOutcome, Gender } from '../types';
 import { supabase } from '../services/supabaseClient';
 
 interface PatientFilters {
@@ -22,7 +22,7 @@ interface HospitalContextType {
   addPatient: (patientData: Omit<Patient, 'registeredAt' | 'hospital_id'>) => Promise<void>; 
   updatePatient: (targetId: string, patient: Patient) => Promise<void>;
   deletePatient: (id: string) => Promise<void>;
-  updateDoctorAssessment: (patientId: string, payload: FullAssessmentPayload) => Promise<void>;
+  updateDoctorAssessment: (patientId: string, assessment: Partial<DoctorAssessment>) => Promise<void>;
   updatePackageProposal: (patientId: string, proposal: PackageProposal) => Promise<void>;
   getPatientById: (id: string) => Patient | undefined;
   fetchFilteredPatients: (filters: PatientFilters, page: number, pageSize: number) => Promise<{ data: Patient[], count: number }>;
@@ -61,15 +61,13 @@ const mapRowToPatient = (row: any): Patient => ({
   hasInsurance: row.has_insurance || 'No',
   insuranceName: row.insurance_name || '',
   source: row.source || 'Other',
+  sourceDoctorName: row.source_doctor_name || '',
   condition: (row.condition || Condition.Other) as Condition,
   visitType: row.is_follow_up ? 'Follow Up' : 'OPD',
   registeredAt: row.created_at || new Date().toISOString(),
   entry_date: row.entry_date || '',
   status: row.booking_status || 'Scheduled',
-  doctorAssessment: row.doctor_assessment,
   packageProposal: row.package_proposal,
-  clinicalFindingsNotes: row.clinical_findings_notes,
-  digitalSignature: row.digital_signature,
   sourceTable: 'himas_appointments'
 });
 
@@ -98,16 +96,33 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
   const refreshData = async () => {
     setIsLoading(true);
     try {
-      const { data: apptRows, error: apptError } = await supabase
-        .from('himas_appointments')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      const { data: staffData } = await supabase.from('staff_users').select('*');
+      // Fetch from both tables concurrently
+      const [
+        { data: apptRows, error: apptError },
+        { data: assessmentRows, error: assessmentError },
+        { data: staffData }
+      ] = await Promise.all([
+        supabase.from('himas_appointments').select('*').order('created_at', { ascending: false }),
+        supabase.from('doctor_assessment').select('*'),
+        supabase.from('staff_users').select('*')
+      ]);
 
       if (apptError) throw apptError;
+      if (assessmentError) throw assessmentError;
 
-      const allRecords = (apptRows || []).map(mapRowToPatient);
+      // Create a lookup map for assessments
+      const assessmentMap = new Map<string, DoctorAssessment>();
+      (assessmentRows || []).forEach(asm => {
+        assessmentMap.set(asm.patient_id, asm as DoctorAssessment);
+      });
+
+      // Map patient rows and join with assessments
+      const allRecords = (apptRows || []).map(row => {
+        const patient = mapRowToPatient(row);
+        patient.doctorAssessment = assessmentMap.get(patient.id);
+        return patient;
+      });
+      
       setPatients(allRecords);
 
       const scheduledOnly = (apptRows || [])
@@ -152,6 +167,7 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
         mobile: patientData.mobile,
         occupation: patientData.occupation,
         source: patientData.source,
+        source_doctor_name: patientData.sourceDoctorName,
         condition: patientData.condition,
         is_follow_up: patientData.visitType === 'Follow Up',
         has_insurance: patientData.hasInsurance,
@@ -186,12 +202,10 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
         is_follow_up: patient.visitType === 'Follow Up',
         has_insurance: patient.hasInsurance,
         insurance_name: patient.insuranceName,
+        source_doctor_name: patient.sourceDoctorName,
         entry_date: nullify(patient.entry_date) || new Date().toISOString().split('T')[0],
         booking_status: patient.status === 'Scheduled' ? 'Scheduled' : 'Arrived',
-        doctor_assessment: patient.doctorAssessment,
         package_proposal: patient.packageProposal,
-        clinical_findings_notes: patient.clinicalFindingsNotes,
-        digital_signature: patient.digitalSignature
       };
       
       const { error } = await supabase.from('himas_appointments').update(updateData).eq('id', targetId);
@@ -206,6 +220,7 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
   const deletePatient = async (id: string) => {
     setSaveStatus('saving');
     try {
+      // Deleting from himas_appointments will cascade and delete from doctor_assessment
       const { error } = await supabase.from('himas_appointments').delete().eq('id', id);
       if (error) throw error;
       await refreshData();
@@ -215,17 +230,27 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
     }
   };
 
-  const updateDoctorAssessment = async (patientId: string, payload: FullAssessmentPayload) => {
-    const patient = patients.find(p => p.id === patientId);
-    if (patient) {
-      await updatePatient(patientId, { 
-        ...patient, 
-        doctorAssessment: payload.assessment,
-        clinicalFindingsNotes: payload.notes,
-        digitalSignature: payload.signature,
-      });
+  const updateDoctorAssessment = async (patientId: string, assessmentData: Partial<DoctorAssessment>) => {
+    setSaveStatus('saving');
+    try {
+        const payload = {
+            patient_id: patientId,
+            ...assessmentData
+        };
+
+        const { error } = await supabase
+            .from('doctor_assessment')
+            .upsert(payload, { onConflict: 'patient_id' });
+
+        if (error) throw error;
+        await refreshData();
+        setSaveStatus('saved');
+    } catch (err) {
+        console.error("Error updating assessment:", err);
+        setSaveStatus('error');
     }
   };
+
 
   const updatePackageProposal = async (patientId: string, proposal: PackageProposal) => {
     const patient = patients.find(p => p.id === patientId);

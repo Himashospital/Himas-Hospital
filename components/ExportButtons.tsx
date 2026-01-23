@@ -3,6 +3,25 @@ import React, { useState } from 'react';
 import { Download, Printer, Calendar as CalendarIcon, X, FileSpreadsheet } from 'lucide-react';
 import { Patient } from '../types';
 
+const formatDate = (dateString: string | undefined | null): string => {
+  if (!dateString) return '';
+
+  const datePart = dateString.split('T')[0];
+  const parts = datePart.split('-');
+
+  if (parts.length === 3) {
+    // Check for DD-MM-YYYY format and convert
+    if (parts[0].length === 2 && parts[2].length === 4) {
+      return `${parts[2]}-${parts[1]}-${parts[0]}`;
+    }
+    // Assume YYYY-MM-DD if not the above, and return the clean date part
+    return datePart;
+  }
+  
+  // Fallback for any other format that isn't dash-separated
+  return dateString;
+};
+
 interface ExportButtonsProps {
   patients: Patient[];
   role: string;
@@ -29,7 +48,10 @@ export const ExportButtons: React.FC<ExportButtonsProps> = ({ patients, role }) 
       end.setHours(23, 59, 59, 999);
 
       filteredPatients = patients.filter(p => {
-        const regDate = new Date(p.registeredAt);
+        const regDateStr = formatDate(p.entry_date || p.registeredAt);
+        if (!regDateStr) return false;
+
+        const regDate = new Date(regDateStr);
         return regDate >= start && regDate <= end;
       });
     }
@@ -47,7 +69,7 @@ export const ExportButtons: React.FC<ExportButtonsProps> = ({ patients, role }) 
       'Insurance Provider',
       'Source',
       'Condition',
-      'entry_date',
+      'Registration Date',
       // Doctor Data
       'Doctor Assessed', 
       'Surgeon Code', 
@@ -77,24 +99,24 @@ export const ExportButtons: React.FC<ExportButtonsProps> = ({ patients, role }) 
       p.insuranceName || 'N/A',
       p.source,
       p.condition,
-      new Date(p.registeredAt).toLocaleString(),
+      formatDate(p.entry_date || p.registeredAt),
       
       // Doctor
       p.doctorAssessment ? 'Yes' : 'No',
-      p.doctorAssessment?.quickCode || '',
-      p.doctorAssessment?.painSeverity || '',
+      p.doctorAssessment?.quick_code || '',
+      p.doctorAssessment?.pain_severity || '',
       p.doctorAssessment?.affordability || '',
-      p.doctorAssessment?.conversionReadiness || '',
-      p.doctorAssessment?.tentativeSurgeryDate || '',
-      p.digitalSignature || '',
-      p.clinicalFindingsNotes || '',
+      p.doctorAssessment?.conversion_readiness || '',
+      formatDate(p.doctorAssessment?.tentative_surgery_date),
+      p.doctorAssessment?.doctor_signature || '',
+      p.doctorAssessment?.notes || '',
 
       // Package
       p.packageProposal ? 'Yes' : 'No',
       p.packageProposal?.decisionPattern || '',
       p.packageProposal?.objectionIdentified || '',
       p.packageProposal?.counselingStrategy || '',
-      p.packageProposal?.followUpDate || ''
+      formatDate(p.packageProposal?.followUpDate)
     ].map(cell => `"${(cell || '').toString().replace(/"/g, '""')}"`).join(','));
 
     const csvContent = [headers.join(','), ...rows].join('\n');
