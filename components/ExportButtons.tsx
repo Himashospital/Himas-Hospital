@@ -34,7 +34,7 @@ export const ExportButtons: React.FC<ExportButtonsProps> = ({ patients, role, se
     // Detect if we are in Package Team view and have a selected patient with a completed package
     if (role === 'package_team' && selectedPatient && selectedPatient.packageProposal) {
       const p = selectedPatient;
-      const prop = p.packageProposal;
+      const prop = p.packageProposal as PackageProposal; // Explicit cast after guard
       const printWindow = window.open('', '_blank');
       if (!printWindow) return;
 
@@ -170,7 +170,6 @@ export const ExportButtons: React.FC<ExportButtonsProps> = ({ patients, role, se
       'Age', 
       'Mobile', 
       'Occupation',
-      'Insurance',
       'Insurance Provider',
       'Source',
       'Condition',
@@ -199,7 +198,6 @@ export const ExportButtons: React.FC<ExportButtonsProps> = ({ patients, role, se
       p.age,
       p.mobile,
       p.occupation || '',
-      p.hasInsurance,
       p.insuranceName || 'N/A',
       p.source === 'Doctor Recommended' ? `Dr. ${p.sourceDoctorName || 'Recommended'}` : p.source,
       p.condition,

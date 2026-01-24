@@ -732,7 +732,6 @@ export const FrontOfficeDashboard: React.FC = () => {
                              {sourceConfig.map(s => <option key={s.name} value={s.name}>{s.name}</option>)}
                            </select>
                          </div>
-                         {/* Insurance Status selection removed from Registration only */}
                          {formData.source === 'Doctor Recommended' && (
                            <div className="md:col-span-2 group animate-in slide-in-from-top-2 duration-300">
                              <label className="block text-[10px] font-black uppercase text-hospital-600 mb-2 tracking-[0.2em]">Doctor Name</label>

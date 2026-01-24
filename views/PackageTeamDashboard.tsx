@@ -118,7 +118,7 @@ export const PackageTeamDashboard: React.FC = () => {
     return true;
   }).sort((a, b) => {
     const dateA = a.entry_date ? new Date(a.entry_date).getTime() : new Date(a.registeredAt).getTime();
-    const dateB = b.entry_date ? new Date(b.entry_date).getTime() : new Date(b.registeredAt).getTime();
+    const dateB = b.entry_date ? new Date(b.entry_date).getTime() : new Date(a.registeredAt).getTime();
     
     if (dateB !== dateA) return dateB - dateA;
     return new Date(b.registeredAt).getTime() - new Date(a.registeredAt).getTime();
@@ -629,7 +629,7 @@ export const PackageTeamDashboard: React.FC = () => {
                       <th className="p-5">Patient Name</th>
                       <th className="p-5">Evaluating Surgeon</th>
                       <th className="p-5">Lead Source</th>
-                      <th className="p-5">Insurance / TPA</th>
+                      <th className="p-5">Insurance Name</th>
                       <th className="p-5">Amount</th>
                       <th className="p-5">Readiness</th>
                       <th className="p-5">Status</th>
@@ -658,12 +658,12 @@ export const PackageTeamDashboard: React.FC = () => {
                           </span>
                         </td>
                         <td className="p-5 text-sm font-bold text-slate-600">
-                          {p.hasInsurance === 'Yes' ? (
+                          {p.insuranceName ? (
                             <span className="flex items-center gap-1.5 text-emerald-600">
-                              <ShieldCheck className="w-4 h-4" /> {p.insuranceName || 'Yes'}
+                              <ShieldCheck className="w-4 h-4" /> {p.insuranceName}
                             </span>
                           ) : (
-                            <span className="text-slate-400 font-medium italic">Self Pay</span>
+                            <span className="text-slate-400 font-medium italic">No</span>
                           )}
                         </td>
                         <td className="p-5">
