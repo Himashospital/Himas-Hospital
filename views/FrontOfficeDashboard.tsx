@@ -259,7 +259,6 @@ export const FrontOfficeDashboard: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (step === 1 && !editingId) {
-      // Removed formData.hasInsurance check from validation
       if (!formData.name || formData.age == null || !formData.gender || !formData.mobile || !formData.occupation || !formData.condition || !formData.source) {
         alert("Please complete all mandatory fields.");
         return;

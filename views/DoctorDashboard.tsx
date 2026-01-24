@@ -170,7 +170,7 @@ export const DoctorDashboard: React.FC = () => {
                 <div className="bg-gradient-to-br from-rose-50 to-white border border-rose-100 p-3 rounded-2xl shadow-sm">
                   <div className="flex items-center gap-1.5 mb-1">
                     <ShieldCheck className="w-3 h-3 text-rose-500" />
-                    <span className="text-[8px] font-black text-rose-400 uppercase tracking-widest">Insurance Details</span>
+                    <span className="text-[8px] font-black text-rose-400 uppercase tracking-widest">Insurance Name</span>
                   </div>
                   <div className="text-sm font-black text-rose-900 truncate leading-tight">{selectedPatient.insuranceName || 'No'}</div>
                 </div>
