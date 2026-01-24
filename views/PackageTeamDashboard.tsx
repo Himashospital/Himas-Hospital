@@ -8,17 +8,14 @@ import { Briefcase, Calendar, MessageCircle, AlertTriangle, Wand2, CheckCircle2,
 
 const formatDate = (dateString: string | undefined | null): string => {
   if (!dateString) return '';
-
   const datePart = dateString.split('T')[0];
   const parts = datePart.split('-');
-
   if (parts.length === 3) {
     if (parts[0].length === 2 && parts[2].length === 4) {
       return `${parts[2]}-${parts[1]}-${parts[0]}`;
     }
     return datePart;
   }
-  
   return dateString;
 };
 
@@ -99,7 +96,6 @@ export const PackageTeamDashboard: React.FC = () => {
 
   const allPatients = [...patients].filter(p => {
     if (p.doctorAssessment?.quickCode !== SurgeonCode.S1) return false;
-
     const outcome = p.packageProposal?.outcome;
     if (listCategory === 'PENDING') {
       if (outcome) return false;
@@ -110,16 +106,13 @@ export const PackageTeamDashboard: React.FC = () => {
     } else if (listCategory === 'LOST') {
       if (outcome !== 'Lost') return false;
     }
-
     if (listCategory === 'PENDING' && filter !== 'ALL') {
       return p.doctorAssessment?.conversionReadiness?.startsWith(filter);
     }
-    
     return true;
   }).sort((a, b) => {
     const dateA = a.entry_date ? new Date(a.entry_date).getTime() : new Date(a.registeredAt).getTime();
     const dateB = b.entry_date ? new Date(b.entry_date).getTime() : new Date(a.registeredAt).getTime();
-    
     if (dateB !== dateA) return dateB - dateA;
     return new Date(b.registeredAt).getTime() - new Date(a.registeredAt).getTime();
   });
@@ -141,9 +134,7 @@ export const PackageTeamDashboard: React.FC = () => {
 
   const handleConfirmOutcome = async () => {
     if (!selectedPatient) return;
-    
     const newOutcomeDate = outcomeModal.type !== 'Lost' ? outcomeModal.date : new Date().toISOString().split('T')[0];
-
     const updatedProposal: PackageProposal = {
       ...proposal as PackageProposal,
       outcome: outcomeModal.type!,
@@ -152,17 +143,11 @@ export const PackageTeamDashboard: React.FC = () => {
       lostReason: outcomeModal.type === 'Lost' ? outcomeModal.reason : undefined,
       proposalCreatedAt: proposal.proposalCreatedAt || new Date().toISOString()
     };
-
     await updatePackageProposal(selectedPatient.id, updatedProposal);
     setOutcomeModal({ ...outcomeModal, show: false });
-
-    if (outcomeModal.type === 'Scheduled') {
-      setListCategory('SCHEDULED');
-    } else if (outcomeModal.type === 'Follow-Up') {
-      setListCategory('FOLLOWUP');
-    } else if (outcomeModal.type === 'Lost') {
-      setListCategory('LOST');
-    }
+    if (outcomeModal.type === 'Scheduled') setListCategory('SCHEDULED');
+    else if (outcomeModal.type === 'Follow-Up') setListCategory('FOLLOWUP');
+    else if (outcomeModal.type === 'Lost') setListCategory('LOST');
   };
 
   const handleGenerateAIStrategy = async () => {
@@ -187,23 +172,20 @@ export const PackageTeamDashboard: React.FC = () => {
     }
   };
 
-  const [newStaff, setNewStaff] = useState<{name: string, email: string, mobile: string, role: Role, password: string}>({
-    name: '', email: '', mobile: '', role: 'FRONT_OFFICE', password: ''
-  });
+  const [newStaff, setNewStaff] = useState({name: '', email: '', mobile: '', role: 'FRONT_OFFICE' as Role, password: ''});
   const [staffSuccess, setStaffSuccess] = useState('');
 
   const handleRegisterStaff = (e: React.FormEvent) => {
     e.preventDefault();
     const { name, mobile, role, email, password } = newStaff;
     if (!name || !mobile || !role || !email || !password) return;
-    
     const emailToLow = email.toLowerCase().trim();
     if (staffUsers.some(u => u.mobile === mobile || (u.email && u.email.toLowerCase() === emailToLow))) {
-      alert("User with this mobile number or email already exists.");
+      alert("User already exists.");
       return;
     }
     registerStaff(newStaff);
-    setStaffSuccess(`Successfully registered ${name} as ${role}`);
+    setStaffSuccess(`Successfully registered ${name}`);
     setNewStaff({ name: '', email: '', mobile: '', role: 'FRONT_OFFICE', password: '' });
     setTimeout(() => setStaffSuccess(''), 3000);
   };
@@ -224,32 +206,10 @@ export const PackageTeamDashboard: React.FC = () => {
 
   const getStatusBadge = (p: Patient) => {
     const outcome = p.packageProposal?.outcome;
-    if (outcome === 'Scheduled') {
-      return {
-        text: 'Surgery Scheduled',
-        classes: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-        icon: <CheckCircle2 className="w-4 h-4" />
-      };
-    }
-    if (outcome === 'Follow-Up') {
-      return {
-        text: 'Follow-Up Surgery',
-        classes: 'bg-blue-50 text-blue-700 border-blue-200',
-        icon: <Clock className="w-4 h-4" />
-      };
-    }
-    if (outcome === 'Lost') {
-      return {
-        text: 'Surgery Lost',
-        classes: 'bg-rose-50 text-rose-700 border-rose-200',
-        icon: <X className="w-4 h-4" />
-      };
-    }
-    return {
-      text: 'Package Proposal Pending',
-      classes: 'bg-amber-50 text-amber-700 border-amber-200',
-      icon: <AlertTriangle className="w-4 h-4" />
-    };
+    if (outcome === 'Scheduled') return { text: 'Scheduled', classes: 'bg-emerald-50 text-emerald-700 border-emerald-200', icon: <CheckCircle2 className="w-4 h-4" /> };
+    if (outcome === 'Follow-Up') return { text: 'Follow-Up', classes: 'bg-blue-50 text-blue-700 border-blue-200', icon: <Clock className="w-4 h-4" /> };
+    if (outcome === 'Lost') return { text: 'Lost', classes: 'bg-rose-50 text-rose-700 border-rose-200', icon: <X className="w-4 h-4" /> };
+    return { text: 'Pending', classes: 'bg-amber-50 text-amber-700 border-amber-200', icon: <AlertTriangle className="w-4 h-4" /> };
   };
 
   return (
@@ -259,499 +219,205 @@ export const PackageTeamDashboard: React.FC = () => {
           <h2 className="text-2xl font-bold text-gray-800 tracking-tight">Management Dashboard</h2>
           <p className="text-gray-500 text-sm font-medium uppercase tracking-wider">Patient Counseling & Staff Hub</p>
         </div>
-        
-        <div className="flex bg-white rounded-xl p-1 border shadow-sm">
-          <button
-            onClick={() => setActiveTab('counseling')}
-            className={`px-6 py-2.5 text-xs font-black uppercase rounded-lg flex items-center gap-2 transition-all ${
-              activeTab === 'counseling' ? 'bg-hospital-600 text-white shadow-md' : 'text-gray-500 hover:bg-gray-50'
-            }`}
-          >
+        <div className="flex bg-white rounded-xl p-1 border shadow-sm w-full md:w-auto">
+          <button onClick={() => setActiveTab('counseling')} className={`flex-1 md:flex-initial px-4 lg:px-6 py-2.5 text-xs font-black uppercase rounded-lg flex items-center justify-center gap-2 transition-all ${activeTab === 'counseling' ? 'bg-hospital-600 text-white shadow-md' : 'text-gray-500 hover:bg-gray-50'}`}>
             <Briefcase className="w-4 h-4" /> Counseling
           </button>
-          <button
-            onClick={() => setActiveTab('staff')}
-            className={`px-6 py-2.5 text-xs font-black uppercase rounded-lg flex items-center gap-2 transition-all ${
-              activeTab === 'staff' ? 'bg-hospital-600 text-white shadow-md' : 'text-gray-500 hover:bg-gray-50'
-            }`}
-          >
-            <Users className="w-4 h-4" /> Staff Admins
+          <button onClick={() => setActiveTab('staff')} className={`flex-1 md:flex-initial px-4 lg:px-6 py-2.5 text-xs font-black uppercase rounded-lg flex items-center justify-center gap-2 transition-all ${activeTab === 'staff' ? 'bg-hospital-600 text-white shadow-md' : 'text-gray-500 hover:bg-gray-50'}`}>
+            <Users className="w-4 h-4" /> Staff
           </button>
         </div>
       </div>
 
       {activeTab === 'counseling' ? (
-        <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
-          <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-            <div className="flex bg-slate-100 p-1 rounded-2xl w-full md:w-auto">
-              <button onClick={() => setListCategory('PENDING')} className={`px-5 py-2.5 rounded-xl text-[10px] font-black uppercase transition-all flex items-center gap-2 ${listCategory === 'PENDING' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
-                <Activity className="w-4 h-4" /> Active Leads
-              </button>
-              <button onClick={() => setListCategory('SCHEDULED')} className={`px-5 py-2.5 rounded-xl text-[10px] font-black uppercase transition-all flex items-center gap-2 ${listCategory === 'SCHEDULED' ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-500 hover:text-slate-700'}`}>
-                <Calendar className="w-4 h-4" /> Schedule Surgery
-              </button>
-              <button onClick={() => setListCategory('FOLLOWUP')} className={`px-5 py-2.5 rounded-xl text-[10px] font-black uppercase transition-all flex items-center gap-2 ${listCategory === 'FOLLOWUP' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-500 hover:text-slate-700'}`}>
-                <Clock className="w-4 h-4" /> Follow-Up
-              </button>
-              <button onClick={() => setListCategory('LOST')} className={`px-5 py-2.5 rounded-xl text-[10px] font-black uppercase transition-all flex items-center gap-2 ${listCategory === 'LOST' ? 'bg-rose-600 text-white shadow-md' : 'text-slate-500 hover:text-slate-700'}`}>
-                <Trash2 className="w-4 h-4" /> Lost
-              </button>
+        <div className="space-y-6">
+          <div className="flex flex-col xl:flex-row justify-between items-center gap-4">
+            <div className="flex bg-slate-100 p-1 rounded-2xl w-full xl:w-auto overflow-x-auto whitespace-nowrap scrollbar-hide">
+              {['PENDING', 'SCHEDULED', 'FOLLOWUP', 'LOST'].map((cat) => (
+                <button key={cat} onClick={() => setListCategory(cat as any)} className={`px-4 lg:px-5 py-2.5 rounded-xl text-[10px] font-black uppercase transition-all flex items-center gap-2 ${listCategory === cat ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
+                  {cat === 'PENDING' && <Activity className="w-4 h-4" />}
+                  {cat === 'SCHEDULED' && <Calendar className="w-4 h-4" />}
+                  {cat === 'FOLLOWUP' && <Clock className="w-4 h-4" />}
+                  {cat === 'LOST' && <Trash2 className="w-4 h-4" />}
+                  {cat.replace('PENDING', 'Leads').replace('FOLLOWUP', 'Follow-Up')}
+                </button>
+              ))}
             </div>
-
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 w-full xl:w-auto justify-end">
               <div className="bg-white border p-1 rounded-xl flex shadow-sm">
-                <button 
-                  onClick={() => setViewMode('split')}
-                  className={`p-2 rounded-lg transition-all ${viewMode === 'split' ? 'bg-slate-100 text-slate-900' : 'text-slate-400'}`}
-                  title="Form View"
-                >
-                  <Columns className="w-4 h-4" />
-                </button>
-                <button 
-                  onClick={() => setViewMode('table')}
-                  className={`p-2 rounded-lg transition-all ${viewMode === 'table' ? 'bg-slate-100 text-slate-900' : 'text-slate-400'}`}
-                  title="Table View"
-                >
-                  <LayoutList className="w-4 h-4" />
-                </button>
+                <button onClick={() => setViewMode('split')} className={`p-2 rounded-lg transition-all ${viewMode === 'split' ? 'bg-slate-100 text-slate-900' : 'text-slate-400'}`}><Columns className="w-4 h-4" /></button>
+                <button onClick={() => setViewMode('table')} className={`p-2 rounded-lg transition-all ${viewMode === 'table' ? 'bg-slate-100 text-slate-900' : 'text-slate-400'}`}><LayoutList className="w-4 h-4" /></button>
               </div>
               <ExportButtons patients={patients} role="package_team" selectedPatient={selectedPatient} />
             </div>
           </div>
 
-          {listCategory === 'PENDING' && (
-            <div className="flex gap-2 overflow-x-auto pb-2">
-              {['ALL', 'CR1', 'CR2', 'CR3', 'CR4'].map(f => (
-                <button
-                  key={f}
-                  onClick={() => setFilter(f as any)}
-                  className={`px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all ${
-                    filter === f ? 'bg-slate-900 text-white shadow-lg' : 'bg-white text-slate-400 border border-slate-100 hover:bg-gray-50'
-                  }`}
-                >
-                  {f === 'ALL' ? 'Global Leads' : `${f} Candidates`}
-                </button>
-              ))}
-            </div>
-          )}
-
           {viewMode === 'split' ? (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <div className="bg-white rounded-[2rem] shadow-sm border border-slate-100 overflow-hidden lg:col-span-1 h-[750px] flex flex-col">
+              <div className="bg-white rounded-[2rem] shadow-sm border border-slate-100 overflow-hidden h-[400px] lg:h-[750px] flex flex-col">
                 <div className="p-5 border-b bg-slate-50/50 flex justify-between items-center">
                   <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">{listCategory} Directory</span>
-                  <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${listCategory === 'LOST' ? 'bg-rose-50 text-rose-600' : 'bg-hospital-50 text-hospital-600'}`}>
-                    {allPatients.length} records
-                  </span>
+                  <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${listCategory === 'LOST' ? 'bg-rose-50 text-rose-600' : 'bg-hospital-50 text-hospital-600'}`}>{allPatients.length}</span>
                 </div>
-                <div className="overflow-y-auto flex-1 p-3 space-y-2 bg-white">
+                <div className="overflow-y-auto flex-1 p-3 space-y-2">
                   {allPatients.map(p => (
-                    <div 
-                      key={p.id}
-                      onClick={() => handlePatientSelect(p)}
-                      className={`p-4 rounded-2xl border transition-all ${
-                        selectedPatient?.id === p.id 
-                          ? 'border-hospital-500 bg-hospital-50 shadow-md ring-2 ring-hospital-50' 
-                          : 'border-slate-50 hover:border-slate-200 bg-white'
-                      }`}
-                    >
+                    <div key={p.id} onClick={() => handlePatientSelect(p)} className={`p-4 rounded-2xl border transition-all ${selectedPatient?.id === p.id ? 'border-hospital-500 bg-hospital-50 shadow-md' : 'border-slate-50 hover:border-slate-200 bg-white'}`}>
                       <div className="flex justify-between mb-2">
                         <span className="font-bold text-slate-800 text-sm">{p.name}</span>
-                        <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded-full ${
-                          p.packageProposal?.outcome === 'Scheduled' ? 'bg-emerald-50 text-emerald-600' :
-                          p.packageProposal?.outcome === 'Follow-Up' ? 'bg-blue-50 text-blue-600' :
-                          p.packageProposal?.outcome === 'Lost' ? 'bg-rose-50 text-rose-600' :
-                          'bg-amber-50 text-amber-600'
-                        }`}>
-                          {p.packageProposal?.outcome || 'Pending'}
-                        </span>
+                        <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded-full ${p.packageProposal?.outcome === 'Scheduled' ? 'bg-emerald-50 text-emerald-600' : p.packageProposal?.outcome === 'Follow-Up' ? 'bg-blue-50 text-blue-600' : p.packageProposal?.outcome === 'Lost' ? 'bg-rose-50 text-rose-600' : 'bg-amber-50 text-amber-600'}`}>{p.packageProposal?.outcome || 'Pending'}</span>
                       </div>
-                      <div className="text-[10px] text-slate-400 font-bold uppercase tracking-tight flex items-center gap-2">
-                        <Stethoscope className="w-3 h-3 text-hospital-400" />
-                        {p.doctorAssessment?.doctorSignature || 'Unassigned Surgeon'}
-                      </div>
-                      <div className="mt-2 text-[9px] text-slate-400 font-black uppercase tracking-widest flex flex-wrap items-center gap-x-2 gap-y-1">
+                      <div className="mt-2 text-[9px] text-slate-400 font-black uppercase tracking-widest flex flex-wrap items-center gap-2">
                         <span>{p.condition}</span>
                         <span className="w-1 h-1 bg-slate-200 rounded-full"></span>
-                        <span>{p.doctorAssessment?.conversionReadiness || 'LEAD'}</span>
-                        <span className="w-1 h-1 bg-slate-200 rounded-full"></span>
-                        <span className="flex items-center gap-1 text-hospital-600 font-bold">
-                          <Clock className="w-3 h-3" /> Arrived: {formatDate(p.entry_date)}
-                        </span>
-                        {p.packageProposal?.outcomeDate && (
-                          <>
-                            <span className="w-1 h-1 bg-slate-200 rounded-full"></span>
-                            <span className={`flex items-center gap-1 font-bold ${
-                              p.packageProposal.outcome === 'Scheduled' ? 'text-emerald-600' : 
-                              p.packageProposal.outcome === 'Follow-Up' ? 'text-blue-600' : 
-                              'text-rose-600'
-                            }`}>
-                              <Calendar className="w-3 h-3" /> {p.packageProposal.outcome}: {formatDate(p.packageProposal.outcomeDate)}
-                            </span>
-                          </>
-                        )}
+                        <span className="text-hospital-600 font-bold">{formatDate(p.entry_date)}</span>
                       </div>
                     </div>
                   ))}
-                  {allPatients.length === 0 && (
-                    <div className="p-12 text-slate-300 text-center flex flex-col items-center gap-4">
-                      <Activity className="w-12 h-12 text-slate-100" />
-                      <span className="text-[10px] font-black uppercase tracking-widest leading-relaxed">No patients in this category</span>
-                    </div>
-                  )}
                 </div>
               </div>
 
-              <div className="bg-white rounded-[2.5rem] shadow-sm border border-slate-100 overflow-hidden lg:col-span-2 flex flex-col h-[750px]">
+              <div className="bg-white rounded-[2rem] shadow-sm border border-slate-100 overflow-hidden lg:col-span-2 flex flex-col min-h-[500px] lg:h-[750px]">
                 {selectedPatient ? (
                   <div className="flex flex-col h-full">
-                    <div className="p-6 bg-slate-50 border-b relative overflow-hidden">
-                      <div className="absolute top-0 right-0 w-32 h-32 bg-hospital-500/10 blur-[50px] rounded-full -mr-16 -mt-16"></div>
-                      <div className="relative z-10 flex flex-col md:flex-row justify-between items-start gap-6">
-                        <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 w-full">
-                          <div className="bg-white border border-indigo-100 p-3 rounded-2xl shadow-sm">
-                            <div className="flex items-center gap-1.5 mb-1">
-                              <User className="w-3 h-3 text-indigo-500" />
-                              <span className="text-[8px] font-black text-indigo-400 uppercase tracking-widest">Name</span>
-                            </div>
-                            <div className="text-sm font-black text-indigo-900 truncate leading-tight">{selectedPatient.name}</div>
-                          </div>
-                          <div className="bg-white border border-blue-100 p-3 rounded-2xl shadow-sm">
-                            <div className="flex items-center gap-1.5 mb-1">
-                              <Activity className="w-3 h-3 text-blue-500" />
-                              <span className="text-[8px] font-black text-blue-400 uppercase tracking-widest">Age / Gender</span>
-                            </div>
-                            <div className="text-sm font-black text-blue-900 leading-tight">{selectedPatient.age}Y <span className="text-blue-200">|</span> {selectedPatient.gender}</div>
-                          </div>
-                          <div className="bg-white border border-teal-100 p-3 rounded-2xl shadow-sm">
-                            <div className="flex items-center gap-1.5 mb-1">
-                              <Share2 className="w-3 h-3 text-teal-500" />
-                              <span className="text-[8px] font-black text-teal-400 uppercase tracking-widest">Source</span>
-                            </div>
-                            <div className="text-sm font-black text-teal-900 truncate leading-tight">
-                              {selectedPatient.source === 'Doctor Recommended' ? `Dr. ${selectedPatient.sourceDoctorName || 'Recommended'}` : selectedPatient.source}
-                            </div>
-                          </div>
-                          <div className="bg-white border border-rose-100 p-3 rounded-2xl shadow-sm">
-                            <div className="flex items-center gap-1.5 mb-1">
-                              <ShieldCheck className="w-3 h-3 text-rose-500" />
-                              <span className="text-[8px] font-black text-rose-400 uppercase tracking-widest">Insurance Name</span>
-                            </div>
-                            <div className="text-sm font-black text-rose-900 truncate leading-tight">{selectedPatient.insuranceName || 'No'}</div>
-                          </div>
+                    <div className="p-4 sm:p-6 bg-slate-50 border-b">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
+                        <div className="bg-white border border-indigo-100 p-3 rounded-2xl shadow-sm">
+                          <div className="flex items-center gap-1.5 mb-1"><User className="w-3 h-3 text-indigo-500" /><span className="text-[8px] font-black text-indigo-400 uppercase tracking-widest">Name</span></div>
+                          <div className="text-sm font-black text-indigo-900 truncate">{selectedPatient.name}</div>
                         </div>
-
-                        <div className="text-right flex flex-col items-end gap-3 min-w-[150px]">
-                          <div className="flex flex-col items-end">
-                            <div className="text-[9px] text-slate-400 font-black uppercase tracking-[0.2em] mb-1.5">Counseling Status</div>
-                            {(() => {
-                              const badge = getStatusBadge(selectedPatient);
-                              return (
-                                <div className={`px-4 py-1.5 rounded-xl border-2 shadow-sm inline-flex items-center gap-2 ${badge.classes}`}>
-                                  {badge.icon}
-                                  <span className="font-black text-[10px] uppercase">{badge.text}</span>
-                                </div>
-                              );
-                            })()}
-                          </div>
-
-                          <div className="flex flex-col items-end">
-                            <div className="text-[9px] text-slate-400 font-black uppercase tracking-[0.2em] mb-1.5">Lead Priority</div>
-                            <div className="bg-white border-2 border-slate-100 px-4 py-1.5 rounded-xl shadow-sm inline-flex items-center gap-2">
-                              <Activity className="w-4 h-4 text-hospital-600" />
-                              <span className="font-black text-slate-800 text-[10px] uppercase">{selectedPatient.doctorAssessment?.conversionReadiness || 'LEAD'}</span>
-                            </div>
-                          </div>
+                        <div className="bg-white border border-blue-100 p-3 rounded-2xl shadow-sm">
+                          <div className="flex items-center gap-1.5 mb-1"><Activity className="w-3 h-3 text-blue-500" /><span className="text-[8px] font-black text-blue-400 uppercase tracking-widest">Age / Gender</span></div>
+                          <div className="text-sm font-black text-blue-900">{selectedPatient.age}Y | {selectedPatient.gender}</div>
+                        </div>
+                        <div className="bg-white border border-teal-100 p-3 rounded-2xl shadow-sm">
+                          <div className="flex items-center gap-1.5 mb-1"><Share2 className="w-3 h-3 text-teal-500" /><span className="text-[8px] font-black text-teal-400 uppercase tracking-widest">Source</span></div>
+                          <div className="text-sm font-black text-teal-900 truncate">{selectedPatient.source === 'Doctor Recommended' ? `Dr. ${selectedPatient.sourceDoctorName || 'Rec'}` : selectedPatient.source}</div>
+                        </div>
+                        <div className="bg-white border border-rose-100 p-3 rounded-2xl shadow-sm">
+                          <div className="flex items-center gap-1.5 mb-1"><ShieldCheck className="w-3 h-3 text-rose-500" /><span className="text-[8px] font-black text-rose-400 uppercase tracking-widest">Insurance Name</span></div>
+                          <div className="text-sm font-black text-rose-900 truncate">{selectedPatient.insuranceName || 'No'}</div>
                         </div>
                       </div>
                     </div>
 
-                    <form onSubmit={handleSaveProposal} className="flex-1 overflow-y-auto p-8 space-y-10">
-                      
-                      <div className="bg-blue-50/50 border border-blue-100 p-6 rounded-[2rem] space-y-5 animate-in fade-in slide-in-from-top-4">
+                    <form onSubmit={handleSaveProposal} className="flex-1 overflow-y-auto p-4 sm:p-8 space-y-10">
+                      <div className="bg-blue-50/50 border border-blue-100 p-6 rounded-[2rem] space-y-5">
                          <div className="flex items-center justify-between">
-                           <div className="flex items-center gap-2 text-[10px] font-black uppercase text-blue-600 tracking-[0.2em]">
-                             <Stethoscope className="w-4 h-4" /> Surgeon's Recommendation
-                           </div>
-                           <div className="flex items-center gap-1.5 text-[9px] font-black text-slate-400 uppercase">
-                             Assessed: {selectedPatient.doctorAssessment?.assessedAt ? formatDate(selectedPatient.doctorAssessment.assessedAt) : 'N/A'}
-                           </div>
+                           <div className="flex items-center gap-2 text-[10px] font-black uppercase text-blue-600 tracking-[0.2em]"><Stethoscope className="w-4 h-4" /> Recommendation</div>
                          </div>
-
-                         {/* Recommended Procedures Display */}
-                         <div className="bg-white p-4 rounded-2xl border border-blue-100 shadow-sm flex items-center justify-between">
-                            <div>
-                               <div className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Recommended Procedure</div>
-                               <div className="text-sm font-black text-blue-700 uppercase">{selectedPatient.doctorAssessment?.surgeryProcedure || 'NOT SPECIFIED'}</div>
-                            </div>
-                            <LayoutList className="w-5 h-5 text-blue-200" />
+                         <div className="bg-white p-4 rounded-2xl border border-blue-100 shadow-sm">
+                           <div className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Recommended Procedure</div>
+                           <div className="text-sm font-black text-blue-700 uppercase">{selectedPatient.doctorAssessment?.surgeryProcedure || 'NOT SPECIFIED'}</div>
                          </div>
-
                          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                            <div className="bg-white p-3 rounded-2xl border border-blue-50 shadow-sm">
-                              <div className="text-[7px] font-black text-slate-400 uppercase tracking-widest mb-1">Evaluating Surgeon</div>
-                              <div className="text-[10px] font-black text-blue-700 truncate">{selectedPatient.doctorAssessment?.doctorSignature || 'Not Signed'}</div>
-                            </div>
-                            <div className="bg-white p-3 rounded-2xl border border-blue-50 shadow-sm">
-                              <div className="text-[7px] font-black text-slate-400 uppercase tracking-widest mb-1">Pain Level</div>
-                              <div className="text-[10px] font-black text-slate-700">{selectedPatient.doctorAssessment?.painSeverity || 'N/A'}</div>
-                            </div>
-                            <div className="bg-white p-3 rounded-2xl border border-blue-50 shadow-sm">
-                              <div className="text-[7px] font-black text-slate-400 uppercase tracking-widest mb-1">Affordability</div>
-                              <div className="text-[10px] font-black text-slate-700">{selectedPatient.doctorAssessment?.affordability || 'N/A'}</div>
-                            </div>
-                            <div className="bg-white p-3 rounded-2xl border border-blue-50 shadow-sm">
-                              <div className="text-[7px] font-black text-slate-400 uppercase tracking-widest mb-1">Readiness</div>
-                              <div className="text-[10px] font-black text-slate-700">{selectedPatient.doctorAssessment?.conversionReadiness || 'N/A'}</div>
-                            </div>
-                         </div>
-
-                         <div className="p-4 bg-white/50 border border-blue-100 rounded-2xl">
-                            <div className="text-[8px] font-black text-blue-400 uppercase tracking-widest mb-2 flex items-center gap-1.5">
-                              <FileText className="w-3 h-3" /> Clinical Observation
-                            </div>
-                            <p className="text-xs font-medium text-slate-700 leading-relaxed italic">
-                              {selectedPatient.doctorAssessment?.notes ? `"${selectedPatient.doctorAssessment.notes}"` : "No specific surgeon notes provided for this evaluation."}
-                            </p>
+                            {['Evaluator', 'Pain', 'Affordability', 'Readiness'].map((label, idx) => (
+                              <div key={idx} className="bg-white p-3 rounded-2xl border border-blue-50 shadow-sm">
+                                <div className="text-[7px] font-black text-slate-400 uppercase tracking-widest mb-1">{label}</div>
+                                <div className="text-[10px] font-black text-blue-700 truncate">
+                                  {idx === 0 ? selectedPatient.doctorAssessment?.doctorSignature || '---' : 
+                                   idx === 1 ? selectedPatient.doctorAssessment?.painSeverity || '---' :
+                                   idx === 2 ? selectedPatient.doctorAssessment?.affordability || '---' :
+                                   selectedPatient.doctorAssessment?.conversionReadiness || '---'}
+                                </div>
+                              </div>
+                            ))}
                          </div>
                       </div>
 
                       <div className="space-y-8">
-                         <div className="flex items-center gap-2 text-[10px] font-black uppercase text-hospital-600 tracking-[0.2em]">
-                           <Banknote className="w-4 h-4" /> Package & Financials
-                         </div>
-                         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                           <div className="md:col-span-1">
-                              <label className="block text-[10px] font-black uppercase text-slate-400 mb-3 tracking-widest">Mode of Payment</label>
-                              <div className="flex flex-wrap gap-2">
-                                 {['Cash', 'Insurance', 'Partly', 'Insurance Approved'].map(mode => (
-                                   <button key={mode} type="button" onClick={() => setProposal({...proposal, modeOfPayment: mode as any})} className={`px-3 py-2 text-[9px] font-black uppercase rounded-lg border transition-all ${proposal.modeOfPayment === mode ? 'bg-hospital-600 text-white border-hospital-600 shadow-md' : 'bg-white text-slate-400 border-slate-100 hover:border-slate-300'}`}>{mode}</button>
-                                 ))}
-                              </div>
-                           </div>
-                           <div className="md:col-span-1">
-                              <label className="block text-[10px] font-black uppercase text-slate-400 mb-3 tracking-widest">Package Amount (₹)</label>
-                              <div className="relative">
-                                 <Banknote className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 w-4 h-4" />
-                                 <input type="text" placeholder="e.g. 45,000" className="w-full pl-12 pr-4 py-3 bg-slate-50 border-2 border-transparent rounded-xl text-sm font-black focus:bg-white focus:border-hospital-500 outline-none transition-all" value={proposal.packageAmount || ''} onChange={e => setProposal({...proposal, packageAmount: e.target.value})} />
-                              </div>
-                           </div>
-                            <div className="md:col-span-1">
-                              <label className="block text-[10px] font-black uppercase text-slate-400 mb-3 tracking-widest">Stay (Days)</label>
-                              <div className="relative">
-                                 <Bed className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 w-4 h-4" />
-                                 <input type="number" placeholder="e.g. 2" className="w-full pl-12 pr-4 py-3 bg-slate-50 border-2 border-transparent rounded-xl text-sm font-black focus:bg-white focus:border-hospital-500 outline-none transition-all" value={proposal.stayDays || ''} onChange={e => setProposal({...proposal, stayDays: e.target.value ? parseInt(e.target.value, 10) : undefined})} />
-                              </div>
-                           </div>
-                         </div>
-                      </div>
-
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-                         <div className="space-y-4">
-                            <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest">Inclusions</label>
-                            <div className="grid grid-cols-2 gap-2">
-                              <ToggleButton label="Pre-op" value="Included" current={proposal.preOpInvestigation} onClick={v => setProposal({...proposal, preOpInvestigation: v})} />
-                              <ToggleButton label="Meds" value="Included" current={proposal.surgeryMedicines} onClick={v => setProposal({...proposal, surgeryMedicines: v})} />
-                              <ToggleButton label="Equip" value="Included" current={proposal.equipment} onClick={v => setProposal({...proposal, equipment: v})} />
-                              <ToggleButton label="ICU" value="Included" current={proposal.icuCharges} onClick={v => setProposal({...proposal, icuCharges: v})} />
+                         <div className="flex items-center gap-2 text-[10px] font-black uppercase text-hospital-600 tracking-[0.2em]"><Banknote className="w-4 h-4" /> Package & Financials</div>
+                         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-8">
+                            <div className="sm:col-span-2 xl:col-span-1">
+                               <label className="block text-[10px] font-black uppercase text-slate-400 mb-3 tracking-widest">Mode of Payment</label>
+                               <div className="flex flex-wrap gap-2">
+                                  {['Cash', 'Insurance', 'Partly', 'Insurance Approved'].map(mode => (
+                                    <button key={mode} type="button" onClick={() => setProposal({...proposal, modeOfPayment: mode as any})} className={`px-3 py-2 text-[9px] font-black uppercase rounded-lg border transition-all ${proposal.modeOfPayment === mode ? 'bg-hospital-600 text-white border-hospital-600 shadow-md' : 'bg-white text-slate-400 border-slate-100 hover:border-slate-300'}`}>{mode}</button>
+                                  ))}
+                               </div>
                             </div>
-                         </div>
-                         <div className="space-y-4">
-                            <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest">Room Type</label>
-                            <div className="flex gap-2">
-                              {['Private', 'Deluxe', 'Semi'].map(room => (
-                                <button key={room} type="button" onClick={() => setProposal({...proposal, roomType: room as any})} className={`flex-1 py-2 text-[9px] font-black uppercase rounded-lg border transition-all ${proposal.roomType === room ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-400 border-slate-100'}`}>{room}</button>
-                              ))}
+                            <div>
+                               <label className="block text-[10px] font-black uppercase text-slate-400 mb-3 tracking-widest">Package Amount (₹)</label>
+                               <div className="relative">
+                                  <Banknote className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 w-4 h-4" />
+                                  <input type="text" placeholder="e.g. 45,000" className="w-full pl-12 pr-4 py-3 bg-slate-50 border-2 border-transparent rounded-xl text-sm font-black focus:bg-white focus:border-hospital-500 outline-none" value={proposal.packageAmount || ''} onChange={e => setProposal({...proposal, packageAmount: e.target.value})} />
+                               </div>
+                            </div>
+                            <div>
+                               <label className="block text-[10px] font-black uppercase text-slate-400 mb-3 tracking-widest">Stay (Days)</label>
+                               <div className="relative">
+                                  <Bed className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 w-4 h-4" />
+                                  <input type="number" placeholder="e.g. 2" className="w-full pl-12 pr-4 py-3 bg-slate-50 border-2 border-transparent rounded-xl text-sm font-black focus:bg-white focus:border-hospital-500 outline-none" value={proposal.stayDays || ''} onChange={e => setProposal({...proposal, stayDays: e.target.value ? parseInt(e.target.value, 10) : undefined})} />
+                               </div>
                             </div>
                          </div>
                       </div>
 
-                      <hr className="border-slate-100" />
-
-                      <div className="space-y-6">
-                         <div className="flex items-center gap-2 text-[10px] font-black uppercase text-hospital-600 tracking-[0.2em]">
-                           <Sparkles className="w-4 h-4" /> AI Counselor Advice
-                         </div>
-                         <div className="relative group">
-                            <button type="button" onClick={handleGenerateAIStrategy} disabled={aiLoading} className="absolute right-4 top-4 z-10 text-[10px] font-black uppercase tracking-widest bg-slate-900 text-white px-5 py-2 rounded-full flex items-center gap-2 hover:bg-hospital-600 disabled:opacity-50 transition-all">
-                               {aiLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Wand2 className="w-3 h-3" />} AI Strategy
-                            </button>
-                            <textarea className="w-full border-2 border-slate-100 rounded-[2rem] p-6 pt-16 min-h-[140px] text-sm font-medium leading-relaxed bg-white focus:border-hospital-500 outline-none" value={proposal.counselingStrategy || ''} onChange={e => setProposal({...proposal, counselingStrategy: e.target.value})} placeholder="AI generated strategy or manual notes..." />
-                         </div>
-                      </div>
-
-                      <div className="pt-8 border-t border-slate-100 space-y-6">
-                        <div className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-4">status</div>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                          <button 
-                            type="button" 
-                            onClick={() => handleOpenOutcomeModal('Scheduled')}
-                            className="py-5 bg-emerald-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-emerald-100 hover:bg-emerald-700 transition-all flex flex-col items-center gap-2"
-                          >
-                            <Calendar className="w-5 h-5" /> Schedule Surgery
+                      <div className="pt-8 border-t border-slate-100">
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                          <button type="button" onClick={() => handleOpenOutcomeModal('Scheduled')} className="py-4 sm:py-6 bg-emerald-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg hover:bg-emerald-700 transition-all flex flex-col items-center gap-2">
+                            <Calendar className="w-5 h-5" /> Schedule
                           </button>
-                          <button 
-                            type="button" 
-                            onClick={() => handleOpenOutcomeModal('Follow-Up')}
-                            className="py-5 bg-blue-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-blue-100 hover:bg-blue-700 transition-all flex flex-col items-center gap-2"
-                          >
-                            <Clock className="w-5 h-5" /> Follow-Up Surgery
+                          <button type="button" onClick={() => handleOpenOutcomeModal('Follow-Up')} className="py-4 sm:py-6 bg-blue-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg hover:bg-blue-700 transition-all flex flex-col items-center gap-2">
+                            <Clock className="w-5 h-5" /> Follow-Up
                           </button>
-                          <button 
-                            type="button" 
-                            onClick={() => handleOpenOutcomeModal('Lost')}
-                            className="py-5 bg-rose-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-rose-100 hover:bg-rose-700 transition-all flex flex-col items-center gap-2"
-                          >
-                            <Trash2 className="w-5 h-5" /> Surgery Lost
+                          <button type="button" onClick={() => handleOpenOutcomeModal('Lost')} className="py-4 sm:py-6 bg-rose-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg hover:bg-rose-700 transition-all flex flex-col items-center gap-2">
+                            <Trash2 className="w-5 h-5" /> Lost
                           </button>
                         </div>
-                        
-                        <button type="submit" className="w-full py-4 text-[10px] font-black uppercase text-slate-400 hover:text-hospital-600 transition-colors">
-                           Update Proposal Details without closing lead
-                        </button>
+                        <button type="submit" className="w-full mt-6 py-4 text-[10px] font-black uppercase text-slate-400 hover:text-hospital-600 transition-colors">Update Details Only</button>
                       </div>
                     </form>
                   </div>
                 ) : (
-                  <div className="flex-1 flex flex-col items-center justify-center text-slate-300">
-                    <Briefcase className="w-20 h-20 mb-6 text-slate-100" />
-                    <p className="text-[10px] font-black uppercase tracking-[0.3em]">Select a candidate from the directory</p>
+                  <div className="flex-1 flex flex-col items-center justify-center text-slate-300 p-10">
+                    <Briefcase className="w-20 h-20 mb-6" />
+                    <p className="text-[10px] font-black uppercase tracking-[0.3em] text-center">Select a candidate from the directory</p>
                   </div>
                 )}
               </div>
             </div>
           ) : (
-            <div className="bg-white rounded-[2rem] shadow-sm border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-300">
+            <div className="bg-white rounded-[2rem] shadow-sm border border-slate-200 overflow-hidden">
               <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse">
+                <table className="w-full text-left border-collapse min-w-[1000px]">
                   <thead className="bg-slate-50 text-slate-500 text-[10px] font-black uppercase tracking-widest border-b">
-                    <tr>
-                      <th className="p-5">Patient Name</th>
-                      <th className="p-5">Evaluating Surgeon</th>
-                      <th className="p-5">Lead Source</th>
-                      <th className="p-5">Insurance Name</th>
-                      <th className="p-5">Amount</th>
-                      <th className="p-5">Readiness</th>
-                      <th className="p-5">Status</th>
-                    </tr>
+                    <tr><th className="p-5">Patient Name</th><th className="p-5">Evaluating Surgeon</th><th className="p-5">Lead Source</th><th className="p-5">Insurance Name</th><th className="p-5">Amount</th><th className="p-5">Status</th></tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {allPatients.map(p => (
-                      <tr 
-                        key={p.id} 
-                        onClick={() => handlePatientSelect(p)}
-                        className="hover:bg-hospital-50/50 cursor-pointer transition-colors group"
-                      >
-                        <td className="p-5">
-                          <div className="font-bold text-slate-900 group-hover:text-hospital-700">{p.name}</div>
-                          <div className="text-[9px] text-slate-400 font-bold uppercase tracking-tight">{p.condition}</div>
-                        </td>
-                        <td className="p-5">
-                          <div className="flex items-center gap-2 text-sm font-medium text-slate-600">
-                            <Stethoscope className="w-4 h-4 text-blue-400" />
-                            {p.doctorAssessment?.doctorSignature || '---'}
-                          </div>
-                        </td>
-                        <td className="p-5">
-                          <span className="text-[10px] font-black uppercase bg-slate-100 text-slate-600 px-3 py-1 rounded-full">
-                            {p.source === 'Doctor Recommended' ? `Dr. ${p.sourceDoctorName || 'Recommended'}` : p.source}
-                          </span>
-                        </td>
-                        <td className="p-5 text-sm font-bold text-slate-600">
-                          {p.insuranceName ? (
-                            <span className="flex items-center gap-1.5 text-emerald-600">
-                              <ShieldCheck className="w-4 h-4" /> {p.insuranceName}
-                            </span>
-                          ) : (
-                            <span className="text-slate-400 font-medium italic">No</span>
-                          )}
-                        </td>
-                        <td className="p-5">
-                          <div className="font-black text-slate-900 text-sm">
-                            {p.packageProposal?.packageAmount ? `₹${p.packageProposal.packageAmount}` : '---'}
-                          </div>
-                        </td>
-                        <td className="p-5">
-                          <span className={`text-[9px] font-black uppercase px-2 py-1 rounded-lg ${
-                            p.doctorAssessment?.conversionReadiness?.startsWith('CR1') ? 'bg-emerald-50 text-emerald-600' :
-                            p.doctorAssessment?.conversionReadiness?.startsWith('CR2') ? 'bg-blue-50 text-blue-600' :
-                            'bg-amber-50 text-amber-600'
-                          }`}>
-                            {p.doctorAssessment?.conversionReadiness || 'LEAD'}
-                          </span>
-                        </td>
-                        <td className="p-5">
-                          <span className={`text-[10px] font-black uppercase px-3 py-1.5 rounded-xl flex items-center gap-2 w-fit ${
-                            p.packageProposal?.outcome === 'Scheduled' ? 'bg-emerald-600 text-white' :
-                            p.packageProposal?.outcome === 'Follow-Up' ? 'bg-blue-600 text-white' :
-                            p.packageProposal?.outcome === 'Lost' ? 'bg-rose-600 text-white' :
-                            'bg-slate-100 text-slate-500'
-                          }`}>
-                            {p.packageProposal?.outcome || 'Counseled'}
-                          </span>
-                        </td>
+                      <tr key={p.id} onClick={() => handlePatientSelect(p)} className="hover:bg-hospital-50/50 cursor-pointer transition-colors group">
+                        <td className="p-5"><div className="font-bold text-slate-900">{p.name}</div><div className="text-[9px] text-slate-400 uppercase">{p.condition}</div></td>
+                        <td className="p-5 text-sm text-slate-600">{p.doctorAssessment?.doctorSignature || '---'}</td>
+                        <td className="p-5 text-[10px] uppercase">{p.source === 'Doctor Recommended' ? `Dr. ${p.sourceDoctorName || 'Rec'}` : p.source}</td>
+                        <td className="p-5 text-sm text-slate-600">{p.insuranceName || 'No'}</td>
+                        <td className="p-5 font-black text-slate-900">₹{p.packageProposal?.packageAmount || '---'}</td>
+                        <td className="p-5"><span className={`text-[10px] font-black uppercase px-3 py-1.5 rounded-xl ${p.packageProposal?.outcome === 'Scheduled' ? 'bg-emerald-600 text-white' : p.packageProposal?.outcome === 'Follow-Up' ? 'bg-blue-600 text-white' : p.packageProposal?.outcome === 'Lost' ? 'bg-rose-600 text-white' : 'bg-slate-100 text-slate-500'}`}>{p.packageProposal?.outcome || 'Pending'}</span></td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
-                {allPatients.length === 0 && (
-                  <div className="p-20 text-center text-slate-300 font-black uppercase tracking-[0.2em] text-xs">
-                    No results found for {listCategory} category
-                  </div>
-                )}
               </div>
             </div>
           )}
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-in fade-in slide-in-from-right-4">
-          <div className="md:col-span-1 bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-100">
-            <h3 className="text-xl font-black text-slate-900 mb-8 flex items-center gap-3 uppercase tracking-tight">
-              <UserPlus className="w-6 h-6 text-hospital-600" /> Add Administrator
-            </h3>
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+          <div className="xl:col-span-1 bg-white p-6 sm:p-8 rounded-[2.5rem] shadow-sm border border-slate-100">
+            <h3 className="text-xl font-black text-slate-900 mb-8 flex items-center gap-3 uppercase tracking-tight"><UserPlus className="w-6 h-6 text-hospital-600" /> Add Admin</h3>
             <form onSubmit={handleRegisterStaff} className="space-y-6">
-              <div>
-                <label className="block text-[10px] font-black uppercase text-slate-400 mb-2 tracking-widest">Display Name</label>
-                <input required type="text" className="w-full p-3.5 bg-slate-50 border-2 border-transparent rounded-2xl text-sm font-bold focus:bg-white focus:border-hospital-500 outline-none" value={newStaff.name} onChange={e => setNewStaff({...newStaff, name: e.target.value})} />
-              </div>
-              <div>
-                <label className="block text-[10px] font-black uppercase text-slate-400 mb-2 tracking-widest">Email Address</label>
-                <input required type="email" className="w-full p-3.5 bg-slate-50 border-2 border-transparent rounded-2xl text-sm font-bold focus:bg-white focus:border-hospital-500 outline-none" value={newStaff.email} onChange={e => setNewStaff({...newStaff, email: e.target.value})} />
-              </div>
-              <div>
-                <label className="block text-[10px] font-black uppercase text-slate-400 mb-2 tracking-widest">Access Key</label>
-                <input required type="password" placeholder="••••••••" className="w-full p-3.5 bg-slate-50 border-2 border-transparent rounded-2xl text-sm font-bold focus:bg-white focus:border-hospital-500 outline-none" value={newStaff.password} onChange={e => setNewStaff({...newStaff, password: e.target.value})} />
-              </div>
-              <div>
-                <label className="block text-[10px] font-black uppercase text-slate-400 mb-2 tracking-widest">Contact Mobile</label>
-                <input required type="tel" className="w-full p-3.5 bg-slate-50 border-2 border-transparent rounded-2xl text-sm font-bold focus:bg-white focus:border-hospital-500 outline-none" value={newStaff.mobile} onChange={e => setNewStaff({...newStaff, mobile: e.target.value.replace(/\D/g, '')})} />
-              </div>
-              <div>
-                <label className="block text-[10px] font-black uppercase text-slate-400 mb-2 tracking-widest">Role Permission</label>
-                <select className="w-full p-3.5 bg-slate-50 border-2 border-transparent rounded-2xl text-sm font-bold focus:bg-white focus:border-hospital-500 outline-none" value={newStaff.role || 'FRONT_OFFICE'} onChange={e => setNewStaff({...newStaff, role: e.target.value as Role})}>
-                  <option value="FRONT_OFFICE">Front Office (Registration)</option>
-                  <option value="DOCTOR">Doctor (Assessment)</option>
-                  <option value="PACKAGE_TEAM">Package Team (Management)</option>
-                </select>
-              </div>
-              {staffSuccess && <div className="p-3 bg-emerald-50 text-emerald-700 text-[10px] font-black uppercase rounded-xl flex items-center gap-2"><CheckCircle2 className="w-4 h-4" /> {staffSuccess}</div>}
-              <button type="submit" className="w-full py-4 bg-slate-900 text-white rounded-2xl font-black text-xs uppercase shadow-lg active:scale-95">Grant Access</button>
+              <div><label className="block text-[10px] font-black uppercase text-slate-400 mb-2 tracking-widest">Display Name</label><input required className="w-full p-3.5 bg-slate-50 border-2 border-transparent rounded-2xl text-sm font-bold focus:bg-white focus:border-hospital-500 outline-none" value={newStaff.name} onChange={e => setNewStaff({...newStaff, name: e.target.value})} /></div>
+              <div><label className="block text-[10px] font-black uppercase text-slate-400 mb-2 tracking-widest">Email</label><input required type="email" className="w-full p-3.5 bg-slate-50 border-2 border-transparent rounded-2xl text-sm font-bold focus:bg-white focus:border-hospital-500 outline-none" value={newStaff.email} onChange={e => setNewStaff({...newStaff, email: e.target.value})} /></div>
+              <div><label className="block text-[10px] font-black uppercase text-slate-400 mb-2 tracking-widest">Role</label><select className="w-full p-3.5 bg-slate-50 border-2 border-transparent rounded-2xl text-sm font-bold focus:bg-white focus:border-hospital-500 outline-none" value={newStaff.role || 'FRONT_OFFICE'} onChange={e => setNewStaff({...newStaff, role: e.target.value as Role})}><option value="FRONT_OFFICE">Front Office</option><option value="DOCTOR">Doctor</option><option value="PACKAGE_TEAM">Package Team</option></select></div>
+              <button type="submit" className="w-full py-4 bg-slate-900 text-white rounded-2xl font-black text-xs uppercase shadow-lg">Grant Access</button>
             </form>
           </div>
-
-          <div className="md:col-span-2 bg-white rounded-[2.5rem] shadow-sm border border-slate-100 overflow-hidden flex flex-col">
-            <div className="p-6 border-b bg-slate-50/50 flex justify-between items-center">
-              <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Personnel Directory</span>
-              <span className="text-[10px] font-black bg-slate-200 px-3 py-1 rounded-full text-slate-600">{staffUsers.length} active</span>
-            </div>
+          <div className="xl:col-span-2 bg-white rounded-[2.5rem] shadow-sm border border-slate-100 overflow-hidden flex flex-col">
+            <div className="p-6 border-b bg-slate-50/50 flex justify-between items-center"><span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Personnel Directory</span></div>
             <div className="overflow-y-auto flex-1 p-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
               {staffUsers.map(user => (
                 <div key={user.id} className="p-5 border-2 border-slate-50 rounded-[2rem] flex items-center gap-4 bg-white group hover:border-hospital-100">
-                  <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-white font-black text-xl ${user.role === 'DOCTOR' ? 'bg-blue-500' : user.role === 'PACKAGE_TEAM' ? 'bg-violet-500' : 'bg-emerald-500'}`}>{user.name ? user.name.charAt(0) : '?'}</div>
-                  <div className="flex-1">
-                    <div className="font-black text-slate-800 text-sm">{user.name || 'Unknown Staff'}</div>
-                    <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest mt-0.5">{user.role}</div>
-                  </div>
+                  <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-white font-black text-xl ${user.role === 'DOCTOR' ? 'bg-blue-500' : user.role === 'PACKAGE_TEAM' ? 'bg-violet-500' : 'bg-emerald-500'}`}>{user.name?.charAt(0)}</div>
+                  <div className="flex-1"><div className="font-black text-slate-800 text-sm">{user.name}</div><div className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{user.role}</div></div>
                 </div>
               ))}
             </div>
@@ -760,60 +426,28 @@ export const PackageTeamDashboard: React.FC = () => {
       )}
 
       {outcomeModal.show && (
-        <div className="fixed inset-0 z-[150] bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-6 animate-in fade-in duration-300">
-          <div className="bg-white w-full max-md rounded-[2.5rem] shadow-2xl overflow-hidden border border-white/20">
-            <header className={`p-8 border-b flex justify-between items-center ${
-              outcomeModal.type === 'Lost' ? 'bg-rose-50 text-rose-900' : 'bg-emerald-50 text-emerald-900'
-            }`}>
-              <h3 className="text-xl font-black uppercase tracking-tight">
-                Finalizing: {outcomeModal.type}
-              </h3>
+        <div className="fixed inset-0 z-[150] bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 sm:p-6 animate-in fade-in duration-300">
+          <div className="bg-white w-full max-w-md sm:max-w-2xl rounded-[2.5rem] shadow-2xl overflow-hidden border border-white/20">
+            <header className={`p-6 sm:p-8 border-b flex justify-between items-center ${outcomeModal.type === 'Lost' ? 'bg-rose-50 text-rose-900' : 'bg-emerald-50 text-emerald-900'}`}>
+              <h3 className="text-xl font-black uppercase tracking-tight">Finalizing: {outcomeModal.type}</h3>
               <button onClick={() => setOutcomeModal({ ...outcomeModal, show: false })}><X className="w-6 h-6 text-slate-400" /></button>
             </header>
-            
-            <div className="p-10 space-y-8">
+            <div className="p-6 sm:p-10 space-y-8">
                {outcomeModal.type !== 'Lost' ? (
                  <div className="space-y-4">
-                    <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest">Select Date (Mandatory)</label>
-                    <div className="relative">
-                      <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 w-5 h-5" />
-                      <input 
-                        type="date" 
-                        required
-                        className="w-full pl-12 pr-4 py-4 bg-slate-50 border-2 border-slate-100 rounded-2xl text-sm font-black focus:bg-white focus:border-hospital-500 outline-none"
-                        value={outcomeModal.date}
-                        onChange={e => setOutcomeModal({ ...outcomeModal, date: e.target.value })}
-                      />
-                    </div>
+                    <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest">Select Date</label>
+                    <div className="relative"><Calendar className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 w-5 h-5" /><input type="date" className="w-full pl-12 pr-4 py-4 bg-slate-50 border-2 border-slate-100 rounded-2xl text-sm font-black focus:bg-white focus:border-hospital-500 outline-none" value={outcomeModal.date} onChange={e => setOutcomeModal({ ...outcomeModal, date: e.target.value })} /></div>
                  </div>
                ) : (
                  <div className="space-y-4">
-                    <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest">Reason for Lead Loss</label>
-                    <select 
-                      className="w-full p-4 bg-slate-50 border-2 border-slate-100 rounded-2xl text-sm font-bold focus:bg-white focus:border-hospital-500 outline-none"
-                      value={outcomeModal.reason}
-                      onChange={e => setOutcomeModal({ ...outcomeModal, reason: e.target.value })}
-                    >
-                      {lostReasons.map(r => <option key={r} value={r}>{r}</option>)}
-                    </select>
+                    <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest">Reason</label>
+                    <select className="w-full p-4 bg-slate-50 border-2 border-slate-100 rounded-2xl text-sm font-bold focus:bg-white focus:border-hospital-500 outline-none" value={outcomeModal.reason} onChange={e => setOutcomeModal({ ...outcomeModal, reason: e.target.value })}>{lostReasons.map(r => <option key={r} value={r}>{r}</option>)}</select>
                  </div>
                )}
-               
-               <p className="text-[10px] text-slate-400 font-medium leading-relaxed italic">
-                 Confirming this will move <strong>{selectedPatient?.name}</strong> to the <strong>{outcomeModal.type}</strong> records category.
-               </p>
             </div>
-
-            <footer className="p-8 border-t flex gap-4 bg-slate-50/50">
-              <button onClick={() => setOutcomeModal({ ...outcomeModal, show: false })} className="flex-1 py-4 text-[10px] font-black uppercase text-slate-400 hover:text-slate-900">Cancel</button>
-              <button 
-                onClick={handleConfirmOutcome} 
-                className={`flex-1 py-4 text-[10px] font-black uppercase text-white rounded-xl shadow-xl hover:scale-105 transition-all ${
-                  outcomeModal.type === 'Lost' ? 'bg-rose-600' : 'bg-emerald-600'
-                }`}
-              >
-                Confirm & Close Lead
-              </button>
+            <footer className="p-6 sm:p-8 border-t flex flex-col sm:flex-row gap-4 bg-slate-50/50">
+              <button onClick={() => setOutcomeModal({ ...outcomeModal, show: false })} className="order-2 sm:order-1 flex-1 py-4 text-[10px] font-black uppercase text-slate-400">Cancel</button>
+              <button onClick={handleConfirmOutcome} className={`order-1 sm:order-2 flex-1 py-4 text-[10px] font-black uppercase text-white rounded-xl shadow-xl transition-all ${outcomeModal.type === 'Lost' ? 'bg-rose-600' : 'bg-emerald-600'}`}>Confirm & Close Lead</button>
             </footer>
           </div>
         </div>

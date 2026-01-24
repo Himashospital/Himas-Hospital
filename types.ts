@@ -98,6 +98,7 @@ export interface Patient {
   visitType: 'OPD' | 'Follow Up';
   registeredAt: string;
   entry_date?: string;
+  arrivalTime?: string;
   status?: string;
   
   // Metadata for multi-table support

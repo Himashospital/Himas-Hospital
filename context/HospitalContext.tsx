@@ -110,6 +110,7 @@ const mapRowToPatient = (row: any): Patient => {
     visitType: row.is_follow_up ? 'Follow Up' : 'OPD',
     registeredAt: row.created_at || new Date().toISOString(),
     entry_date: row.entry_date || '',
+    arrivalTime: row.arrival_time || '',
     status: row.booking_status || 'Scheduled',
     packageProposal: uiProposal,
     doctorAssessment: uiAssessment,
@@ -153,7 +154,6 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
       if (apptError) throw apptError;
 
       // Patients list: Include all who have Arrived, OR have been Assessed, OR have a Proposal.
-      // This ensures the Package Team sees the full counseling journey from the single table.
       const consolidatedPatients = (apptRows || [])
         .filter((r: any) => 
           r.booking_status === 'Arrived' || 
@@ -164,7 +164,7 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
       
       setPatients(consolidatedPatients);
       
-      // Appointment Leads: Strictly Scheduled or Follow Up leads that HAVEN'T been assessed yet.
+      // Appointment Leads
       const appointmentLeads = (apptRows || [])
         .filter((r: any) => 
           ['Scheduled', 'Follow Up'].includes(r.booking_status) && 
@@ -218,8 +218,8 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
         has_insurance: patientData.hasInsurance,
         insurance_name: patientData.insuranceName,
         booking_status: 'Arrived',
-        entry_date: new Date().toISOString().split('T')[0],
-        arrival_time: new Date().toTimeString().split(' ')[0],
+        entry_date: patientData.entry_date || new Date().toISOString().split('T')[0],
+        arrival_time: patientData.arrivalTime || new Date().toTimeString().split(' ')[0],
         hospital_id: 'himas_facility_01'
       };
       
@@ -275,9 +275,9 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
         insurance_name: patient.insuranceName,
         source_doctor_name: patient.sourceDoctorName,
         entry_date: nullify(patient.entry_date) || new Date().toISOString().split('T')[0],
+        arrival_time: nullify(patient.arrivalTime) || new Date().toTimeString().split(' ')[0],
         booking_status: patient.status || 'Arrived',
         package_proposal: dbPackageProposal,
-        // Fixed: Use camelCase 'doctorAssessment' as defined in types.ts. Removed invalid 'doctor_assessment' property access.
         doctor_assessment: patient.doctorAssessment || null
       };
       
@@ -321,18 +321,17 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
             has_insurance: patientData.hasInsurance,
             insurance_name: patientData.insuranceName,
             booking_status: 'Arrived',
-            entry_date: new Date().toISOString().split('T')[0],
-            arrival_time: new Date().toTimeString().split(' ')[0],
+            entry_date: patientData.entry_date || new Date().toISOString().split('T')[0],
+            arrival_time: patientData.arrivalTime || new Date().toTimeString().split(' ')[0],
             hospital_id: 'himas_facility_01'
         };
         
-        // Use a more robust transaction-like approach
         const { error: insertError } = await supabase.from('himas_appointments').insert(dbRecord);
         if (insertError) throw insertError;
 
         const { error: deleteError } = await supabase.from('himas_appointments').delete().eq('id', appointmentId);
         if (deleteError) {
-            console.warn(`Cleanup warning: Old lead ${appointmentId} was not removed, but patient ${dbRecord.id} was created.`);
+            console.warn(`Cleanup warning: Old lead ${appointmentId} was not removed.`);
         }
 
         await refreshData();
@@ -418,7 +417,7 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
         condition: appointment.condition,
         entry_date: nullify(appointment.date),
         booking_time: nullify(appointment.time),
-        booking_status: appointment.bookingType, // Primary status column for appointments
+        booking_status: appointment.bookingType, 
         is_follow_up: appointment.bookingType === 'Follow Up'
       };
       const { error } = await supabase.from('himas_appointments').update(updateData).eq('id', appointment.id);
