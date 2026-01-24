@@ -2,7 +2,20 @@
 import React, { useState, useEffect } from 'react';
 import { useHospital } from '../context/HospitalContext';
 import { SurgeonCode, PainSeverity, Affordability, ConversionReadiness, Patient, DoctorAssessment } from '../types';
-import { Stethoscope, Check, ChevronRight, User, Calendar, Save, Briefcase, CreditCard, Activity, Tag, FileText, Database } from 'lucide-react';
+import { Stethoscope, Check, ChevronRight, User, Calendar, Save, Briefcase, CreditCard, Activity, Tag, FileText, Database, Clock, Share2, ShieldCheck } from 'lucide-react';
+
+const PROCEDURES = [
+  "Lap Cholecystectomy",
+  "Lap Appendectomy",
+  "Lap Umbilical Hernioplasty",
+  "Lap Inguinal Hernioplasty",
+  "Laser Varicose Veins",
+  "Laser Piles",
+  "Laser Pilonidoplasty",
+  "Laser Fistula + Perianal Abscess",
+  "Laser Fissure",
+  "Stapler Haemorrhoidectomy"
+];
 
 export const DoctorDashboard: React.FC = () => {
   const { patients, updateDoctorAssessment } = useHospital();
@@ -14,6 +27,7 @@ export const DoctorDashboard: React.FC = () => {
     affordability: undefined,
     conversionReadiness: undefined,
     tentativeSurgeryDate: '',
+    surgeryProcedure: '',
     notes: '',
     doctorSignature: ''
   });
@@ -26,6 +40,7 @@ export const DoctorDashboard: React.FC = () => {
         affordability: undefined,
         conversionReadiness: undefined,
         tentativeSurgeryDate: '',
+        surgeryProcedure: '',
         notes: '',
         doctorSignature: ''
       });
@@ -55,9 +70,25 @@ export const DoctorDashboard: React.FC = () => {
   };
 
   // Doctors directory should only show Arrived patients OR those they've already assessed.
+  // Updated sorting: Prioritize Pending (Arrived but no assessment) at the top, then newest first.
   const allPatients = [...patients]
     .filter(p => p.status === 'Arrived' || p.doctorAssessment !== undefined)
-    .sort((a, b) => new Date(b.registeredAt).getTime() - new Date(a.registeredAt).getTime());
+    .sort((a, b) => {
+      // 1. Prioritize Pending Status (Arrived and no assessment yet)
+      const aIsPending = a.status === 'Arrived' && !a.doctorAssessment;
+      const bIsPending = b.status === 'Arrived' && !b.doctorAssessment;
+
+      if (aIsPending && !bIsPending) return -1;
+      if (!aIsPending && bIsPending) return 1;
+
+      // 2. Secondary Sort: Recency (Newest first)
+      const timeA = new Date(a.registeredAt).getTime();
+      const timeB = new Date(b.registeredAt).getTime();
+      return timeB - timeA;
+    });
+
+  const pendingCount = allPatients.filter(p => p.status === 'Arrived' && !p.doctorAssessment).length;
+  const doneCount = allPatients.filter(p => !!p.doctorAssessment).length;
     
   const isSurgery = formState.quickCode === SurgeonCode.S1;
 
@@ -68,24 +99,42 @@ export const DoctorDashboard: React.FC = () => {
            <h3 className="font-bold text-gray-700 flex items-center gap-2">
              <User className="w-5 h-5 text-hospital-600" /> Patient Directory
            </h3>
-           <span className="text-[10px] font-black text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">{allPatients.length}</span>
+           <div className="flex gap-2">
+             <div className="flex flex-col items-end">
+               <span className="text-[7px] font-black text-slate-400 uppercase leading-none mb-1">Pending</span>
+               <span className="text-[10px] font-black text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-100 leading-none">{pendingCount}</span>
+             </div>
+             <div className="flex flex-col items-end">
+               <span className="text-[7px] font-black text-slate-400 uppercase leading-none mb-1">Done</span>
+               <span className="text-[10px] font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100 leading-none">{doneCount}</span>
+             </div>
+           </div>
         </div>
         <div className="overflow-y-auto flex-1 p-2 space-y-2">
           {allPatients.map(p => (
-            <div key={p.id} onClick={() => setSelectedPatient(p)} className={`p-3 rounded-lg border cursor-pointer hover:shadow-md transition-all ${selectedPatient?.id === p.id ? 'border-hospital-500 bg-hospital-50 shadow-sm' : p.doctorAssessment ? 'border-gray-100 bg-gray-50' : 'border-slate-100 bg-white'}`}>
+            <div key={p.id} onClick={() => setSelectedPatient(p)} className={`p-4 rounded-xl border cursor-pointer hover:shadow-md transition-all ${selectedPatient?.id === p.id ? 'border-hospital-500 bg-hospital-50 shadow-sm' : p.doctorAssessment ? 'border-gray-100 bg-gray-50' : 'border-slate-100 bg-white'}`}>
               <div className="flex justify-between items-start">
-                <div>
+                <div className="flex-1">
                   <div className="font-bold text-gray-800">{p.name}</div>
-                  <div className="text-[10px] text-gray-500 font-medium uppercase">{p.age}Y • {p.gender} • {p.condition}</div>
+                  <div className="text-[10px] text-gray-500 font-medium uppercase mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
+                    <span>{p.age}Y • {p.gender} • {p.condition}</span>
+                    <span className="w-1 h-1 bg-slate-200 rounded-full"></span>
+                    <span className="flex items-center gap-1 text-hospital-600 font-bold">
+                      <Clock className="w-3 h-3" /> Arrived: {p.entry_date}
+                    </span>
+                  </div>
                 </div>
                 {p.doctorAssessment ? (
-                  <Check className="w-4 h-4 text-green-500" />
+                  <Check className="w-5 h-5 text-green-500 bg-green-100 rounded-full p-1" />
                 ) : (
                   <ChevronRight className="w-4 h-4 text-gray-300" />
                 )}
               </div>
             </div>
           ))}
+          {allPatients.length === 0 && (
+            <div className="p-10 text-center text-slate-300 text-xs font-black uppercase tracking-widest">No patients arrived</div>
+          )}
         </div>
       </div>
 
@@ -93,12 +142,38 @@ export const DoctorDashboard: React.FC = () => {
       <div className="w-2/3 bg-white rounded-xl shadow-sm border border-gray-100 flex flex-col overflow-hidden">
         {selectedPatient ? (
           <form onSubmit={handleSave} className="flex flex-col h-full">
-            <div className="p-6 border-b bg-gray-50">
-              <h3 className="text-xl font-bold text-gray-800 tracking-tight">{selectedPatient.name}</h3>
-              <div className="text-xs text-gray-500 font-medium uppercase mt-1 flex gap-4">
-                <span><User className="w-3 h-3 inline mr-1" />{selectedPatient.age}Y / {selectedPatient.gender}</span>
-                <span><Activity className="w-3 h-3 inline mr-1" />{selectedPatient.condition}</span>
-                <span><Tag className="w-3 h-3 inline mr-1" />{selectedPatient.source}</span>
+            <div className="p-6 border-b bg-white">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                <div className="bg-gradient-to-br from-indigo-50 to-white border border-indigo-100 p-3 rounded-2xl shadow-sm">
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <User className="w-3 h-3 text-indigo-500" />
+                    <span className="text-[8px] font-black text-indigo-400 uppercase tracking-widest">Name</span>
+                  </div>
+                  <div className="text-sm font-black text-indigo-900 truncate leading-tight">{selectedPatient.name}</div>
+                </div>
+                <div className="bg-gradient-to-br from-blue-50 to-white border border-blue-100 p-3 rounded-2xl shadow-sm">
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <Activity className="w-3 h-3 text-blue-500" />
+                    <span className="text-[8px] font-black text-blue-400 uppercase tracking-widest">Age / Gender</span>
+                  </div>
+                  <div className="text-sm font-black text-blue-900 leading-tight">{selectedPatient.age}Y <span className="text-blue-200">|</span> {selectedPatient.gender}</div>
+                </div>
+                <div className="bg-gradient-to-br from-teal-50 to-white border border-teal-100 p-3 rounded-2xl shadow-sm">
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <Share2 className="w-3 h-3 text-teal-500" />
+                    <span className="text-[8px] font-black text-teal-400 uppercase tracking-widest">Source</span>
+                  </div>
+                  <div className="text-sm font-black text-teal-900 truncate leading-tight">
+                    {selectedPatient.source === 'Doctor Recommended' ? `Dr. ${selectedPatient.sourceDoctorName || 'Recommended'}` : selectedPatient.source}
+                  </div>
+                </div>
+                <div className="bg-gradient-to-br from-rose-50 to-white border border-rose-100 p-3 rounded-2xl shadow-sm">
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <ShieldCheck className="w-3 h-3 text-rose-500" />
+                    <span className="text-[8px] font-black text-rose-400 uppercase tracking-widest">Insurance Details</span>
+                  </div>
+                  <div className="text-sm font-black text-rose-900 truncate leading-tight">{selectedPatient.insuranceName || 'No'}</div>
+                </div>
               </div>
             </div>
 
@@ -121,6 +196,13 @@ export const DoctorDashboard: React.FC = () => {
               {/* Additional fields for surgery */}
               {isSurgery && (
                 <div className="grid grid-cols-2 gap-6 p-6 bg-green-50/50 rounded-lg border border-green-100 animate-in fade-in">
+                  <div className="col-span-2">
+                    <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Procedures</label>
+                    <select required={isSurgery} value={formState.surgeryProcedure || ''} onChange={e => setFormState(s => ({...s, surgeryProcedure: e.target.value}))} className="w-full p-2 border border-gray-300 rounded-md">
+                      <option value="">Select Procedure...</option>
+                      {PROCEDURES.map(p => <option key={p} value={p}>{p}</option>)}
+                    </select>
+                  </div>
                   <div>
                     <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Pain Severity</label>
                     <select required={isSurgery} value={formState.painSeverity || ''} onChange={e => setFormState(s => ({...s, painSeverity: e.target.value as PainSeverity}))} className="w-full p-2 border border-gray-300 rounded-md">

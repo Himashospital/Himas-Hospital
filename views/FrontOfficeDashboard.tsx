@@ -26,7 +26,6 @@ const formatDate = (dateString: string | undefined | null): string => {
 };
 
 const getHistoryStatus = (p: Patient): string => {
-  // 1. Package Team Outcomes (The Final Stage)
   if (p.packageProposal?.outcome) {
     switch (p.packageProposal.outcome) {
       case 'Scheduled': return 'Surgery Scheduled';
@@ -34,18 +33,12 @@ const getHistoryStatus = (p: Patient): string => {
       case 'Lost': return 'Surgery Lost';
     }
   }
-
-  // 2. Doctor Assessment Stage
   if (p.doctorAssessment) {
     if (p.doctorAssessment.quickCode === SurgeonCode.S1) return 'Package Proposal';
     if (p.doctorAssessment.quickCode === SurgeonCode.M1) return 'Medication Done';
     return 'Doctor Done';
   }
-
-  // 3. Front Office Arrival Stage
   if (p.status === 'Arrived') return 'Arrived';
-
-  // 4. Appointment/Lead Stage (Fallback)
   return p.visitType === 'Follow Up' ? 'Follow Up' : 'Scheduled';
 };
 
@@ -82,7 +75,7 @@ export const FrontOfficeDashboard: React.FC = () => {
 
   const [formData, setFormData] = useState<Partial<Patient> & { sourceDoctorNotes?: string; sourceOtherDetails?: string }>({
     id: '', name: '', dob: '', gender: undefined, age: undefined,
-    mobile: '', occupation: '', hasInsurance: undefined, insuranceName: '',
+    mobile: '', occupation: '', hasInsurance: 'No', insuranceName: '',
     source: '', condition: undefined, visitType: undefined,
     sourceDoctorName: '', sourceDoctorNotes: '', sourceOtherDetails: ''
   });
@@ -102,7 +95,7 @@ export const FrontOfficeDashboard: React.FC = () => {
     { name: "Old Patient / Relatives", icon: <UsersIcon className="w-4 h-4 text-amber-600" /> },
     { name: "Friends / Online", icon: <Share2 className="w-4 h-4 text-indigo-500" /> },
     { name: "Hospital Billboards", icon: <Tag className="w-4 h-4 text-slate-500" /> },
-    { name: "Doctor Recommend", icon: <Stethoscope className="w-4 h-4 text-teal-500" /> },
+    { name: "Doctor Recommended", icon: <Stethoscope className="w-4 h-4 text-teal-500" /> },
     { name: "Other", icon: <PlusCircle className="w-4 h-4 text-slate-400" /> }
   ];
 
@@ -139,7 +132,7 @@ export const FrontOfficeDashboard: React.FC = () => {
   const resetForm = () => {
     setFormData({ 
       id: '', name: '', dob: '', gender: undefined, age: undefined, 
-      mobile: '', occupation: '', hasInsurance: undefined, insuranceName: '', 
+      mobile: '', occupation: '', hasInsurance: 'No', insuranceName: '', 
       source: '', condition: undefined, visitType: undefined,
       sourceDoctorName: '', sourceDoctorNotes: '', sourceOtherDetails: ''
     });
@@ -193,7 +186,7 @@ export const FrontOfficeDashboard: React.FC = () => {
   const handleArrived = (appt: Appointment) => {
     setFormData({ 
       id: '', name: appt.name || '', dob: '', gender: undefined, age: undefined, mobile: appt.mobile || '', 
-      occupation: '', hasInsurance: undefined, insuranceName: '', source: appt.source || '', 
+      occupation: '', hasInsurance: 'No', insuranceName: '', source: appt.source || '', 
       sourceDoctorName: appt.sourceDoctorName || '', condition: appt.condition, visitType: appt.bookingType === 'Follow Up' ? 'Follow Up' : 'OPD'
     });
     setEditingId(null);
@@ -237,7 +230,7 @@ export const FrontOfficeDashboard: React.FC = () => {
     e.preventDefault();
     const isBasicValid = bookingData.name && bookingData.mobile && bookingData.date && bookingData.time && bookingData.bookingType && bookingData.source && bookingData.condition;
     let isExtraValid = true;
-    if (bookingData.source === 'Doctor Recommend') {
+    if (bookingData.source === 'Doctor Recommended') {
         isExtraValid = !!bookingData.sourceDoctorName;
     } else if (bookingData.source === 'Other') {
         isExtraValid = !!bookingData.sourceOtherDetails;
@@ -266,11 +259,12 @@ export const FrontOfficeDashboard: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (step === 1 && !editingId) {
-      if (!formData.name || formData.age == null || !formData.gender || !formData.mobile || !formData.occupation || !formData.condition || !formData.hasInsurance || !formData.source) {
+      // Removed formData.hasInsurance check from validation
+      if (!formData.name || formData.age == null || !formData.gender || !formData.mobile || !formData.occupation || !formData.condition || !formData.source) {
         alert("Please complete all mandatory fields.");
         return;
       }
-      if (formData.source === 'Doctor Recommend' && !formData.sourceDoctorName) {
+      if (formData.source === 'Doctor Recommended' && !formData.sourceDoctorName) {
         alert("Please enter the recommending doctor's name.");
         return;
       }
@@ -283,7 +277,7 @@ export const FrontOfficeDashboard: React.FC = () => {
     }
     if (!formData.id) return alert("Case Number is required.");
     const dataToSave: Partial<Patient> & { sourceDoctorNotes?: string; sourceOtherDetails?: string } = { ...formData };
-    if (dataToSave.source === 'Doctor Recommend' && dataToSave.sourceDoctorName) {
+    if (dataToSave.source === 'Doctor Recommended' && dataToSave.sourceDoctorName) {
         dataToSave.sourceDoctorName = dataToSave.sourceDoctorNotes ? `${dataToSave.sourceDoctorName} (Notes: ${dataToSave.sourceDoctorNotes})` : dataToSave.sourceDoctorName;
     }
     if (dataToSave.source === 'Other' && dataToSave.sourceOtherDetails) {
@@ -346,30 +340,24 @@ export const FrontOfficeDashboard: React.FC = () => {
     const matches = item.name.toLowerCase().includes(sTerm) || (item.id && item.id.toLowerCase().includes(sTerm)) || item.mobile.includes(sTerm);
     if (!matches) return false;
 
-    // Advanced Global Search Filters
     if (activeTab === 'GLOBAL_SEARCH') {
       if (historyFilters.type !== 'ALL' && item.recordType !== historyFilters.type) return false;
       
-      // Date Range Filter
       if (historyFilters.startDate || historyFilters.endDate) {
         const itemDate = item.displayEntryDate || '';
         if (historyFilters.startDate && itemDate < historyFilters.startDate) return false;
         if (historyFilters.endDate && itemDate > historyFilters.endDate) return false;
       }
 
-      // Source Filter
       if (historyFilters.source && item.source !== historyFilters.source) return false;
 
-      // Visit Type Filter
       if (historyFilters.visitType !== 'ALL') {
         const vType = calculateVisitType(item, patients);
         if (vType !== historyFilters.visitType) return false;
       }
 
-      // Status Filter
       if (historyFilters.status && item.displayStatus !== historyFilters.status) return false;
 
-      // Condition Filter
       if (historyFilters.condition && item.condition !== historyFilters.condition) return false;
     }
 
@@ -378,7 +366,6 @@ export const FrontOfficeDashboard: React.FC = () => {
 
   const displayData = activeTab === 'REGISTRATION' ? filteredPatients : activeTab === 'APPOINTMENTS' ? filteredAppointments : combinedHistoryData;
 
-  // Reusable filter input classes for uniform styling
   const filterInputClasses = "h-10 w-full bg-slate-50 border border-slate-100 rounded-xl px-3 text-[10px] font-bold focus:ring-2 focus:ring-hospital-500 focus:bg-white outline-none transition-all appearance-none";
 
   return (
@@ -388,7 +375,7 @@ export const FrontOfficeDashboard: React.FC = () => {
           <h2 className="text-2xl font-bold text-gray-800 tracking-tight">Front Office</h2>
           <p className="text-gray-500 text-sm">Patient Registration & Management</p>
         </div>
-        <ExportButtons patients={activeTab === 'GLOBAL_SEARCH' ? (combinedHistoryData as any) : patients} role="front_office" />
+        <ExportButtons patients={activeTab === 'GLOBAL_SEARCH' ? (combinedHistoryData as any) : patients} role="front_office" selectedPatient={null} />
       </div>
 
       <div className="flex bg-white p-1 rounded-xl border w-fit shadow-sm overflow-x-auto">
@@ -434,7 +421,6 @@ export const FrontOfficeDashboard: React.FC = () => {
           </div>
         </div>
 
-        {/* Advanced Filters for Global Search */}
         {activeTab === 'GLOBAL_SEARCH' && (
           <div className="pt-4 border-t border-slate-50 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4 animate-in slide-in-from-top-2 duration-300 items-end">
             <div className="flex flex-col gap-1.5">
@@ -538,7 +524,11 @@ export const FrontOfficeDashboard: React.FC = () => {
                   </td>
                   <td className="p-5">
                     <div className="font-bold text-slate-900">{item.name}</div>
-                    <div className="text-[10px] text-slate-500 font-medium uppercase">{item.age ? `${item.age}Y • ${item.gender}` : item.source}</div>
+                    <div className="text-[10px] text-slate-500 font-medium uppercase">
+                      {item.age ? `${item.age}Y • ${item.gender}` : ''}
+                      {(item.age || item.gender) && item.source ? ' • ' : ''}
+                      {item.source === 'Doctor Recommended' ? `Dr. ${item.sourceDoctorName || 'Recommended'}` : item.source}
+                    </div>
                   </td>
                   <td className="p-5 text-sm font-medium text-slate-600 flex items-center gap-2"><Phone className="w-3 h-3 text-slate-300" /> {item.mobile}</td>
                   {(activeTab === 'REGISTRATION' || activeTab === 'GLOBAL_SEARCH') && (
@@ -657,15 +647,15 @@ export const FrontOfficeDashboard: React.FC = () => {
                         ))}
                       </div>
                     </div>
-                    {bookingData.source === 'Doctor Recommend' && (
+                    {bookingData.source === 'Doctor Recommended' && (
                       <div className="md:col-span-2 animate-in slide-in-from-top-2 duration-300">
-                        <label className="block text-[10px] font-black uppercase text-hospital-600 mb-2 tracking-widest">Recommending Doctor Name</label>
+                        <label className="block text-[10px] font-black uppercase text-hospital-600 mb-2 tracking-widest">Doctor Name</label>
                         <input required className="w-full text-xl font-bold border-b-2 border-hospital-100 p-2 outline-none focus:border-hospital-500 placeholder-slate-200" value={bookingData.sourceDoctorName || ''} onChange={e => setBookingData({...bookingData, sourceDoctorName: e.target.value})} placeholder="Dr. Enter Name" />
                       </div>
                     )}
                     {bookingData.source === 'Other' && (
                       <div className="md:col-span-2 animate-in slide-in-from-top-2 duration-300">
-                        <label className="block text-[10px] font-black uppercase text-hospital-600 mb-2 tracking-widest">Specify Other Source Details</label>
+                        <label className="block text-[10px] font-black uppercase text-hospital-600 mb-2 tracking-widest">Other Details</label>
                         <input required className="w-full text-xl font-bold border-b-2 border-hospital-100 p-2 outline-none focus:border-hospital-500 placeholder-slate-200" value={bookingData.sourceOtherDetails || ''} onChange={e => setBookingData({...bookingData, sourceOtherDetails: e.target.value})} placeholder="Enter Details..." />
                       </div>
                     )}
@@ -743,23 +733,16 @@ export const FrontOfficeDashboard: React.FC = () => {
                              {sourceConfig.map(s => <option key={s.name} value={s.name}>{s.name}</option>)}
                            </select>
                          </div>
-                         <div className="group">
-                           <label className="block text-[10px] font-black uppercase text-slate-500 mb-2 tracking-[0.2em] transition-colors group-focus-within:text-hospital-600">Insurance Status</label>
-                           <select required className="w-full border-b-2 border-slate-100 bg-slate-50/30 p-2 text-sm font-bold bg-white outline-none focus:border-hospital-500 focus:bg-white transition-all duration-300 appearance-none" value={formData.hasInsurance || 'No'} onChange={e => setFormData({...formData, hasInsurance: e.target.value as any})}>
-                              <option value="No">Self-Pay / Cash</option>
-                              <option value="Yes">TPA / Insurance</option>
-                              <option value="Not Sure">Status Pending</option>
-                           </select>
-                         </div>
-                         {formData.source === 'Doctor Recommend' && (
+                         {/* Insurance Status selection removed from Registration only */}
+                         {formData.source === 'Doctor Recommended' && (
                            <div className="md:col-span-2 group animate-in slide-in-from-top-2 duration-300">
-                             <label className="block text-[10px] font-black uppercase text-hospital-600 mb-2 tracking-[0.2em]">Recommending Doctor Name</label>
+                             <label className="block text-[10px] font-black uppercase text-hospital-600 mb-2 tracking-[0.2em]">Doctor Name</label>
                              <input required className="w-full text-xl font-bold border-b-2 border-hospital-100 bg-hospital-50/30 p-2 outline-none focus:border-hospital-500 focus:bg-white transition-all duration-300 placeholder-slate-200" value={formData.sourceDoctorName || ''} onChange={e => setFormData({...formData, sourceDoctorName: e.target.value})} placeholder="Dr. Name" />
                            </div>
                          )}
                          {formData.source === 'Other' && (
                            <div className="md:col-span-2 group animate-in slide-in-from-top-2 duration-300">
-                             <label className="block text-[10px] font-black uppercase text-hospital-600 mb-2 tracking-[0.2em]">Lead Source Details</label>
+                             <label className="block text-[10px] font-black uppercase text-hospital-600 mb-2 tracking-[0.2em]">Other Details</label>
                              <input required className="w-full text-xl font-bold border-b-2 border-hospital-100 bg-hospital-50/30 p-2 outline-none focus:border-hospital-500 focus:bg-white transition-all duration-300 placeholder-slate-200" value={formData.sourceOtherDetails || ''} onChange={e => setFormData({...formData, sourceOtherDetails: e.target.value})} placeholder="Specify Source Details..." />
                            </div>
                          )}

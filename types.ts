@@ -54,6 +54,7 @@ export interface DoctorAssessment {
   otherSurgeryName?: string;
   conversionReadiness?: ConversionReadiness;
   tentativeSurgeryDate?: string; // YYYY-MM-DD
+  surgeryProcedure?: string;
 }
 
 export type ProposalOutcome = 'Scheduled' | 'Follow-Up' | 'Lost';

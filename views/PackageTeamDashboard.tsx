@@ -13,34 +13,26 @@ const formatDate = (dateString: string | undefined | null): string => {
   const parts = datePart.split('-');
 
   if (parts.length === 3) {
-    // Check for DD-MM-YYYY format and convert
     if (parts[0].length === 2 && parts[2].length === 4) {
       return `${parts[2]}-${parts[1]}-${parts[0]}`;
     }
-    // Assume YYYY-MM-DD if not the above, and return the clean date part
     return datePart;
   }
   
-  // Fallback for any other format that isn't dash-separated
   return dateString;
 };
 
 export const PackageTeamDashboard: React.FC = () => {
   const { patients, updatePackageProposal, staffUsers, registerStaff } = useHospital();
   
-  // Tabs: 'counseling' | 'staff'
   const [activeTab, setActiveTab] = useState<'counseling' | 'staff'>('counseling');
-  // List Category: 'PENDING' | 'SCHEDULED' | 'FOLLOWUP' | 'LOST'
   const [listCategory, setListCategory] = useState<'PENDING' | 'SCHEDULED' | 'FOLLOWUP' | 'LOST'>('PENDING');
-  // View Mode: 'split' (List + Form) | 'table' (Full Table)
   const [viewMode, setViewMode] = useState<'split' | 'table'>('split');
 
-  // --- Counseling State ---
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
   const [filter, setFilter] = useState<'ALL' | 'CR1' | 'CR2' | 'CR3' | 'CR4'>('ALL');
   const [aiLoading, setAiLoading] = useState(false);
   
-  // Outcome Modal State
   const [outcomeModal, setOutcomeModal] = useState<{
     show: boolean;
     type: ProposalOutcome | null;
@@ -76,27 +68,20 @@ export const PackageTeamDashboard: React.FC = () => {
 
   const [proposal, setProposal] = useState<Partial<PackageProposal>>(initialProposalState);
 
-  // --- State Synchronization Effects ---
   useEffect(() => {
-    // This effect keeps the selectedPatient object in sync with the master list.
-    // When the `patients` array updates after a save, this finds the fresh data.
     if (selectedPatient?.id) {
       const freshPatient = patients.find(p => p.id === selectedPatient.id);
       if (freshPatient) {
-        // Avoid re-render if object is identical
         if (JSON.stringify(freshPatient) !== JSON.stringify(selectedPatient)) {
           setSelectedPatient(freshPatient);
         }
       } else {
-        // Patient was removed from the list (e.g. filtered out)
         setSelectedPatient(null);
       }
     }
   }, [patients, selectedPatient?.id]);
 
   useEffect(() => {
-    // This effect syncs the local `proposal` form state with the `selectedPatient`.
-    // It runs whenever a new patient is selected or when the selected patient's data is updated.
     if (selectedPatient) {
       setProposal(selectedPatient.packageProposal || initialProposalState);
     }
@@ -112,15 +97,12 @@ export const PackageTeamDashboard: React.FC = () => {
     "Personal / Non-Medical Reasons"
   ];
 
-  // --- Logic ---
   const allPatients = [...patients].filter(p => {
-    // 1. Must be surgery recommended
     if (p.doctorAssessment?.quickCode !== SurgeonCode.S1) return false;
 
-    // 2. Filter by Outcome Category
     const outcome = p.packageProposal?.outcome;
     if (listCategory === 'PENDING') {
-      if (outcome) return false; // Hide if already has an outcome
+      if (outcome) return false;
     } else if (listCategory === 'SCHEDULED') {
       if (outcome !== 'Scheduled') return false;
     } else if (listCategory === 'FOLLOWUP') {
@@ -129,17 +111,22 @@ export const PackageTeamDashboard: React.FC = () => {
       if (outcome !== 'Lost') return false;
     }
 
-    // 3. Filter by Conversion Readiness (only for Pending)
     if (listCategory === 'PENDING' && filter !== 'ALL') {
       return p.doctorAssessment?.conversionReadiness?.startsWith(filter);
     }
     
     return true;
-  }).sort((a, b) => new Date(b.registeredAt).getTime() - new Date(a.registeredAt).getTime());
+  }).sort((a, b) => {
+    const dateA = a.entry_date ? new Date(a.entry_date).getTime() : new Date(a.registeredAt).getTime();
+    const dateB = b.entry_date ? new Date(b.entry_date).getTime() : new Date(b.registeredAt).getTime();
+    
+    if (dateB !== dateA) return dateB - dateA;
+    return new Date(b.registeredAt).getTime() - new Date(a.registeredAt).getTime();
+  });
 
   const handlePatientSelect = (p: Patient) => {
     setSelectedPatient(p);
-    setViewMode('split'); // Always switch back to split view for editing
+    setViewMode('split');
     setProposal(p.packageProposal || initialProposalState);
   };
 
@@ -155,14 +142,12 @@ export const PackageTeamDashboard: React.FC = () => {
   const handleConfirmOutcome = async () => {
     if (!selectedPatient) return;
     
-    const newOutcomeDate = outcomeModal.type !== 'Lost' ? outcomeModal.date : undefined;
+    const newOutcomeDate = outcomeModal.type !== 'Lost' ? outcomeModal.date : new Date().toISOString().split('T')[0];
 
     const updatedProposal: PackageProposal = {
       ...proposal as PackageProposal,
       outcome: outcomeModal.type!,
       outcomeDate: newOutcomeDate,
-      // Sync surgeryDate with outcomeDate to ensure the correct date is saved.
-      // The database mapping logic prioritizes surgeryDate.
       surgeryDate: newOutcomeDate,
       lostReason: outcomeModal.type === 'Lost' ? outcomeModal.reason : undefined,
       proposalCreatedAt: proposal.proposalCreatedAt || new Date().toISOString()
@@ -171,8 +156,6 @@ export const PackageTeamDashboard: React.FC = () => {
     await updatePackageProposal(selectedPatient.id, updatedProposal);
     setOutcomeModal({ ...outcomeModal, show: false });
 
-    // FIX: Improve UX by switching to the correct list after finalizing an outcome.
-    // This prevents the patient from "disappearing" from the UI.
     if (outcomeModal.type === 'Scheduled') {
       setListCategory('SCHEDULED');
     } else if (outcomeModal.type === 'Follow-Up') {
@@ -214,7 +197,6 @@ export const PackageTeamDashboard: React.FC = () => {
     const { name, mobile, role, email, password } = newStaff;
     if (!name || !mobile || !role || !email || !password) return;
     
-    // Safety check: ensure email check is null-safe
     const emailToLow = email.toLowerCase().trim();
     if (staffUsers.some(u => u.mobile === mobile || (u.email && u.email.toLowerCase() === emailToLow))) {
       alert("User with this mobile number or email already exists.");
@@ -272,7 +254,6 @@ export const PackageTeamDashboard: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {/* Header & Tabs */}
       <div className="flex flex-col md:flex-row justify-between items-end gap-4">
         <div>
           <h2 className="text-2xl font-bold text-gray-800 tracking-tight">Management Dashboard</h2>
@@ -301,7 +282,6 @@ export const PackageTeamDashboard: React.FC = () => {
 
       {activeTab === 'counseling' ? (
         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
-          {/* Main List Sections Toggle */}
           <div className="flex flex-col md:flex-row justify-between items-center gap-4">
             <div className="flex bg-slate-100 p-1 rounded-2xl w-full md:w-auto">
               <button onClick={() => setListCategory('PENDING')} className={`px-5 py-2.5 rounded-xl text-[10px] font-black uppercase transition-all flex items-center gap-2 ${listCategory === 'PENDING' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
@@ -335,11 +315,10 @@ export const PackageTeamDashboard: React.FC = () => {
                   <LayoutList className="w-4 h-4" />
                 </button>
               </div>
-              <ExportButtons patients={patients} role="package_team" />
+              <ExportButtons patients={patients} role="package_team" selectedPatient={selectedPatient} />
             </div>
           </div>
 
-          {/* Sub-Filter for Pending Leads */}
           {listCategory === 'PENDING' && (
             <div className="flex gap-2 overflow-x-auto pb-2">
               {['ALL', 'CR1', 'CR2', 'CR3', 'CR4'].map(f => (
@@ -358,7 +337,6 @@ export const PackageTeamDashboard: React.FC = () => {
 
           {viewMode === 'split' ? (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {/* List */}
               <div className="bg-white rounded-[2rem] shadow-sm border border-slate-100 overflow-hidden lg:col-span-1 h-[750px] flex flex-col">
                 <div className="p-5 border-b bg-slate-50/50 flex justify-between items-center">
                   <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">{listCategory} Directory</span>
@@ -392,10 +370,26 @@ export const PackageTeamDashboard: React.FC = () => {
                         <Stethoscope className="w-3 h-3 text-hospital-400" />
                         {p.doctorAssessment?.doctorSignature || 'Unassigned Surgeon'}
                       </div>
-                      <div className="mt-2 text-[9px] text-slate-400 font-black uppercase tracking-widest flex items-center gap-2">
-                        {p.condition}
+                      <div className="mt-2 text-[9px] text-slate-400 font-black uppercase tracking-widest flex flex-wrap items-center gap-x-2 gap-y-1">
+                        <span>{p.condition}</span>
                         <span className="w-1 h-1 bg-slate-200 rounded-full"></span>
-                        {p.doctorAssessment?.conversionReadiness || 'LEAD'}
+                        <span>{p.doctorAssessment?.conversionReadiness || 'LEAD'}</span>
+                        <span className="w-1 h-1 bg-slate-200 rounded-full"></span>
+                        <span className="flex items-center gap-1 text-hospital-600 font-bold">
+                          <Clock className="w-3 h-3" /> Arrived: {formatDate(p.entry_date)}
+                        </span>
+                        {p.packageProposal?.outcomeDate && (
+                          <>
+                            <span className="w-1 h-1 bg-slate-200 rounded-full"></span>
+                            <span className={`flex items-center gap-1 font-bold ${
+                              p.packageProposal.outcome === 'Scheduled' ? 'text-emerald-600' : 
+                              p.packageProposal.outcome === 'Follow-Up' ? 'text-blue-600' : 
+                              'text-rose-600'
+                            }`}>
+                              <Calendar className="w-3 h-3" /> {p.packageProposal.outcome}: {formatDate(p.packageProposal.outcomeDate)}
+                            </span>
+                          </>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -408,24 +402,46 @@ export const PackageTeamDashboard: React.FC = () => {
                 </div>
               </div>
 
-              {/* Detail Form */}
               <div className="bg-white rounded-[2.5rem] shadow-sm border border-slate-100 overflow-hidden lg:col-span-2 flex flex-col h-[750px]">
                 {selectedPatient ? (
                   <div className="flex flex-col h-full">
-                    <div className="p-8 bg-slate-50 border-b relative overflow-hidden">
+                    <div className="p-6 bg-slate-50 border-b relative overflow-hidden">
                       <div className="absolute top-0 right-0 w-32 h-32 bg-hospital-500/10 blur-[50px] rounded-full -mr-16 -mt-16"></div>
-                      <div className="relative z-10 flex justify-between items-start">
-                        <div>
-                          <h3 className="text-2xl font-black text-slate-900 tracking-tight">{selectedPatient.name}</h3>
-                          <div className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-2 flex flex-wrap gap-x-6 gap-y-2">
-                            <span className="flex items-center gap-1.5"><User className="w-3 h-3" /> {selectedPatient.age} / {selectedPatient.gender}</span>
-                            <span className="flex items-center gap-1.5"><ShieldCheck className="w-3 h-3" /> {selectedPatient.hasInsurance} {selectedPatient.insuranceName ? `(${selectedPatient.insuranceName})` : ''}</span>
-                            <span className="flex items-center gap-1.5"><Briefcase className="w-3 h-3" /> {selectedPatient.occupation}</span>
-                            <span className="flex items-center gap-1.5"><Share2 className="w-3 h-3" /> {selectedPatient.source}</span>
+                      <div className="relative z-10 flex flex-col md:flex-row justify-between items-start gap-6">
+                        <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 w-full">
+                          <div className="bg-white border border-indigo-100 p-3 rounded-2xl shadow-sm">
+                            <div className="flex items-center gap-1.5 mb-1">
+                              <User className="w-3 h-3 text-indigo-500" />
+                              <span className="text-[8px] font-black text-indigo-400 uppercase tracking-widest">Name</span>
+                            </div>
+                            <div className="text-sm font-black text-indigo-900 truncate leading-tight">{selectedPatient.name}</div>
+                          </div>
+                          <div className="bg-white border border-blue-100 p-3 rounded-2xl shadow-sm">
+                            <div className="flex items-center gap-1.5 mb-1">
+                              <Activity className="w-3 h-3 text-blue-500" />
+                              <span className="text-[8px] font-black text-blue-400 uppercase tracking-widest">Age / Gender</span>
+                            </div>
+                            <div className="text-sm font-black text-blue-900 leading-tight">{selectedPatient.age}Y <span className="text-blue-200">|</span> {selectedPatient.gender}</div>
+                          </div>
+                          <div className="bg-white border border-teal-100 p-3 rounded-2xl shadow-sm">
+                            <div className="flex items-center gap-1.5 mb-1">
+                              <Share2 className="w-3 h-3 text-teal-500" />
+                              <span className="text-[8px] font-black text-teal-400 uppercase tracking-widest">Source</span>
+                            </div>
+                            <div className="text-sm font-black text-teal-900 truncate leading-tight">
+                              {selectedPatient.source === 'Doctor Recommended' ? `Dr. ${selectedPatient.sourceDoctorName || 'Recommended'}` : selectedPatient.source}
+                            </div>
+                          </div>
+                          <div className="bg-white border border-rose-100 p-3 rounded-2xl shadow-sm">
+                            <div className="flex items-center gap-1.5 mb-1">
+                              <ShieldCheck className="w-3 h-3 text-rose-500" />
+                              <span className="text-[8px] font-black text-rose-400 uppercase tracking-widest">Insurance Details</span>
+                            </div>
+                            <div className="text-sm font-black text-rose-900 truncate leading-tight">{selectedPatient.insuranceName || 'No'}</div>
                           </div>
                         </div>
-                        <div className="text-right flex flex-col items-end gap-3">
-                          {/* NEW: Counseling Status Badge */}
+
+                        <div className="text-right flex flex-col items-end gap-3 min-w-[150px]">
                           <div className="flex flex-col items-end">
                             <div className="text-[9px] text-slate-400 font-black uppercase tracking-[0.2em] mb-1.5">Counseling Status</div>
                             {(() => {
@@ -452,7 +468,6 @@ export const PackageTeamDashboard: React.FC = () => {
 
                     <form onSubmit={handleSaveProposal} className="flex-1 overflow-y-auto p-8 space-y-10">
                       
-                      {/* Surgeon's Assessment Recommendation Section */}
                       <div className="bg-blue-50/50 border border-blue-100 p-6 rounded-[2rem] space-y-5 animate-in fade-in slide-in-from-top-4">
                          <div className="flex items-center justify-between">
                            <div className="flex items-center gap-2 text-[10px] font-black uppercase text-blue-600 tracking-[0.2em]">
@@ -461,6 +476,15 @@ export const PackageTeamDashboard: React.FC = () => {
                            <div className="flex items-center gap-1.5 text-[9px] font-black text-slate-400 uppercase">
                              Assessed: {selectedPatient.doctorAssessment?.assessedAt ? formatDate(selectedPatient.doctorAssessment.assessedAt) : 'N/A'}
                            </div>
+                         </div>
+
+                         {/* Recommended Procedures Display */}
+                         <div className="bg-white p-4 rounded-2xl border border-blue-100 shadow-sm flex items-center justify-between">
+                            <div>
+                               <div className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Recommended Procedure</div>
+                               <div className="text-sm font-black text-blue-700 uppercase">{selectedPatient.doctorAssessment?.surgeryProcedure || 'NOT SPECIFIED'}</div>
+                            </div>
+                            <LayoutList className="w-5 h-5 text-blue-200" />
                          </div>
 
                          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -492,7 +516,6 @@ export const PackageTeamDashboard: React.FC = () => {
                          </div>
                       </div>
 
-                      {/* Package Configuration */}
                       <div className="space-y-8">
                          <div className="flex items-center gap-2 text-[10px] font-black uppercase text-hospital-600 tracking-[0.2em]">
                            <Banknote className="w-4 h-4" /> Package & Financials
@@ -523,7 +546,6 @@ export const PackageTeamDashboard: React.FC = () => {
                          </div>
                       </div>
 
-                      {/* Room & Inclusions */}
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
                          <div className="space-y-4">
                             <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest">Inclusions</label>
@@ -546,7 +568,6 @@ export const PackageTeamDashboard: React.FC = () => {
 
                       <hr className="border-slate-100" />
 
-                      {/* AI Counselor Advice */}
                       <div className="space-y-6">
                          <div className="flex items-center gap-2 text-[10px] font-black uppercase text-hospital-600 tracking-[0.2em]">
                            <Sparkles className="w-4 h-4" /> AI Counselor Advice
@@ -559,7 +580,6 @@ export const PackageTeamDashboard: React.FC = () => {
                          </div>
                       </div>
 
-                      {/* Final Action Buttons */}
                       <div className="pt-8 border-t border-slate-100 space-y-6">
                         <div className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-4">status</div>
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -601,7 +621,6 @@ export const PackageTeamDashboard: React.FC = () => {
               </div>
             </div>
           ) : (
-            /* Table View Mode */
             <div className="bg-white rounded-[2rem] shadow-sm border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-300">
               <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse">
@@ -634,7 +653,9 @@ export const PackageTeamDashboard: React.FC = () => {
                           </div>
                         </td>
                         <td className="p-5">
-                          <span className="text-[10px] font-black uppercase bg-slate-100 text-slate-600 px-3 py-1 rounded-full">{p.source}</span>
+                          <span className="text-[10px] font-black uppercase bg-slate-100 text-slate-600 px-3 py-1 rounded-full">
+                            {p.source === 'Doctor Recommended' ? `Dr. ${p.sourceDoctorName || 'Recommended'}` : p.source}
+                          </span>
                         </td>
                         <td className="p-5 text-sm font-bold text-slate-600">
                           {p.hasInsurance === 'Yes' ? (
@@ -683,7 +704,6 @@ export const PackageTeamDashboard: React.FC = () => {
           )}
         </div>
       ) : (
-        /* Staff Management View (Unchanged) */
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-in fade-in slide-in-from-right-4">
           <div className="md:col-span-1 bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-100">
             <h3 className="text-xl font-black text-slate-900 mb-8 flex items-center gap-3 uppercase tracking-tight">
@@ -739,10 +759,9 @@ export const PackageTeamDashboard: React.FC = () => {
         </div>
       )}
 
-      {/* Outcome Selection Modal */}
       {outcomeModal.show && (
         <div className="fixed inset-0 z-[150] bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-6 animate-in fade-in duration-300">
-          <div className="bg-white w-full max-w-md rounded-[2.5rem] shadow-2xl overflow-hidden border border-white/20">
+          <div className="bg-white w-full max-md rounded-[2.5rem] shadow-2xl overflow-hidden border border-white/20">
             <header className={`p-8 border-b flex justify-between items-center ${
               outcomeModal.type === 'Lost' ? 'bg-rose-50 text-rose-900' : 'bg-emerald-50 text-emerald-900'
             }`}>
