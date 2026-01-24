@@ -75,6 +75,7 @@ const mapRowToPatient = (row: any): Patient => {
       lostReason: dbProposal.lostReason || undefined,
       remarks: dbProposal.remarks || undefined,
       postFollowUp: dbProposal.postOpFollowUp || undefined,
+      postFollowUpCount: dbProposal.postOpFollowUpCount || undefined,
       packageAmount: dbProposal.packageAmount != null ? String(dbProposal.packageAmount) : undefined,
       equipment: (dbProposal.equipment && Array.isArray(dbProposal.equipment) && dbProposal.equipment.length > 0) ? 'Included' : 'Excluded',
       decisionPattern: dbProposal.decisionPattern || '',
@@ -256,6 +257,7 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
           lostReason: nullify(uiProposal.lostReason),
           remarks: nullify(uiProposal.remarks),
           postOpFollowUp: nullify(uiProposal.postFollowUp),
+          postOpFollowUpCount: nullify(uiProposal.postFollowUpCount),
           packageAmount: uiProposal.packageAmount ? parseInt(uiProposal.packageAmount.replace(/,/g, ''), 10) : null,
           equipment: uiProposal.equipment,
         };

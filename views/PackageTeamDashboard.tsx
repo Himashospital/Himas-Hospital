@@ -56,6 +56,7 @@ export const PackageTeamDashboard: React.FC = () => {
     roomType: undefined,
     stayDays: undefined,
     postFollowUp: undefined,
+    postFollowUpCount: undefined,
     surgeryDate: '',
     remarks: '',
     outcome: undefined,
@@ -193,7 +194,7 @@ export const PackageTeamDashboard: React.FC = () => {
   const ToggleButton = ({ label, value, current, onClick }: { label: string, value: string, current: string | undefined, onClick: (v: any) => void }) => (
     <button
       type="button"
-      onClick={() => onClick(current === 'Included' ? 'Excluded' : 'Included')}
+      onClick={() => onClick(value)}
       className={`flex-1 py-2 text-[10px] font-black uppercase rounded-lg border transition-all ${
         current === value 
           ? 'bg-hospital-600 text-white border-hospital-600 shadow-sm' 
@@ -326,7 +327,7 @@ export const PackageTeamDashboard: React.FC = () => {
 
                       <div className="space-y-8">
                          <div className="flex items-center gap-2 text-[10px] font-black uppercase text-hospital-600 tracking-[0.2em]"><Banknote className="w-4 h-4" /> Package & Financials</div>
-                         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-8">
+                         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-x-8 gap-y-6">
                             <div className="sm:col-span-2 xl:col-span-1">
                                <label className="block text-[10px] font-black uppercase text-slate-400 mb-3 tracking-widest">Mode of Payment</label>
                                <div className="flex flex-wrap gap-2">
@@ -347,6 +348,50 @@ export const PackageTeamDashboard: React.FC = () => {
                                <div className="relative">
                                   <Bed className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 w-4 h-4" />
                                   <input type="number" placeholder="e.g. 2" className="w-full pl-12 pr-4 py-3 bg-slate-50 border-2 border-transparent rounded-xl text-sm font-black focus:bg-white focus:border-hospital-500 outline-none" value={proposal.stayDays || ''} onChange={e => setProposal({...proposal, stayDays: e.target.value ? parseInt(e.target.value, 10) : undefined})} />
+                               </div>
+                            </div>
+
+                            {/* New Fields */}
+                            <div>
+                               <label className="block text-[10px] font-black uppercase text-slate-400 mb-3 tracking-widest">Room Type</label>
+                               <div className="flex gap-1.5">
+                                  {['Semi', 'Economy', 'Deluxe'].map(type => (
+                                    <button key={type} type="button" onClick={() => setProposal({...proposal, roomType: type as any})} className={`flex-1 py-2 text-[10px] font-black uppercase rounded-lg border transition-all ${proposal.roomType === type ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm' : 'bg-white text-slate-400 border-slate-100 hover:border-slate-300'}`}>{type}</button>
+                                  ))}
+                               </div>
+                            </div>
+                            <div>
+                               <label className="block text-[10px] font-black uppercase text-slate-400 mb-3 tracking-widest">Medicines</label>
+                               <div className="flex gap-1.5">
+                                  <ToggleButton label="Included" value="Included" current={proposal.surgeryMedicines} onClick={(v) => setProposal({...proposal, surgeryMedicines: v})} />
+                                  <ToggleButton label="Excluded" value="Excluded" current={proposal.surgeryMedicines} onClick={(v) => setProposal({...proposal, surgeryMedicines: v})} />
+                               </div>
+                            </div>
+                            <div>
+                               <label className="block text-[10px] font-black uppercase text-slate-400 mb-3 tracking-widest">ICU Charges</label>
+                               <div className="flex gap-1.5">
+                                  <ToggleButton label="Included" value="Included" current={proposal.icuCharges} onClick={(v) => setProposal({...proposal, icuCharges: v})} />
+                                  <ToggleButton label="Excluded" value="Excluded" current={proposal.icuCharges} onClick={(v) => setProposal({...proposal, icuCharges: v})} />
+                               </div>
+                            </div>
+                            <div>
+                               <label className="block text-[10px] font-black uppercase text-slate-400 mb-3 tracking-widest">Post-Op Follow-Up</label>
+                               <div className="flex flex-col gap-2">
+                                  <div className="flex gap-1.5">
+                                    <ToggleButton label="Included" value="Included" current={proposal.postFollowUp} onClick={(v) => setProposal({...proposal, postFollowUp: v})} />
+                                    <ToggleButton label="Excluded" value="Excluded" current={proposal.postFollowUp} onClick={(v) => setProposal({...proposal, postFollowUp: v})} />
+                                  </div>
+                                  {proposal.postFollowUp === 'Included' && (
+                                    <div className="animate-in fade-in slide-in-from-top-1 duration-200">
+                                      <input 
+                                        type="number" 
+                                        placeholder="Follow-Up Count (e.g. 1, 2, 3)" 
+                                        className="w-full px-4 py-2.5 bg-slate-50 border-2 border-transparent rounded-xl text-xs font-black focus:bg-white focus:border-hospital-500 outline-none" 
+                                        value={proposal.postFollowUpCount || ''} 
+                                        onChange={e => setProposal({...proposal, postFollowUpCount: e.target.value ? parseInt(e.target.value, 10) : undefined})} 
+                                      />
+                                    </div>
+                                  )}
                                </div>
                             </div>
                          </div>

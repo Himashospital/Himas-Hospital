@@ -111,8 +111,8 @@ export const ExportButtons: React.FC<ExportButtonsProps> = ({ patients, role, se
           <ul class="facilities-list">
             <li>• Room Category: <b>${prop.roomType || '---'}</b></li>
             <li>• Medicines: <b>${prop.surgeryMedicines || '---'}</b></li>
-            <li>• Pre-Op Care: <b>${prop.preOpInvestigation || '---'}</b></li>
-            <li>• Equipment: <b>${prop.equipment === 'Included' ? 'Standard OT Kit' : 'Excluded'}</b></li>
+            <li>• ICU Charges: <b>${prop.icuCharges || '---'}</b></li>
+            <li>• Post-Op Follow-Up: <b>${prop.postFollowUp === 'Excluded' ? 'NO' : (prop.postFollowUpCount ? prop.postFollowUpCount + ' VISITS' : (prop.postFollowUp === 'Included' ? 'YES' : '---'))}</b></li>
           </ul>
 
           <div class="section-title">IMPORTANT TERMS</div>

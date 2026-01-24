@@ -71,9 +71,10 @@ export interface PackageProposal {
   surgeryMedicines?: 'Included' | 'Excluded';
   equipment?: 'Included' | 'Excluded';
   icuCharges?: 'Included' | 'Excluded';
-  roomType?: 'Private' | 'Deluxe' | 'Semi';
+  roomType?: 'Private' | 'Deluxe' | 'Semi' | 'Economy';
   stayDays?: number;
-  postFollowUp?: 'None' | 'Single' | 'Double' | 'Excluded';
+  postFollowUp?: 'None' | 'Single' | 'Double' | 'Excluded' | 'Included';
+  postFollowUpCount?: number;
   surgeryDate?: string;
   remarks?: string;
   outcome?: ProposalOutcome;
