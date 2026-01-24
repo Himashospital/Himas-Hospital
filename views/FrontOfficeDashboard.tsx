@@ -217,7 +217,22 @@ export const FrontOfficeDashboard: React.FC = () => {
 
   const combinedHistoryData = [
     ...patients.map(p => ({ ...p, recordType: 'Registration' as const, displayDate: p.registeredAt, displayEntryDate: p.entry_date, displayStatus: getHistoryStatus(p) })),
-    ...appointments.map(a => ({ id: '---', name: a.name, mobile: a.mobile, condition: a.condition, source: a.source, registeredAt: a.createdAt, entry_date: a.date, recordType: 'Appointment' as const, displayDate: a.date + 'T' + (a.time || '00:00') + ':00', displayEntryDate: a.date, displayStatus: a.bookingType || 'Scheduled' }))
+    ...appointments.map(a => ({ 
+      id: '---', 
+      name: a.name, 
+      mobile: a.mobile, 
+      condition: a.condition, 
+      source: a.source, 
+      sourceDoctorName: a.sourceDoctorName || '',
+      registeredAt: a.createdAt, 
+      entry_date: a.date, 
+      recordType: 'Appointment' as const, 
+      displayDate: a.date + 'T' + (a.time || '00:00') + ':00', 
+      displayEntryDate: a.date, 
+      displayStatus: a.bookingType || 'Scheduled',
+      age: undefined as any,
+      gender: undefined as any
+    }))
   ].filter(item => {
     const sTerm = searchTerm.toLowerCase();
     const matches = item.name.toLowerCase().includes(sTerm) || (item.id && item.id.toLowerCase().includes(sTerm)) || item.mobile.includes(sTerm);
