@@ -52,8 +52,7 @@ export const FrontOfficeDashboard: React.FC = () => {
   const [showBookingForm, setShowBookingForm] = useState(false);
   const [step, setStep] = useState(1);
   const [searchTerm, setSearchTerm] = useState('');
-  const [opdStartDate, setOpdStartDate] = useState('');
-  const [opdEndDate, setOpdEndDate] = useState('');
+  const [opdFilterDate, setOpdFilterDate] = useState(new Date().toISOString().split('T')[0]);
   const [apptDate, setApptDate] = useState(new Date().toISOString().split('T')[0]);
 
   const [historyFilters, setHistoryFilters] = useState({
@@ -171,7 +170,7 @@ export const FrontOfficeDashboard: React.FC = () => {
     const baseId = item.id.split('_V')[0];
     const newVisitId = `${baseId}_V${Date.now()}`;
     const revisitData: Omit<Patient, 'registeredAt' | 'hospital_id'> = { id: newVisitId, name: item.name, dob: item.dob || null, gender: item.gender || Gender.Other, age: item.age || 0, mobile: item.mobile, occupation: item.occupation || '', condition: item.condition, source: item.source || 'Other', hasInsurance: item.hasInsurance || 'No', insuranceName: item.insuranceName || '', sourceDoctorName: item.sourceDoctorName || '', visitType: 'Follow Up' };
-    try { await addPatient(revisitData); setSearchTerm(item.mobile); setOpdStartDate(''); setOpdEndDate(''); setActiveTab('REGISTRATION'); } catch (error) { alert("Failed to create revisit record."); }
+    try { await addPatient(revisitData); setSearchTerm(item.mobile); setOpdFilterDate(new Date().toISOString().split('T')[0]); setActiveTab('REGISTRATION'); } catch (error) { alert("Failed to create revisit record."); }
   };
 
   const handleBookingSubmit = async (e: React.FormEvent) => {
@@ -209,7 +208,7 @@ export const FrontOfficeDashboard: React.FC = () => {
 
   const filteredPatients = patients.filter(p => {
     if (p.status !== 'Arrived') return false;
-    if (opdStartDate || opdEndDate) { const pDate = formatDate(p.entry_date); if (opdStartDate && pDate < opdStartDate) return false; if (opdEndDate && pDate > opdEndDate) return false; }
+    if (opdFilterDate) { const pDate = p.entry_date; if (pDate !== opdFilterDate) return false; }
     const sTerm = searchTerm.toLowerCase(); return !sTerm || p.name.toLowerCase().includes(sTerm) || p.id.toLowerCase().includes(sTerm) || p.mobile.includes(sTerm);
   }).sort((a, b) => (b.entry_date || '').localeCompare(a.entry_date || ''));
 
@@ -321,9 +320,8 @@ export const FrontOfficeDashboard: React.FC = () => {
             </div>
             {activeTab === 'REGISTRATION' && (
                 <div className="flex items-center gap-2 w-full sm:w-auto animate-in fade-in duration-300">
-                    <input type="date" className="flex-1 bg-slate-50 border border-slate-100 rounded-xl px-3 py-2 text-xs font-bold" value={opdStartDate} onChange={e => setOpdStartDate(e.target.value)} />
-                    <span className="text-[10px] font-black uppercase text-slate-400">TO</span>
-                    <input type="date" className="flex-1 bg-slate-50 border border-slate-100 rounded-xl px-3 py-2 text-xs font-bold" value={opdEndDate} onChange={e => setOpdEndDate(e.target.value)} />
+                    <Calendar className="w-4 h-4 text-slate-400" />
+                    <input type="date" className="flex-1 sm:w-40 bg-slate-50 border border-slate-100 rounded-xl px-3 py-2 text-xs font-bold" value={opdFilterDate} onChange={e => setOpdFilterDate(e.target.value)} />
                 </div>
             )}
             {activeTab === 'APPOINTMENTS' && (
