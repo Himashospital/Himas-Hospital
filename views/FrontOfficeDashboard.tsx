@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useHospital } from '../context/HospitalContext';
 import { ExportButtons } from '../components/ExportButtons';
@@ -30,6 +31,7 @@ const getHistoryStatus = (p: Patient): string => {
       case 'Scheduled': return 'Surgery Scheduled';
       case 'Follow-Up': return 'Follow-Up Surgery';
       case 'Lost': return 'Surgery Lost';
+      case 'Completed': return 'Surgery Completed';
     }
   }
   if (p.doctorAssessment) {
@@ -91,11 +93,12 @@ export const FrontOfficeDashboard: React.FC = () => {
     { name: "Other", icon: <PlusCircle className="w-4 h-4 text-slate-400" /> }
   ];
 
-  const statusOptions = ['Arrived', 'Doctor Done', 'Medication Done', 'Package Proposal', 'Surgery Scheduled', 'Follow-Up Surgery', 'Surgery Lost', 'Scheduled', 'Follow Up'];
+  const statusOptions = ['Arrived', 'Doctor Done', 'Medication Done', 'Package Proposal', 'Surgery Scheduled', 'Follow-Up Surgery', 'Surgery Lost', 'Surgery Completed', 'Scheduled', 'Follow Up'];
 
   const getStatusClass = (status?: string): string => {
     if (!status) return 'bg-slate-50 text-slate-400';
     const s = status.toLowerCase();
+    if (s.includes('completed')) return 'bg-teal-50 text-teal-600';
     if (s.includes('scheduled')) return 'bg-emerald-50 text-emerald-600';
     if (s.includes('follow-up')) return 'bg-blue-50 text-blue-600';
     if (s.includes('lost')) return 'bg-rose-50 text-rose-600';

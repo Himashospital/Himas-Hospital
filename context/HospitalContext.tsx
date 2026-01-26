@@ -60,10 +60,12 @@ const mapRowToPatient = (row: any): Patient => {
       outcomeStatus = 'Scheduled';
     } else if (outcomeStatus === 'Surgery Lost') {
       outcomeStatus = 'Lost';
+    } else if (outcomeStatus === 'Surgery Completed') {
+      outcomeStatus = 'Completed';
     }
 
     uiProposal = {
-      outcome: outcomeStatus || undefined,
+      outcome: (outcomeStatus || undefined) as ProposalOutcome,
       modeOfPayment: dbProposal.paymentMode || undefined,
       surgeryDate: dbProposal.outcomeDate || undefined,
       outcomeDate: dbProposal.outcomeDate || undefined,
@@ -241,7 +243,7 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
       if (patient.packageProposal) {
         const uiProposal = patient.packageProposal;
         dbPackageProposal = {
-          status: uiProposal.outcome ? (uiProposal.outcome === 'Scheduled' ? 'Surgery Fixed' : uiProposal.outcome) : null,
+          status: uiProposal.outcome ? (uiProposal.outcome === 'Scheduled' ? 'Surgery Fixed' : (uiProposal.outcome === 'Completed' ? 'Surgery Completed' : uiProposal.outcome)) : null,
           paymentMode: nullify(uiProposal.modeOfPayment),
           outcomeDate: nullify(uiProposal.surgeryDate || uiProposal.outcomeDate),
           roomType: nullify(uiProposal.roomType),

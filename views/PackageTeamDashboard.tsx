@@ -23,7 +23,7 @@ export const PackageTeamDashboard: React.FC = () => {
   const { patients, updatePackageProposal, staffUsers, registerStaff } = useHospital();
   
   const [activeTab, setActiveTab] = useState<'counseling' | 'staff'>('counseling');
-  const [listCategory, setListCategory] = useState<'PENDING' | 'SCHEDULED' | 'FOLLOWUP' | 'LOST'>('PENDING');
+  const [listCategory, setListCategory] = useState<'PENDING' | 'SCHEDULED' | 'FOLLOWUP' | 'COMPLETED' | 'LOST'>('PENDING');
   const [viewMode, setViewMode] = useState<'split' | 'table'>('split');
 
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
@@ -104,6 +104,8 @@ export const PackageTeamDashboard: React.FC = () => {
       if (outcome !== 'Scheduled') return false;
     } else if (listCategory === 'FOLLOWUP') {
       if (outcome !== 'Follow-Up') return false;
+    } else if (listCategory === 'COMPLETED') {
+      if (outcome !== 'Completed') return false;
     } else if (listCategory === 'LOST') {
       if (outcome !== 'Lost') return false;
     }
@@ -149,6 +151,19 @@ export const PackageTeamDashboard: React.FC = () => {
     if (outcomeModal.type === 'Scheduled') setListCategory('SCHEDULED');
     else if (outcomeModal.type === 'Follow-Up') setListCategory('FOLLOWUP');
     else if (outcomeModal.type === 'Lost') setListCategory('LOST');
+    else if (outcomeModal.type === 'Completed') setListCategory('COMPLETED');
+  };
+
+  const handleSurgeryComplete = async () => {
+    if (!selectedPatient) return;
+    const updatedProposal: PackageProposal = {
+      ...proposal as PackageProposal,
+      outcome: 'Completed',
+      outcomeDate: new Date().toISOString().split('T')[0],
+      proposalCreatedAt: proposal.proposalCreatedAt || new Date().toISOString()
+    };
+    await updatePackageProposal(selectedPatient.id, updatedProposal);
+    setListCategory('COMPLETED');
   };
 
   const handleGenerateAIStrategy = async () => {
@@ -208,6 +223,7 @@ export const PackageTeamDashboard: React.FC = () => {
   const getStatusBadge = (p: Patient) => {
     const outcome = p.packageProposal?.outcome;
     if (outcome === 'Scheduled') return { text: 'Scheduled', classes: 'bg-emerald-50 text-emerald-700 border-emerald-200', icon: <CheckCircle2 className="w-4 h-4" /> };
+    if (outcome === 'Completed') return { text: 'Completed', classes: 'bg-teal-50 text-teal-700 border-teal-200', icon: <BadgeCheck className="w-4 h-4" /> };
     if (outcome === 'Follow-Up') return { text: 'Follow-Up', classes: 'bg-blue-50 text-blue-700 border-blue-200', icon: <Clock className="w-4 h-4" /> };
     if (outcome === 'Lost') return { text: 'Lost', classes: 'bg-rose-50 text-rose-700 border-rose-200', icon: <X className="w-4 h-4" /> };
     return { text: 'Pending', classes: 'bg-amber-50 text-amber-700 border-amber-200', icon: <AlertTriangle className="w-4 h-4" /> };
@@ -234,11 +250,12 @@ export const PackageTeamDashboard: React.FC = () => {
         <div className="space-y-6">
           <div className="flex flex-col xl:flex-row justify-between items-center gap-4">
             <div className="flex bg-slate-100 p-1 rounded-2xl w-full xl:w-auto overflow-x-auto whitespace-nowrap scrollbar-hide">
-              {['PENDING', 'SCHEDULED', 'FOLLOWUP', 'LOST'].map((cat) => (
+              {['PENDING', 'SCHEDULED', 'FOLLOWUP', 'COMPLETED', 'LOST'].map((cat) => (
                 <button key={cat} onClick={() => setListCategory(cat as any)} className={`px-4 lg:px-5 py-2.5 rounded-xl text-[10px] font-black uppercase transition-all flex items-center gap-2 ${listCategory === cat ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
                   {cat === 'PENDING' && <Activity className="w-4 h-4" />}
                   {cat === 'SCHEDULED' && <Calendar className="w-4 h-4" />}
                   {cat === 'FOLLOWUP' && <Clock className="w-4 h-4" />}
+                  {cat === 'COMPLETED' && <BadgeCheck className="w-4 h-4" />}
                   {cat === 'LOST' && <Trash2 className="w-4 h-4" />}
                   {cat.replace('PENDING', 'Leads').replace('FOLLOWUP', 'Follow-Up')}
                 </button>
@@ -265,7 +282,7 @@ export const PackageTeamDashboard: React.FC = () => {
                     <div key={p.id} onClick={() => handlePatientSelect(p)} className={`p-4 rounded-2xl border transition-all ${selectedPatient?.id === p.id ? 'border-hospital-500 bg-hospital-50 shadow-md' : 'border-slate-50 hover:border-slate-200 bg-white'}`}>
                       <div className="flex justify-between mb-2">
                         <span className="font-bold text-slate-800 text-sm">{p.name}</span>
-                        <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded-full ${p.packageProposal?.outcome === 'Scheduled' ? 'bg-emerald-50 text-emerald-600' : p.packageProposal?.outcome === 'Follow-Up' ? 'bg-blue-50 text-blue-600' : p.packageProposal?.outcome === 'Lost' ? 'bg-rose-50 text-rose-600' : 'bg-amber-50 text-amber-600'}`}>{p.packageProposal?.outcome || 'Pending'}</span>
+                        <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded-full ${p.packageProposal?.outcome === 'Scheduled' ? 'bg-emerald-50 text-emerald-600' : p.packageProposal?.outcome === 'Completed' ? 'bg-teal-50 text-teal-600' : p.packageProposal?.outcome === 'Follow-Up' ? 'bg-blue-50 text-blue-600' : p.packageProposal?.outcome === 'Lost' ? 'bg-rose-50 text-rose-600' : 'bg-amber-50 text-amber-600'}`}>{p.packageProposal?.outcome || 'Pending'}</span>
                       </div>
                       <div className="mt-2 text-[9px] text-slate-400 font-black uppercase tracking-widest flex flex-wrap items-center gap-2">
                         <span>{p.condition}</span>
@@ -398,17 +415,44 @@ export const PackageTeamDashboard: React.FC = () => {
                       </div>
 
                       <div className="pt-8 border-t border-slate-100">
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                          <button type="button" onClick={() => handleOpenOutcomeModal('Scheduled')} className="py-4 sm:py-6 bg-emerald-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg hover:bg-emerald-700 transition-all flex flex-col items-center gap-2">
-                            <Calendar className="w-5 h-5" /> Schedule
-                          </button>
-                          <button type="button" onClick={() => handleOpenOutcomeModal('Follow-Up')} className="py-4 sm:py-6 bg-blue-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg hover:bg-blue-700 transition-all flex flex-col items-center gap-2">
-                            <Clock className="w-5 h-5" /> Follow-Up
-                          </button>
-                          <button type="button" onClick={() => handleOpenOutcomeModal('Lost')} className="py-4 sm:py-6 bg-rose-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg hover:bg-rose-700 transition-all flex flex-col items-center gap-2">
-                            <Trash2 className="w-5 h-5" /> Lost
-                          </button>
-                        </div>
+                        {selectedPatient.packageProposal?.outcome === 'Scheduled' ? (
+                          <div className="bg-emerald-50 border border-emerald-100 p-6 rounded-[2rem] flex flex-col sm:flex-row items-center justify-between gap-6 animate-in slide-in-from-bottom-2">
+                            <div className="flex items-center gap-4 text-emerald-800">
+                              <Calendar className="w-10 h-10 opacity-40" />
+                              <div>
+                                <div className="text-[10px] font-black uppercase tracking-widest mb-1">Current Status</div>
+                                <div className="text-lg font-black uppercase">Surgery Scheduled</div>
+                              </div>
+                            </div>
+                            <button 
+                              type="button" 
+                              onClick={handleSurgeryComplete}
+                              className="w-full sm:w-auto px-8 py-4 bg-emerald-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl hover:bg-emerald-700 transition-all flex items-center justify-center gap-3"
+                            >
+                              <BadgeCheck className="w-5 h-5" /> Surgery Complete
+                            </button>
+                          </div>
+                        ) : selectedPatient.packageProposal?.outcome === 'Completed' ? (
+                          <div className="bg-teal-50 border border-teal-100 p-6 rounded-[2rem] flex items-center gap-4 text-teal-800 animate-in fade-in">
+                            <BadgeCheck className="w-10 h-10 opacity-40" />
+                            <div>
+                              <div className="text-[10px] font-black uppercase tracking-widest mb-1">Final Outcome</div>
+                              <div className="text-lg font-black uppercase">Surgery Successfully Completed</div>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                            <button type="button" onClick={() => handleOpenOutcomeModal('Scheduled')} className="py-4 sm:py-6 bg-emerald-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg hover:bg-emerald-700 transition-all flex flex-col items-center gap-2">
+                              <Calendar className="w-5 h-5" /> Schedule
+                            </button>
+                            <button type="button" onClick={() => handleOpenOutcomeModal('Follow-Up')} className="py-4 sm:py-6 bg-blue-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg hover:bg-blue-700 transition-all flex flex-col items-center gap-2">
+                              <Clock className="w-5 h-5" /> Follow-Up
+                            </button>
+                            <button type="button" onClick={() => handleOpenOutcomeModal('Lost')} className="py-4 sm:py-6 bg-rose-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg hover:bg-rose-700 transition-all flex flex-col items-center gap-2">
+                              <Trash2 className="w-5 h-5" /> Lost
+                            </button>
+                          </div>
+                        )}
                         <button type="submit" className="w-full mt-6 py-4 text-[10px] font-black uppercase text-slate-400 hover:text-hospital-600 transition-colors">Update Details Only</button>
                       </div>
                     </form>
@@ -436,7 +480,7 @@ export const PackageTeamDashboard: React.FC = () => {
                         <td className="p-5 text-[10px] uppercase">{p.source === 'Doctor Recommended' ? `Dr. ${p.sourceDoctorName || 'Rec'}` : p.source}</td>
                         <td className="p-5 text-sm text-slate-600">{p.insuranceName || 'No'}</td>
                         <td className="p-5 font-black text-slate-900">₹{p.packageProposal?.packageAmount || '---'}</td>
-                        <td className="p-5"><span className={`text-[10px] font-black uppercase px-3 py-1.5 rounded-xl ${p.packageProposal?.outcome === 'Scheduled' ? 'bg-emerald-600 text-white' : p.packageProposal?.outcome === 'Follow-Up' ? 'bg-blue-600 text-white' : p.packageProposal?.outcome === 'Lost' ? 'bg-rose-600 text-white' : 'bg-slate-100 text-slate-500'}`}>{p.packageProposal?.outcome || 'Pending'}</span></td>
+                        <td className="p-5"><span className={`text-[10px] font-black uppercase px-3 py-1.5 rounded-xl ${p.packageProposal?.outcome === 'Scheduled' ? 'bg-emerald-600 text-white' : p.packageProposal?.outcome === 'Completed' ? 'bg-teal-600 text-white' : p.packageProposal?.outcome === 'Follow-Up' ? 'bg-blue-600 text-white' : p.packageProposal?.outcome === 'Lost' ? 'bg-rose-600 text-white' : 'bg-slate-100 text-slate-500'}`}>{p.packageProposal?.outcome || 'Pending'}</span></td>
                       </tr>
                     ))}
                   </tbody>
@@ -472,7 +516,7 @@ export const PackageTeamDashboard: React.FC = () => {
 
       {outcomeModal.show && (
         <div className="fixed inset-0 z-[150] bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 sm:p-6 animate-in fade-in duration-300">
-          <div className="bg-white w-full max-w-md sm:max-w-2xl rounded-[2.5rem] shadow-2xl overflow-hidden border border-white/20">
+          <div className="bg-white w-full max-md sm:max-w-2xl rounded-[2.5rem] shadow-2xl overflow-hidden border border-white/20">
             <header className={`p-6 sm:p-8 border-b flex justify-between items-center ${outcomeModal.type === 'Lost' ? 'bg-rose-50 text-rose-900' : 'bg-emerald-50 text-emerald-900'}`}>
               <h3 className="text-xl font-black uppercase tracking-tight">Finalizing: {outcomeModal.type}</h3>
               <button onClick={() => setOutcomeModal({ ...outcomeModal, show: false })}><X className="w-6 h-6 text-slate-400" /></button>

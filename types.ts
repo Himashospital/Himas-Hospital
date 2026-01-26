@@ -57,7 +57,7 @@ export interface DoctorAssessment {
   surgeryProcedure?: string;
 }
 
-export type ProposalOutcome = 'Scheduled' | 'Follow-Up' | 'Lost';
+export type ProposalOutcome = 'Scheduled' | 'Follow-Up' | 'Lost' | 'Completed';
 
 export interface PackageProposal {
   decisionPattern: string;
