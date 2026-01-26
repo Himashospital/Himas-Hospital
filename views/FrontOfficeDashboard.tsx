@@ -8,7 +8,7 @@ import {
   Phone, X, CalendarCheck, Tag, Chrome, MessageCircle, Instagram, 
   Facebook, Youtube, Globe, Clock, Users as UsersIcon,
   Share2, History, BadgeInfo, FileText, CreditCard, Clock3, Stethoscope,
-  Filter, FileSpreadsheet, Briefcase
+  Filter, FileSpreadsheet, Briefcase, AlertTriangle
 } from 'lucide-react';
 
 const formatDate = (dateString: string | undefined | null): string => {
@@ -60,6 +60,7 @@ export const FrontOfficeDashboard: React.FC = () => {
   });
 
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [originatingAppointmentId, setOriginatingAppointmentId] = useState<string | null>(null);
 
   const [formData, setFormData] = useState<Partial<Patient> & { sourceDoctorNotes?: string; sourceOtherDetails?: string }>({
@@ -500,7 +501,7 @@ export const FrontOfficeDashboard: React.FC = () => {
                       )}
                       <button onClick={() => handleEdit(item)} className="p-2 text-slate-300 hover:text-blue-600 transition-colors"><Pencil className="w-4 h-4" /></button>
                       {item.id !== '---' && (
-                        <button onClick={() => deletePatient(item.id)} className="p-2 text-slate-200 hover:text-red-500 transition-colors"><Trash2 className="w-4 h-4" /></button>
+                        <button onClick={() => setDeleteConfirmId(item.id)} className="p-2 text-slate-200 hover:text-red-500 transition-colors"><Trash2 className="w-4 h-4" /></button>
                       )}
                     </div>
                   </td>
@@ -668,6 +669,39 @@ export const FrontOfficeDashboard: React.FC = () => {
                  <button onClick={() => step === 2 ? setStep(1) : setShowForm(false)} className="px-6 py-4 text-xs font-black uppercase text-slate-400">{step === 2 ? 'Back' : 'Cancel'}</button>
                  <button onClick={handleSubmit} className="px-8 sm:px-14 py-5 bg-hospital-600 text-white rounded-2xl font-black text-xs uppercase shadow-xl transition-all">{step === 1 ? 'Next' : 'Save'}</button>
               </footer>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {deleteConfirmId && (
+        <div className="fixed inset-0 z-[200] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-white w-full max-w-sm rounded-[2rem] shadow-2xl p-8 border border-slate-100 animate-in zoom-in-95 duration-200">
+            <div className="w-16 h-16 bg-rose-50 rounded-2xl flex items-center justify-center mx-auto mb-6">
+              <AlertTriangle className="w-8 h-8 text-rose-600" />
+            </div>
+            <h3 className="text-xl font-black text-slate-900 mb-2 uppercase tracking-tight text-center">Confirm Deletion</h3>
+            <p className="text-sm text-slate-500 font-medium mb-8 text-center">
+              Are you sure you want to delete this patient record? This action is permanent and cannot be undone.
+            </p>
+            <div className="flex gap-3">
+              <button 
+                onClick={() => setDeleteConfirmId(null)}
+                className="flex-1 py-3 text-[10px] font-black uppercase text-slate-400 hover:text-slate-600 transition-colors bg-slate-50 rounded-xl"
+              >
+                No, Cancel
+              </button>
+              <button 
+                onClick={async () => {
+                  if (deleteConfirmId) {
+                    await deletePatient(deleteConfirmId);
+                    setDeleteConfirmId(null);
+                  }
+                }}
+                className="flex-1 py-3 text-[10px] font-black uppercase text-white bg-rose-600 rounded-xl shadow-lg shadow-rose-200 hover:bg-rose-700 transition-all"
+              >
+                Yes, Delete
+              </button>
             </div>
           </div>
         </div>
