@@ -64,8 +64,8 @@ export const FrontOfficeDashboard: React.FC = () => {
 
   const [formData, setFormData] = useState<Partial<Patient> & { sourceDoctorNotes?: string; sourceOtherDetails?: string }>({
     id: '', name: '', dob: '', gender: undefined, age: undefined,
-    mobile: '', occupation: 'Self-Employed', hasInsurance: 'No', insuranceName: '',
-    source: 'Other', condition: undefined, visitType: 'OPD',
+    mobile: '', occupation: '', hasInsurance: 'No', insuranceName: '',
+    source: '', condition: undefined, visitType: 'OPD',
     sourceDoctorName: '', sourceDoctorNotes: '', sourceOtherDetails: '',
     entry_date: new Date().toISOString().split('T')[0],
     arrivalTime: new Date().toTimeString().split(' ')[0].substring(0, 5)
@@ -117,7 +117,7 @@ export const FrontOfficeDashboard: React.FC = () => {
 
   const resetForm = () => { 
     setFormData({ 
-      id: '', name: '', dob: '', gender: undefined, age: undefined, mobile: '', occupation: 'Self-Employed', hasInsurance: 'No', insuranceName: '', source: 'Other', condition: undefined, visitType: 'OPD', sourceDoctorName: '', sourceDoctorNotes: '', sourceOtherDetails: '',
+      id: '', name: '', dob: '', gender: undefined, age: undefined, mobile: '', occupation: '', hasInsurance: 'No', insuranceName: '', source: '', condition: undefined, visitType: 'OPD', sourceDoctorName: '', sourceDoctorNotes: '', sourceOtherDetails: '',
       entry_date: new Date().toISOString().split('T')[0],
       arrivalTime: new Date().toTimeString().split(' ')[0].substring(0, 5)
     }); 
@@ -144,7 +144,7 @@ export const FrontOfficeDashboard: React.FC = () => {
       let sourceOtherDetails = '';
       if (source.startsWith('Other: ')) { sourceOtherDetails = source.substring(7); source = 'Other'; }
       setFormData({ 
-        ...item, source, sourceOtherDetails, visitType: item.visitType || 'OPD', hasInsurance: item.hasInsurance || 'No', sourceDoctorName, sourceDoctorNotes,
+        ...item, source, sourceOtherDetails, visitType: item.visitType || 'OPD', hasInsurance: item.hasInsurance || 'No', insuranceName: item.insuranceName || '', sourceDoctorName, sourceDoctorNotes,
         entry_date: item.entry_date || new Date().toISOString().split('T')[0],
         arrivalTime: item.arrivalTime || new Date().toTimeString().split(' ')[0].substring(0, 5)
       });
@@ -156,7 +156,7 @@ export const FrontOfficeDashboard: React.FC = () => {
 
   const handleArrived = (appt: Appointment) => { 
     setFormData({ 
-      id: '', name: appt.name || '', dob: '', gender: undefined, age: undefined, mobile: appt.mobile || '', occupation: 'Self-Employed', hasInsurance: 'No', insuranceName: '', source: appt.source || 'Other', sourceDoctorName: appt.sourceDoctorName || '', condition: appt.condition, visitType: appt.bookingType === 'Follow Up' ? 'Follow Up' : 'OPD',
+      id: '', name: appt.name || '', dob: '', gender: undefined, age: undefined, mobile: appt.mobile || '', occupation: '', hasInsurance: 'No', insuranceName: '', source: appt.source || '', sourceDoctorName: appt.sourceDoctorName || '', condition: appt.condition, visitType: appt.bookingType === 'Follow Up' ? 'Follow Up' : 'OPD',
       entry_date: new Date().toISOString().split('T')[0],
       arrivalTime: new Date().toTimeString().split(' ')[0].substring(0, 5)
     }); 
@@ -194,6 +194,9 @@ export const FrontOfficeDashboard: React.FC = () => {
       // Validate conditional sources
       if (formData.source === 'Doctor Recommended' && !formData.sourceDoctorName) return alert("Please provide the Doctor Name.");
       if (formData.source === 'Other' && !formData.sourceOtherDetails) return alert("Please provide details for 'Other' source.");
+      
+      // New: Validate Insurance Name if Insurance is Yes
+      if (formData.hasInsurance === 'Yes' && !formData.insuranceName) return alert("Please provide the Insurance Name.");
       
       setStep(2); return;
     }
@@ -601,8 +604,32 @@ export const FrontOfficeDashboard: React.FC = () => {
                        <div><label className="block text-[10px] font-black uppercase text-slate-500 mb-2">Mobile</label><input required type="tel" className="w-full text-xl border-b-2 border-slate-100 p-2 outline-none" value={formData.mobile || ''} onChange={e => setFormData({...formData, mobile: e.target.value})} /></div>
                        <div><label className="block text-[10px] font-black uppercase text-slate-500 mb-2">Condition</label><select required className="w-full border-b-2 border-slate-100 p-2 bg-white" value={formData.condition || ''} onChange={e => setFormData({...formData, condition: e.target.value as Condition})}><option value="">Select...</option>{Object.values(Condition).map(c => <option key={c} value={c}>{c}</option>)}</select></div>
                        <div><label className="block text-[10px] font-black uppercase text-slate-500 mb-2">Occupation</label><input className="w-full border-b-2 border-slate-100 p-2 outline-none" value={formData.occupation || ''} onChange={e => setFormData({...formData, occupation: e.target.value})} /></div>
-                       <div><label className="block text-[10px] font-black uppercase text-slate-500 mb-2">Lead Source</label><select className="w-full border-b-2 border-slate-100 p-2 bg-white" value={formData.source || ''} onChange={e => setFormData({...formData, source: e.target.value})}><option value="">Select...</option>{sourceConfig.map(s => <option key={s.name} value={s.name}>{s.name}</option>)}</select></div>
+                       <div><label className="block text-[10px] font-black uppercase text-slate-500 mb-2">How did you hear about us?</label><select className="w-full border-b-2 border-slate-100 p-2 bg-white" value={formData.source || ''} onChange={e => setFormData({...formData, source: e.target.value})}><option value="">Select...</option>{sourceConfig.map(s => <option key={s.name} value={s.name}>{s.name}</option>)}</select></div>
                        
+                       {/* New: Insurance Selection */}
+                       <div>
+                         <label className="block text-[10px] font-black uppercase text-slate-500 mb-2">Insurance</label>
+                         <div className="flex gap-2 p-1 bg-slate-100 rounded-xl">
+                           {['Yes', 'No'].map(v => (
+                             <button key={v} type="button" onClick={() => setFormData({...formData, hasInsurance: v as any})} className={`flex-1 py-2 rounded-lg text-[10px] font-black uppercase transition-all ${formData.hasInsurance === v ? 'bg-hospital-600 text-white shadow' : 'text-slate-500'}`}>{v}</button>
+                           ))}
+                         </div>
+                       </div>
+
+                       {/* New: Conditional Insurance Name Input */}
+                       {formData.hasInsurance === 'Yes' && (
+                         <div className="animate-in slide-in-from-top-2 duration-300">
+                           <label className="block text-[10px] font-black uppercase text-hospital-600 mb-2 tracking-widest">Insurance Name</label>
+                           <input 
+                             required 
+                             className="w-full text-lg font-bold border-b-2 border-hospital-100 p-2 outline-none focus:border-hospital-500 placeholder-slate-200" 
+                             value={formData.insuranceName || ''} 
+                             onChange={e => setFormData({...formData, insuranceName: e.target.value})} 
+                             placeholder="Enter Insurance Provider" 
+                           />
+                         </div>
+                       )}
+
                        {/* Conditional Inputs for Lead Source */}
                        {formData.source === 'Doctor Recommended' && (
                          <div className="animate-in slide-in-from-top-2 duration-300">
