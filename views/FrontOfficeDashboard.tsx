@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useHospital } from '../context/HospitalContext';
 import { ExportButtons } from '../components/ExportButtons';
@@ -678,21 +677,21 @@ export const FrontOfficeDashboard: React.FC = () => {
       )}
 
       {deleteConfirmId && (
-        <div className="fixed inset-0 z-[200] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-[200] bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200">
           <div className="bg-white w-full max-w-sm rounded-[2rem] shadow-2xl p-8 border border-slate-100 animate-in zoom-in-95 duration-200">
             <div className="w-16 h-16 bg-rose-50 rounded-2xl flex items-center justify-center mx-auto mb-6">
               <AlertTriangle className="w-8 h-8 text-rose-600" />
             </div>
             <h3 className="text-xl font-black text-slate-900 mb-2 uppercase tracking-tight text-center">Confirm Deletion</h3>
-            <p className="text-sm text-slate-500 font-medium mb-8 text-center">
-              Are you sure you want to delete this patient record? This action is permanent and cannot be undone.
+            <p className="text-sm text-slate-500 font-medium mb-8 text-center leading-relaxed">
+              Are you sure? This patient data will be <span className="text-rose-600 font-bold">permanently deleted</span>. This action cannot be undone.
             </p>
             <div className="flex gap-3">
               <button 
                 onClick={() => setDeleteConfirmId(null)}
-                className="flex-1 py-3 text-[10px] font-black uppercase text-slate-400 hover:text-slate-600 transition-colors bg-slate-50 rounded-xl"
+                className="flex-1 py-3 text-[10px] font-black uppercase text-slate-500 hover:text-slate-700 transition-colors bg-slate-50 rounded-xl border border-slate-200"
               >
-                No, Cancel
+                No / Cancel
               </button>
               <button 
                 onClick={async () => {
@@ -703,7 +702,7 @@ export const FrontOfficeDashboard: React.FC = () => {
                 }}
                 className="flex-1 py-3 text-[10px] font-black uppercase text-white bg-rose-600 rounded-xl shadow-lg shadow-rose-200 hover:bg-rose-700 transition-all"
               >
-                Yes, Delete
+                Confirm / Yes
               </button>
             </div>
           </div>

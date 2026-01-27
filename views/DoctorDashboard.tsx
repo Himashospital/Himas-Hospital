@@ -1,8 +1,7 @@
-
 import React, { useState, useEffect } from 'react';
 import { useHospital } from '../context/HospitalContext';
 import { SurgeonCode, PainSeverity, Affordability, ConversionReadiness, Patient, DoctorAssessment } from '../types';
-import { Stethoscope, Check, ChevronRight, User, Calendar, Save, Briefcase, CreditCard, Activity, Tag, FileText, Database, Clock, Share2, ShieldCheck } from 'lucide-react';
+import { Stethoscope, Check, ChevronRight, User, Calendar, Save, Briefcase, CreditCard, Activity, Tag, FileText, Database, Clock, Share2, ShieldCheck, Search } from 'lucide-react';
 
 const PROCEDURES = [
   "Lap Cholecystectomy",
@@ -14,12 +13,14 @@ const PROCEDURES = [
   "Laser Pilonidoplasty",
   "Laser Fistula + Perianal Abscess",
   "Laser Fissure",
-  "Stapler Haemorrhoidectomy"
+  "Stapler Haemorrhoidectomy",
+  "Other"
 ];
 
 export const DoctorDashboard: React.FC = () => {
   const { patients, updateDoctorAssessment } = useHospital();
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
 
   const [formState, setFormState] = useState<Partial<DoctorAssessment>>({
     quickCode: undefined,
@@ -28,6 +29,7 @@ export const DoctorDashboard: React.FC = () => {
     conversionReadiness: undefined,
     tentativeSurgeryDate: '',
     surgeryProcedure: '',
+    otherSurgeryName: '',
     notes: '',
     doctorSignature: ''
   });
@@ -41,6 +43,7 @@ export const DoctorDashboard: React.FC = () => {
         conversionReadiness: undefined,
         tentativeSurgeryDate: '',
         surgeryProcedure: '',
+        otherSurgeryName: '',
         notes: '',
         doctorSignature: ''
       });
@@ -51,7 +54,7 @@ export const DoctorDashboard: React.FC = () => {
     e.preventDefault();
     if (!selectedPatient) return;
 
-    const { quickCode, doctorSignature, painSeverity, affordability, conversionReadiness } = formState;
+    const { quickCode, doctorSignature, painSeverity, affordability, conversionReadiness, surgeryProcedure, otherSurgeryName } = formState;
 
     if (!quickCode || !doctorSignature) {
       alert("Please select a Quick Code and provide your signature.");
@@ -59,8 +62,12 @@ export const DoctorDashboard: React.FC = () => {
     }
 
     if (quickCode === SurgeonCode.S1) {
-      if (!painSeverity || !affordability || !conversionReadiness) {
+      if (!painSeverity || !affordability || !conversionReadiness || !surgeryProcedure) {
         alert("Please complete all additional surgery fields before saving.");
+        return;
+      }
+      if (surgeryProcedure === 'Other' && !otherSurgeryName) {
+        alert("Please specify the surgery procedure name.");
         return;
       }
     }
@@ -80,6 +87,13 @@ export const DoctorDashboard: React.FC = () => {
       const timeB = new Date(b.registeredAt).getTime();
       return timeB - timeA;
     });
+
+  const filteredDirectoryPatients = allPatients.filter(p => {
+    const s = searchTerm.toLowerCase();
+    return p.name.toLowerCase().includes(s) || 
+           p.id.toLowerCase().includes(s) || 
+           p.mobile.includes(s);
+  });
 
   const pendingCount = allPatients.filter(p => p.status === 'Arrived' && !p.doctorAssessment).length;
   const doneCount = allPatients.filter(p => !!p.doctorAssessment).length;
@@ -104,8 +118,23 @@ export const DoctorDashboard: React.FC = () => {
              </div>
            </div>
         </div>
+
+        {/* Directory Search */}
+        <div className="p-3 bg-white border-b">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
+            <input
+              type="text"
+              placeholder="Search patients..."
+              className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-100 rounded-lg text-sm font-medium focus:ring-2 focus:ring-hospital-500 outline-none transition-all"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+        </div>
+
         <div className="overflow-y-auto flex-1 p-2 space-y-2">
-          {allPatients.map(p => (
+          {filteredDirectoryPatients.map(p => (
             <div key={p.id} onClick={() => setSelectedPatient(p)} className={`p-4 rounded-xl border cursor-pointer hover:shadow-md transition-all ${selectedPatient?.id === p.id ? 'border-hospital-500 bg-hospital-50 shadow-sm' : p.doctorAssessment ? 'border-gray-100 bg-gray-50' : 'border-slate-100 bg-white'}`}>
               <div className="flex justify-between items-start">
                 <div className="flex-1">
@@ -126,8 +155,10 @@ export const DoctorDashboard: React.FC = () => {
               </div>
             </div>
           ))}
-          {allPatients.length === 0 && (
-            <div className="p-10 text-center text-slate-300 text-xs font-black uppercase tracking-widest">No patients arrived</div>
+          {filteredDirectoryPatients.length === 0 && (
+            <div className="p-10 text-center text-slate-300 text-xs font-black uppercase tracking-widest">
+              {searchTerm ? 'No results found' : 'No patients arrived'}
+            </div>
           )}
         </div>
       </div>
@@ -194,6 +225,19 @@ export const DoctorDashboard: React.FC = () => {
                       {PROCEDURES.map(p => <option key={p} value={p}>{p}</option>)}
                     </select>
                   </div>
+                  {formState.surgeryProcedure === 'Other' && (
+                    <div className="sm:col-span-2 animate-in slide-in-from-top-2 duration-200">
+                      <label className="block text-xs font-bold text-hospital-600 uppercase mb-2">Specific Procedure Name</label>
+                      <input 
+                        required 
+                        type="text" 
+                        className="w-full p-2 border border-hospital-200 rounded-md bg-white focus:border-hospital-500 outline-none" 
+                        value={formState.otherSurgeryName || ''} 
+                        onChange={e => setFormState(s => ({...s, otherSurgeryName: e.target.value}))} 
+                        placeholder="Enter specific procedure name..." 
+                      />
+                    </div>
+                  )}
                   <div>
                     <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Pain Severity</label>
                     <select required={isSurgery} value={formState.painSeverity || ''} onChange={e => setFormState(s => ({...s, painSeverity: e.target.value as PainSeverity}))} className="w-full p-2 border border-gray-300 rounded-md bg-white">

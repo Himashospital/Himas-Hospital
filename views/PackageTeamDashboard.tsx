@@ -4,7 +4,7 @@ import { useHospital } from '../context/HospitalContext';
 import { ExportButtons } from '../components/ExportButtons';
 import { generateCounselingStrategy } from '../services/geminiService';
 import { Patient, PackageProposal, Role, StaffUser, SurgeonCode, ProposalOutcome, ConversionReadiness } from '../types';
-import { Briefcase, Calendar, MessageCircle, AlertTriangle, Wand2, CheckCircle2, UserPlus, Users, BadgeCheck, Mail, Phone, User, Lock, Loader2, Sparkles, Activity, ShieldCheck, FileText, Banknote, CreditCard, Bed, ClipboardList, Info, Trash2, Clock, Check, X, Share2, Stethoscope, LayoutList, Columns } from 'lucide-react';
+import { Briefcase, Calendar, MessageCircle, AlertTriangle, Wand2, CheckCircle2, UserPlus, Users, BadgeCheck, Mail, Phone, User, Lock, Loader2, Sparkles, Activity, ShieldCheck, FileText, Banknote, CreditCard, Bed, ClipboardList, Info, Trash2, Clock, Check, X, Share2, Stethoscope, LayoutList, Columns, Search } from 'lucide-react';
 
 const formatDate = (dateString: string | undefined | null): string => {
   if (!dateString) return '';
@@ -25,6 +25,7 @@ export const PackageTeamDashboard: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'counseling' | 'staff'>('counseling');
   const [listCategory, setListCategory] = useState<'PENDING' | 'SCHEDULED' | 'FOLLOWUP' | 'COMPLETED' | 'LOST'>('PENDING');
   const [viewMode, setViewMode] = useState<'split' | 'table'>('split');
+  const [searchTerm, setSearchTerm] = useState('');
 
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
   const [filter, setFilter] = useState<'ALL' | 'CR1' | 'CR2' | 'CR3' | 'CR4'>('ALL');
@@ -97,6 +98,8 @@ export const PackageTeamDashboard: React.FC = () => {
 
   const allPatients = [...patients].filter(p => {
     if (p.doctorAssessment?.quickCode !== SurgeonCode.S1) return false;
+    
+    // Outcome based filtering
     const outcome = p.packageProposal?.outcome;
     if (listCategory === 'PENDING') {
       if (outcome) return false;
@@ -109,9 +112,21 @@ export const PackageTeamDashboard: React.FC = () => {
     } else if (listCategory === 'LOST') {
       if (outcome !== 'Lost') return false;
     }
+
+    // Readiness filtering
     if (listCategory === 'PENDING' && filter !== 'ALL') {
-      return p.doctorAssessment?.conversionReadiness?.startsWith(filter);
+      if (!p.doctorAssessment?.conversionReadiness?.startsWith(filter)) return false;
     }
+
+    // Search term filtering
+    if (searchTerm) {
+      const s = searchTerm.toLowerCase();
+      const match = p.name.toLowerCase().includes(s) || 
+                    p.id.toLowerCase().includes(s) || 
+                    p.mobile.includes(s);
+      if (!match) return false;
+    }
+
     return true;
   }).sort((a, b) => {
     const dateA = a.entry_date ? new Date(a.entry_date).getTime() : new Date(a.registeredAt).getTime();
@@ -262,6 +277,18 @@ export const PackageTeamDashboard: React.FC = () => {
               ))}
             </div>
             <div className="flex items-center gap-3 w-full xl:w-auto justify-end">
+              {/* Added Search Input for Counseling Tab */}
+              <div className="relative w-full sm:w-64">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
+                <input
+                  type="text"
+                  placeholder="Quick Search..."
+                  className="w-full pl-9 pr-3 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-bold focus:ring-2 focus:ring-hospital-500 outline-none transition-all shadow-sm"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+              </div>
+
               <div className="bg-white border p-1 rounded-xl flex shadow-sm">
                 <button onClick={() => setViewMode('split')} className={`p-2 rounded-lg transition-all ${viewMode === 'split' ? 'bg-slate-100 text-slate-900' : 'text-slate-400'}`}><Columns className="w-4 h-4" /></button>
                 <button onClick={() => setViewMode('table')} className={`p-2 rounded-lg transition-all ${viewMode === 'table' ? 'bg-slate-100 text-slate-900' : 'text-slate-400'}`}><LayoutList className="w-4 h-4" /></button>
@@ -291,6 +318,11 @@ export const PackageTeamDashboard: React.FC = () => {
                       </div>
                     </div>
                   ))}
+                  {allPatients.length === 0 && (
+                    <div className="p-10 text-center text-slate-300 text-[10px] font-black uppercase tracking-widest">
+                      {searchTerm ? 'No results found' : 'No patients found'}
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -485,6 +517,11 @@ export const PackageTeamDashboard: React.FC = () => {
                     ))}
                   </tbody>
                 </table>
+                {allPatients.length === 0 && (
+                  <div className="p-10 text-center text-slate-300 text-[10px] font-black uppercase tracking-widest">
+                    {searchTerm ? 'No results found' : 'No patients found'}
+                  </div>
+                )}
               </div>
             </div>
           )}
