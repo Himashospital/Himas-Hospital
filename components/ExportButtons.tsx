@@ -30,6 +30,12 @@ export const ExportButtons: React.FC<ExportButtonsProps> = ({ patients, role, se
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
 
+  // Fixed: Added resetForm to clear local state when modal is closed
+  const resetForm = () => {
+    setStartDate('');
+    setEndDate('');
+  };
+
   const handlePrint = () => {
     // Detect if we are in Package Team view and have a selected patient with a completed package
     if (role === 'package_team' && selectedPatient && selectedPatient.packageProposal) {
@@ -42,6 +48,10 @@ export const ExportButtons: React.FC<ExportButtonsProps> = ({ patients, role, se
       const stayText = prop.stayDays ? `${prop.stayDays} DAYS` : '---';
       const packageAmt = prop.packageAmount ? `₹ ${parseInt(prop.packageAmount).toLocaleString()}` : '₹ 0';
       const displaySource = p.source === 'Doctor Recommended' ? `DR. ${p.sourceDoctorName || 'RECOMMENDED'}` : p.source;
+
+      const surgeryText = p.doctorAssessment?.surgeryProcedure === 'Other'
+        ? (p.doctorAssessment?.otherSurgeryName || 'OTHER PROCEDURE')
+        : (p.doctorAssessment?.surgeryProcedure || '---');
 
       const html = `
         <!DOCTYPE html>
@@ -100,7 +110,7 @@ export const ExportButtons: React.FC<ExportButtonsProps> = ({ patients, role, se
             <tr><th>PATIENT NAME</th><td>${p.name}</td></tr>
             <tr><th>UHID NO</th><td>${p.id}</td></tr>
             <tr><th>REFERRED BY</th><td>${displaySource}</td></tr>
-            <tr><th>PROPOSED SURGERY</th><td>${p.doctorAssessment?.surgeryProcedure || '---'}</td></tr>
+            <tr><th>PROPOSED SURGERY</th><td>${surgeryText}</td></tr>
             <tr><th>PAYMENT MODE</th><td>${prop.modeOfPayment || '---'}</td></tr>
             <tr><th>ROOM TYPE</th><td>${prop.roomType || '---'}</td></tr>
             <tr><th>EXPECTED STAY</th><td>${stayText}</td></tr>
@@ -205,7 +215,9 @@ export const ExportButtons: React.FC<ExportButtonsProps> = ({ patients, role, se
       
       p.doctorAssessment ? 'Yes' : 'No',
       p.doctorAssessment?.quickCode || '',
-      p.doctorAssessment?.surgeryProcedure || '',
+      p.doctorAssessment?.surgeryProcedure === 'Other' 
+        ? (p.doctorAssessment?.otherSurgeryName || 'Other') 
+        : (p.doctorAssessment?.surgeryProcedure || ''),
       p.doctorAssessment?.painSeverity || '',
       p.doctorAssessment?.affordability || '',
       p.doctorAssessment?.conversionReadiness || '',
@@ -259,7 +271,7 @@ export const ExportButtons: React.FC<ExportButtonsProps> = ({ patients, role, se
             <h3 className="font-bold text-gray-800 flex items-center gap-2">
               <CalendarIcon className="w-4 h-4 text-hospital-500" /> Date Range Report
             </h3>
-            <button onClick={() => setShowDateFilter(false)} className="text-gray-400 hover:text-gray-600">
+            <button onClick={() => { setShowDateFilter(false); resetForm(); }} className="text-gray-400 hover:text-gray-600">
               <X className="w-5 h-5" />
             </button>
           </div>

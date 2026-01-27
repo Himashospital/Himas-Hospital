@@ -357,7 +357,11 @@ export const PackageTeamDashboard: React.FC = () => {
                          </div>
                          <div className="bg-white p-4 rounded-2xl border border-blue-100 shadow-sm">
                            <div className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Recommended Procedure</div>
-                           <div className="text-sm font-black text-blue-700 uppercase">{selectedPatient.doctorAssessment?.surgeryProcedure || 'NOT SPECIFIED'}</div>
+                           <div className="text-sm font-black text-blue-700 uppercase">
+                             {selectedPatient.doctorAssessment?.surgeryProcedure === 'Other' 
+                               ? (selectedPatient.doctorAssessment?.otherSurgeryName || 'Other Procedure') 
+                               : (selectedPatient.doctorAssessment?.surgeryProcedure || 'NOT SPECIFIED')}
+                           </div>
                          </div>
                          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                             {['Evaluator', 'Pain', 'Affordability', 'Readiness'].map((label, idx) => (
