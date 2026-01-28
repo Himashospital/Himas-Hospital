@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useHospital } from '../context/HospitalContext';
 import { ExportButtons } from '../components/ExportButtons';
@@ -6,15 +5,16 @@ import { generateCounselingStrategy } from '../services/geminiService';
 import { Patient, PackageProposal, Role, StaffUser, SurgeonCode, ProposalOutcome, ConversionReadiness } from '../types';
 import { Briefcase, Calendar, MessageCircle, AlertTriangle, Wand2, CheckCircle2, UserPlus, Users, BadgeCheck, Mail, Phone, User, Lock, Loader2, Sparkles, Activity, ShieldCheck, FileText, Banknote, CreditCard, Bed, ClipboardList, Info, Trash2, Clock, Check, X, Share2, Stethoscope, LayoutList, Columns, Search } from 'lucide-react';
 
-const formatDate = (dateString: string | undefined | null): string => {
+// Helper to format any ISO/YYYY-MM-DD date to DD-MM-YYYY
+const formatToDDMMYYYY = (dateString: string | undefined | null): string => {
   if (!dateString) return '';
   const datePart = dateString.split('T')[0];
   const parts = datePart.split('-');
   if (parts.length === 3) {
-    if (parts[0].length === 2 && parts[2].length === 4) {
+    if (parts[0].length === 4) { // YYYY-MM-DD
       return `${parts[2]}-${parts[1]}-${parts[0]}`;
     }
-    return datePart;
+    return datePart; // Assume already in correct format if first part isn't 4 chars
   }
   return dateString;
 };
@@ -129,11 +129,11 @@ export const PackageTeamDashboard: React.FC = () => {
 
     return true;
   }).sort((a, b) => {
-    // ⏱ Ordering: In FOLLOW-UP section only, sort by Follow-Up Date (nearest first, overdue at top)
+    // ⏱ Ordering (Very Important): In FOLLOW-UP section only, records must be sorted by Follow-up Date ASC
     if (listCategory === 'FOLLOWUP') {
       const dateA = a.packageProposal?.followUpDate ? new Date(a.packageProposal.followUpDate).getTime() : Infinity;
       const dateB = b.packageProposal?.followUpDate ? new Date(b.packageProposal.followUpDate).getTime() : Infinity;
-      if (dateA !== dateB) return dateA - dateB;
+      return dateA - dateB; // Nearest/Earliest first (Overdue at top)
     }
 
     // Default sorting for other sections: Most recent entry first
@@ -400,21 +400,21 @@ export const PackageTeamDashboard: React.FC = () => {
                         <span className="font-bold text-slate-800 text-sm">{p.name}</span>
                         <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded-full ${p.packageProposal?.outcome === 'Scheduled' ? 'bg-emerald-50 text-emerald-600' : p.packageProposal?.outcome === 'Completed' ? 'bg-teal-50 text-teal-600' : p.packageProposal?.outcome === 'Follow-Up' ? 'bg-blue-50 text-blue-600' : p.packageProposal?.outcome === 'Lost' ? 'bg-rose-50 text-rose-600' : 'bg-amber-50 text-amber-600'}`}>{p.packageProposal?.outcome || 'Pending'}</span>
                       </div>
-                      <div className="mt-2 text-[9px] text-slate-400 font-black uppercase tracking-widest flex flex-wrap items-center gap-2">
-                        <span>{p.condition}</span>
-                        <span className="w-1 h-1 bg-slate-200 rounded-full"></span>
-                        <div className="flex flex-col gap-0.5">
+                      <div className="mt-2 text-[9px] text-slate-400 font-black uppercase tracking-widest">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span>{p.condition}</span>
+                          <span className="w-1 h-1 bg-slate-200 rounded-full"></span>
                           <div className="flex items-center gap-1">
                             <span className="text-slate-400 font-black uppercase">Arrived</span>
-                            <span className="text-hospital-600 font-bold">{formatDate(p.entry_date)}</span>
+                            <span className="text-hospital-600 font-bold">{formatToDDMMYYYY(p.entry_date)}</span>
                           </div>
-                          {/* 📍 Where to show Follow-Up Date: ONLY in the FOLLOW-UP section directory */}
-                          {listCategory === 'FOLLOWUP' && p.packageProposal?.followUpDate && (
-                            <div className="text-[9px] font-black text-slate-500 uppercase mt-0.5">
-                              Follow-Up Date: {formatDate(p.packageProposal.followUpDate)}
-                            </div>
-                          )}
                         </div>
+                        {/* 📍 UI placement: Show Follow-Up Date ONLY in the FOLLOW-UP section directory list below Arrived */}
+                        {listCategory === 'FOLLOWUP' && p.packageProposal?.followUpDate && (
+                          <div className="text-slate-400 font-black mt-0.5">
+                            Follow-Up Date: <span className="text-slate-500">{formatToDDMMYYYY(p.packageProposal.followUpDate)}</span>
+                          </div>
+                        )}
                       </div>
                     </div>
                   ))}

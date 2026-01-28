@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { Patient, DoctorAssessment, PackageProposal, Role, StaffUser, Appointment, Condition, SurgeonCode, PainSeverity, Affordability, ConversionReadiness, ProposalOutcome, Gender } from '../types';
 import { supabase } from '../services/supabaseClient';
@@ -54,8 +53,8 @@ const mapRowToPatient = (row: any): Patient => {
   const dbProposal = row.package_proposal;
   let uiProposal: PackageProposal | undefined = undefined;
 
-  if (dbProposal) {
-    let outcomeStatus = dbProposal.status;
+  if (dbProposal || row.follow_up_date) {
+    let outcomeStatus = dbProposal?.status;
     if (outcomeStatus === 'Surgery Fixed' || outcomeStatus === 'Schedule Surgery') {
       outcomeStatus = 'Scheduled';
     } else if (outcomeStatus === 'Surgery Lost') {
@@ -66,25 +65,26 @@ const mapRowToPatient = (row: any): Patient => {
 
     uiProposal = {
       outcome: (outcomeStatus || undefined) as ProposalOutcome,
-      modeOfPayment: dbProposal.paymentMode || undefined,
-      surgeryDate: dbProposal.outcomeDate || undefined,
-      outcomeDate: dbProposal.outcomeDate || undefined,
-      roomType: dbProposal.roomType || undefined,
-      stayDays: dbProposal.stayDays || undefined,
-      icuCharges: dbProposal.icuCharges || undefined,
-      surgeryMedicines: dbProposal.surgeryMedicines || undefined,
-      preOpInvestigation: dbProposal.preOpInvestigation || undefined,
-      lostReason: dbProposal.lostReason || undefined,
-      remarks: dbProposal.remarks || undefined,
-      postFollowUp: dbProposal.postOpFollowUp || undefined,
-      postFollowUpCount: dbProposal.postOpFollowUpCount || undefined,
-      packageAmount: dbProposal.packageAmount != null ? String(dbProposal.packageAmount) : undefined,
-      equipment: (dbProposal.equipment && Array.isArray(dbProposal.equipment) && dbProposal.equipment.length > 0) ? 'Included' : 'Excluded',
-      decisionPattern: dbProposal.decisionPattern || '',
-      objectionIdentified: dbProposal.objectionIdentified || '',
-      counselingStrategy: dbProposal.counselingStrategy || '',
-      followUpDate: dbProposal.followUpDate || '',
-      proposalCreatedAt: dbProposal.proposalCreatedAt || new Date().toISOString(),
+      modeOfPayment: dbProposal?.paymentMode || undefined,
+      surgeryDate: dbProposal?.outcomeDate || undefined,
+      outcomeDate: dbProposal?.outcomeDate || undefined,
+      roomType: dbProposal?.roomType || undefined,
+      stayDays: dbProposal?.stayDays || undefined,
+      icuCharges: dbProposal?.icuCharges || undefined,
+      surgeryMedicines: dbProposal?.surgeryMedicines || undefined,
+      preOpInvestigation: dbProposal?.preOpInvestigation || undefined,
+      lostReason: dbProposal?.lostReason || undefined,
+      remarks: dbProposal?.remarks || undefined,
+      postFollowUp: dbProposal?.postOpFollowUp || undefined,
+      postFollowUpCount: dbProposal?.postOpFollowUpCount || undefined,
+      packageAmount: dbProposal?.packageAmount != null ? String(dbProposal.packageAmount) : undefined,
+      equipment: (dbProposal?.equipment && Array.isArray(dbProposal.equipment) && dbProposal.equipment.length > 0) ? 'Included' : 'Excluded',
+      decisionPattern: dbProposal?.decisionPattern || '',
+      objectionIdentified: dbProposal?.objectionIdentified || '',
+      counselingStrategy: dbProposal?.counselingStrategy || '',
+      // Sync from new native column with fallback to JSON
+      followUpDate: row.follow_up_date || dbProposal?.followUpDate || '',
+      proposalCreatedAt: dbProposal?.proposalCreatedAt || new Date().toISOString(),
     };
   }
   
@@ -156,7 +156,6 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
 
       if (apptError) throw apptError;
 
-      // Patients list: Include all who have Arrived, OR have been Assessed, OR have a Proposal.
       const consolidatedPatients = (apptRows || [])
         .filter((r: any) => 
           r.booking_status === 'Arrived' || 
@@ -167,7 +166,6 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
       
       setPatients(consolidatedPatients);
       
-      // Appointment Leads
       const appointmentLeads = (apptRows || [])
         .filter((r: any) => 
           ['Scheduled', 'Follow Up'].includes(r.booking_status) && 
@@ -240,8 +238,11 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
     setSaveStatus('saving');
     try {
       let dbPackageProposal = null;
+      let followUpDateVal = null;
+
       if (patient.packageProposal) {
         const uiProposal = patient.packageProposal;
+        followUpDateVal = nullify(uiProposal.followUpDate);
         dbPackageProposal = {
           status: uiProposal.outcome ? (uiProposal.outcome === 'Scheduled' ? 'Surgery Fixed' : (uiProposal.outcome === 'Completed' ? 'Surgery Completed' : uiProposal.outcome)) : null,
           paymentMode: nullify(uiProposal.modeOfPayment),
@@ -249,7 +250,7 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
           roomType: nullify(uiProposal.roomType),
           stayDays: nullify(uiProposal.stayDays),
           icuCharges: nullify(uiProposal.icuCharges),
-          followUpDate: nullify(uiProposal.followUpDate),
+          followUpDate: followUpDateVal,
           decisionPattern: nullify(uiProposal.decisionPattern),
           surgeryMedicines: nullify(uiProposal.surgeryMedicines),
           proposalCreatedAt: uiProposal.proposalCreatedAt,
@@ -282,7 +283,9 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
         arrival_time: nullify(patient.arrivalTime) || new Date().toTimeString().split(' ')[0],
         booking_status: patient.status || 'Arrived',
         package_proposal: dbPackageProposal,
-        doctor_assessment: patient.doctorAssessment || null
+        doctor_assessment: patient.doctorAssessment || null,
+        // Persist followUpDate to the native column
+        follow_up_date: followUpDateVal
       };
       
       const { error } = await supabase.from('himas_appointments').update(updateData).eq('id', targetId);
