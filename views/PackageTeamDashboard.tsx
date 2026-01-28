@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useHospital } from '../context/HospitalContext';
 import { ExportButtons } from '../components/ExportButtons';
@@ -157,7 +156,7 @@ export const PackageTeamDashboard: React.FC = () => {
       ...proposal as PackageProposal,
       outcome: outcomeModal.type!,
       outcomeDate: newOutcomeDate,
-      surgeryDate: newOutcomeDate,
+      surgeryDate: outcomeModal.type === 'Scheduled' ? newOutcomeDate : proposal.surgeryDate,
       lostReason: outcomeModal.type === 'Lost' ? outcomeModal.reason : undefined,
       proposalCreatedAt: proposal.proposalCreatedAt || new Date().toISOString()
     };
@@ -244,6 +243,96 @@ export const PackageTeamDashboard: React.FC = () => {
     return { text: 'Pending', classes: 'bg-amber-50 text-amber-700 border-amber-200', icon: <AlertTriangle className="w-4 h-4" /> };
   };
 
+  const renderActionButtons = (currentOutcome: ProposalOutcome | undefined) => {
+    // Scheduled Section logic
+    if (currentOutcome === 'Scheduled') {
+      return (
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <button 
+            type="button" 
+            onClick={handleSurgeryComplete}
+            className="py-4 sm:py-6 bg-emerald-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg hover:bg-emerald-700 transition-all flex flex-col items-center gap-2"
+          >
+            <BadgeCheck className="w-5 h-5" /> Surgery Complete
+          </button>
+          <button 
+            type="button" 
+            onClick={() => handleOpenOutcomeModal('Follow-Up')} 
+            className="py-4 sm:py-6 bg-blue-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg hover:bg-blue-700 transition-all flex flex-col items-center gap-2"
+          >
+            <Clock className="w-5 h-5" /> Follow-Up
+          </button>
+          <button 
+            type="button" 
+            onClick={() => handleOpenOutcomeModal('Lost')} 
+            className="py-4 sm:py-6 bg-rose-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg hover:bg-rose-700 transition-all flex flex-col items-center gap-2"
+          >
+            <Trash2 className="w-5 h-5" /> Surgery Lost
+          </button>
+        </div>
+      );
+    }
+
+    // Follow-up Section logic
+    if (currentOutcome === 'Follow-Up') {
+      return (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <button 
+            type="button" 
+            onClick={() => handleOpenOutcomeModal('Scheduled')} 
+            className="py-4 sm:py-6 bg-emerald-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg hover:bg-emerald-700 transition-all flex flex-col items-center gap-2"
+          >
+            <Calendar className="w-5 h-5" /> Scheduled
+          </button>
+          <button 
+            type="button" 
+            onClick={() => handleOpenOutcomeModal('Lost')} 
+            className="py-4 sm:py-6 bg-rose-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg hover:bg-rose-700 transition-all flex flex-col items-center gap-2"
+          >
+            <Trash2 className="w-5 h-5" /> Surgery Lost
+          </button>
+        </div>
+      );
+    }
+
+    // Lost Section logic
+    if (currentOutcome === 'Lost') {
+      return (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <button 
+            type="button" 
+            onClick={() => handleOpenOutcomeModal('Scheduled')} 
+            className="py-4 sm:py-6 bg-emerald-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg hover:bg-emerald-700 transition-all flex flex-col items-center gap-2"
+          >
+            <Calendar className="w-5 h-5" /> Scheduled
+          </button>
+          <button 
+            type="button" 
+            onClick={() => handleOpenOutcomeModal('Follow-Up')} 
+            className="py-4 sm:py-6 bg-blue-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg hover:bg-blue-700 transition-all flex flex-col items-center gap-2"
+          >
+            <Clock className="w-5 h-5" /> Follow-Up
+          </button>
+        </div>
+      );
+    }
+
+    // Pending Section logic (default)
+    return (
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <button type="button" onClick={() => handleOpenOutcomeModal('Scheduled')} className="py-4 sm:py-6 bg-emerald-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg hover:bg-emerald-700 transition-all flex flex-col items-center gap-2">
+          <Calendar className="w-5 h-5" /> Schedule
+        </button>
+        <button type="button" onClick={() => handleOpenOutcomeModal('Follow-Up')} className="py-4 sm:py-6 bg-blue-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg hover:bg-blue-700 transition-all flex flex-col items-center gap-2">
+          <Clock className="w-5 h-5" /> Follow-Up
+        </button>
+        <button type="button" onClick={() => handleOpenOutcomeModal('Lost')} className="py-4 sm:py-6 bg-rose-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg hover:bg-rose-700 transition-all flex flex-col items-center gap-2">
+          <Trash2 className="w-5 h-5" /> Lost
+        </button>
+      </div>
+    );
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row justify-between items-end gap-4">
@@ -277,7 +366,6 @@ export const PackageTeamDashboard: React.FC = () => {
               ))}
             </div>
             <div className="flex items-center gap-3 w-full xl:w-auto justify-end">
-              {/* Added Search Input for Counseling Tab */}
               <div className="relative w-full sm:w-64">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
                 <input
@@ -404,7 +492,6 @@ export const PackageTeamDashboard: React.FC = () => {
                                </div>
                             </div>
 
-                            {/* New Fields */}
                             <div>
                                <label className="block text-[10px] font-black uppercase text-slate-400 mb-3 tracking-widest">Room Type</label>
                                <div className="flex gap-1.5">
@@ -451,24 +538,7 @@ export const PackageTeamDashboard: React.FC = () => {
                       </div>
 
                       <div className="pt-8 border-t border-slate-100">
-                        {selectedPatient.packageProposal?.outcome === 'Scheduled' ? (
-                          <div className="bg-emerald-50 border border-emerald-100 p-6 rounded-[2rem] flex flex-col sm:flex-row items-center justify-between gap-6 animate-in slide-in-from-bottom-2">
-                            <div className="flex items-center gap-4 text-emerald-800">
-                              <Calendar className="w-10 h-10 opacity-40" />
-                              <div>
-                                <div className="text-[10px] font-black uppercase tracking-widest mb-1">Current Status</div>
-                                <div className="text-lg font-black uppercase">Surgery Scheduled</div>
-                              </div>
-                            </div>
-                            <button 
-                              type="button" 
-                              onClick={handleSurgeryComplete}
-                              className="w-full sm:w-auto px-8 py-4 bg-emerald-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl hover:bg-emerald-700 transition-all flex items-center justify-center gap-3"
-                            >
-                              <BadgeCheck className="w-5 h-5" /> Surgery Complete
-                            </button>
-                          </div>
-                        ) : selectedPatient.packageProposal?.outcome === 'Completed' ? (
+                        {selectedPatient.packageProposal?.outcome === 'Completed' ? (
                           <div className="bg-teal-50 border border-teal-100 p-6 rounded-[2rem] flex items-center gap-4 text-teal-800 animate-in fade-in">
                             <BadgeCheck className="w-10 h-10 opacity-40" />
                             <div>
@@ -477,16 +547,40 @@ export const PackageTeamDashboard: React.FC = () => {
                             </div>
                           </div>
                         ) : (
-                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                            <button type="button" onClick={() => handleOpenOutcomeModal('Scheduled')} className="py-4 sm:py-6 bg-emerald-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg hover:bg-emerald-700 transition-all flex flex-col items-center gap-2">
-                              <Calendar className="w-5 h-5" /> Schedule
-                            </button>
-                            <button type="button" onClick={() => handleOpenOutcomeModal('Follow-Up')} className="py-4 sm:py-6 bg-blue-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg hover:bg-blue-700 transition-all flex flex-col items-center gap-2">
-                              <Clock className="w-5 h-5" /> Follow-Up
-                            </button>
-                            <button type="button" onClick={() => handleOpenOutcomeModal('Lost')} className="py-4 sm:py-6 bg-rose-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg hover:bg-rose-700 transition-all flex flex-col items-center gap-2">
-                              <Trash2 className="w-5 h-5" /> Lost
-                            </button>
+                          <div className="space-y-6 animate-in slide-in-from-bottom-2">
+                             {/* Specific header for Scheduled Section */}
+                             {selectedPatient.packageProposal?.outcome === 'Scheduled' && (
+                               <div className="bg-emerald-50 border border-emerald-100 p-6 rounded-[2rem] flex items-center gap-4 text-emerald-800">
+                                 <Calendar className="w-10 h-10 opacity-40" />
+                                 <div>
+                                   <div className="text-[10px] font-black uppercase tracking-widest mb-1">Current Status</div>
+                                   <div className="text-lg font-black uppercase">Surgery Scheduled</div>
+                                 </div>
+                               </div>
+                             )}
+                             {/* Specific header for Follow-up Section */}
+                             {selectedPatient.packageProposal?.outcome === 'Follow-Up' && (
+                               <div className="bg-blue-50 border border-blue-100 p-6 rounded-[2rem] flex items-center gap-4 text-blue-800">
+                                 <Clock className="w-10 h-10 opacity-40" />
+                                 <div>
+                                   <div className="text-[10px] font-black uppercase tracking-widest mb-1">Current Status</div>
+                                   <div className="text-lg font-black uppercase">Follow-up Counseling</div>
+                                 </div>
+                               </div>
+                             )}
+                             {/* Specific header for Lost Section */}
+                             {selectedPatient.packageProposal?.outcome === 'Lost' && (
+                               <div className="bg-rose-50 border border-rose-100 p-6 rounded-[2rem] flex items-center gap-4 text-rose-800">
+                                 <Trash2 className="w-10 h-10 opacity-40" />
+                                 <div>
+                                   <div className="text-[10px] font-black uppercase tracking-widest mb-1">Current Status</div>
+                                   <div className="text-lg font-black uppercase">Surgery Lost: {selectedPatient.packageProposal?.lostReason}</div>
+                                 </div>
+                               </div>
+                             )}
+                             
+                             {/* Action buttons with custom logic for each state */}
+                             {renderActionButtons(selectedPatient.packageProposal?.outcome)}
                           </div>
                         )}
                         <button type="submit" className="w-full mt-6 py-4 text-[10px] font-black uppercase text-slate-400 hover:text-hospital-600 transition-colors">Update Details Only</button>
