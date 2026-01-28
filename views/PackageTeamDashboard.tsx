@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useHospital } from '../context/HospitalContext';
 import { ExportButtons } from '../components/ExportButtons';
@@ -128,11 +129,11 @@ export const PackageTeamDashboard: React.FC = () => {
 
     return true;
   }).sort((a, b) => {
-    // Custom sorting for Follow-up section: Ascending followUpDate (Overdue first)
+    // ⏱ Ordering: In FOLLOW-UP section only, sort by Follow-Up Date (nearest first, overdue at top)
     if (listCategory === 'FOLLOWUP') {
       const dateA = a.packageProposal?.followUpDate ? new Date(a.packageProposal.followUpDate).getTime() : Infinity;
       const dateB = b.packageProposal?.followUpDate ? new Date(b.packageProposal.followUpDate).getTime() : Infinity;
-      return dateA - dateB;
+      if (dateA !== dateB) return dateA - dateB;
     }
 
     // Default sorting for other sections: Most recent entry first
@@ -242,15 +243,6 @@ export const PackageTeamDashboard: React.FC = () => {
       {label}
     </button>
   );
-
-  const getStatusBadge = (p: Patient) => {
-    const outcome = p.packageProposal?.outcome;
-    if (outcome === 'Scheduled') return { text: 'Scheduled', classes: 'bg-emerald-50 text-emerald-700 border-emerald-200', icon: <CheckCircle2 className="w-4 h-4" /> };
-    if (outcome === 'Completed') return { text: 'Completed', classes: 'bg-teal-50 text-teal-700 border-teal-200', icon: <BadgeCheck className="w-4 h-4" /> };
-    if (outcome === 'Follow-Up') return { text: 'Follow-Up', classes: 'bg-blue-50 text-blue-700 border-blue-200', icon: <Clock className="w-4 h-4" /> };
-    if (outcome === 'Lost') return { text: 'Lost', classes: 'bg-rose-50 text-rose-700 border-rose-200', icon: <X className="w-4 h-4" /> };
-    return { text: 'Pending', classes: 'bg-amber-50 text-amber-700 border-amber-200', icon: <AlertTriangle className="w-4 h-4" /> };
-  };
 
   const renderActionButtons = (currentOutcome: ProposalOutcome | undefined) => {
     // Scheduled Section logic
@@ -413,13 +405,13 @@ export const PackageTeamDashboard: React.FC = () => {
                         <span className="w-1 h-1 bg-slate-200 rounded-full"></span>
                         <div className="flex flex-col gap-0.5">
                           <div className="flex items-center gap-1">
-                            <span className="text-slate-400 font-black">ARRIVED</span>
+                            <span className="text-slate-400 font-black uppercase">Arrived</span>
                             <span className="text-hospital-600 font-bold">{formatDate(p.entry_date)}</span>
                           </div>
+                          {/* 📍 Where to show Follow-Up Date: ONLY in the FOLLOW-UP section directory */}
                           {listCategory === 'FOLLOWUP' && p.packageProposal?.followUpDate && (
-                            <div className="flex flex-col gap-0.5 mt-0.5 border-t border-slate-50 pt-0.5">
-                              <span className="text-blue-600 font-black">FOLLOW-UP DATE:</span>
-                              <span className="text-blue-600 font-bold">{formatDate(p.packageProposal.followUpDate)}</span>
+                            <div className="text-[9px] font-black text-slate-500 uppercase mt-0.5">
+                              Follow-Up Date: {formatDate(p.packageProposal.followUpDate)}
                             </div>
                           )}
                         </div>
