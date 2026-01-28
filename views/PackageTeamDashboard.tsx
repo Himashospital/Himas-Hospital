@@ -159,10 +159,10 @@ export const PackageTeamDashboard: React.FC = () => {
       ...proposal as PackageProposal,
       outcome: outcomeModal.type!,
       outcomeDate: newOutcomeDate,
-      surgeryDate: outcomeModal.type === 'Scheduled' ? newOutcomeDate : proposal.surgeryDate,
+      surgeryDate: outcomeModal.type === 'Scheduled' ? newOutcomeDate : (proposal.surgeryDate || ''),
       lostReason: outcomeModal.type === 'Lost' ? outcomeModal.reason : undefined,
       proposalCreatedAt: proposal.proposalCreatedAt || new Date().toISOString(),
-      followUpDate: outcomeModal.type === 'Follow-Up' ? outcomeModal.date : proposal.followUpDate
+      followUpDate: (outcomeModal.type === 'Follow-Up' ? outcomeModal.date : proposal.followUpDate) || ''
     };
     await updatePackageProposal(selectedPatient.id, updatedProposal);
     setOutcomeModal({ ...outcomeModal, show: false });
@@ -304,7 +304,7 @@ export const PackageTeamDashboard: React.FC = () => {
           <div className="flex flex-col xl:flex-row justify-between items-center gap-4">
             <div className="flex bg-slate-100 p-1 rounded-2xl w-full xl:w-auto overflow-x-auto whitespace-nowrap scrollbar-hide">
               {['PENDING', 'SCHEDULED', 'FOLLOWUP', 'COMPLETED', 'LOST'].map((cat) => (
-                <button key={cat} onClick={() => setListCategory(cat as any)} className={`px-4 lg:px-5 py-2.5 rounded-xl text-[10px] font-black uppercase transition-all flex items-center gap-2 ${listCategory === cat ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
+                <button key={cat} onClick={() => setListCategory(cat as any)} className={`px-4 lg:px-5 py-2.5 rounded-xl text-[10px] font-black uppercase transition-all flex items-center gap-2 ${listCategory === cat ? 'bg-slate-900 text-white shadow-md' : 'text-slate-500 hover:text-slate-700'}`}>
                   {cat === 'PENDING' && <Activity className="w-4 h-4" />}
                   {cat === 'SCHEDULED' && <Calendar className="w-4 h-4" />}
                   {cat === 'FOLLOWUP' && <Clock className="w-4 h-4" />}
@@ -350,10 +350,16 @@ export const PackageTeamDashboard: React.FC = () => {
                             <span className="text-hospital-600 font-bold">{formatToDDMMYYYY(p.entry_date)}</span>
                           </div>
                         </div>
-                        {/* 📍 Update this ONLY for Follow-up section */}
+                        {/* 📍 Strictly rendering Follow-Up Date in this section */}
                         {listCategory === 'FOLLOWUP' && (
-                          <div className="text-slate-400 font-black mt-0.5">
-                            Follow-Up Date: <span className="text-slate-500">{formatToDDMMYYYY(p.packageProposal?.followUpDate || p.doctorAssessment?.tentativeSurgeryDate)}</span>
+                          <div className="text-slate-400 font-black mt-1 flex items-center gap-1">
+                            <Clock className="w-3 h-3 text-blue-500" />
+                            <span>Follow-Up:</span>
+                            <span className="text-blue-600 font-black">
+                              {formatToDDMMYYYY(p.packageProposal?.followUpDate) || 
+                               formatToDDMMYYYY(p.doctorAssessment?.tentativeSurgeryDate) || 
+                               'PENDING'}
+                            </span>
                           </div>
                         )}
                       </div>
