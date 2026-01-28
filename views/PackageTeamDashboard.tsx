@@ -128,6 +128,14 @@ export const PackageTeamDashboard: React.FC = () => {
 
     return true;
   }).sort((a, b) => {
+    // Custom sorting for Follow-up section: Ascending followUpDate (Overdue first)
+    if (listCategory === 'FOLLOWUP') {
+      const dateA = a.packageProposal?.followUpDate ? new Date(a.packageProposal.followUpDate).getTime() : Infinity;
+      const dateB = b.packageProposal?.followUpDate ? new Date(b.packageProposal.followUpDate).getTime() : Infinity;
+      return dateA - dateB;
+    }
+
+    // Default sorting for other sections: Most recent entry first
     const dateA = a.entry_date ? new Date(a.entry_date).getTime() : new Date(a.registeredAt).getTime();
     const dateB = b.entry_date ? new Date(b.entry_date).getTime() : new Date(a.registeredAt).getTime();
     if (dateB !== dateA) return dateB - dateA;
@@ -158,7 +166,8 @@ export const PackageTeamDashboard: React.FC = () => {
       outcomeDate: newOutcomeDate,
       surgeryDate: outcomeModal.type === 'Scheduled' ? newOutcomeDate : proposal.surgeryDate,
       lostReason: outcomeModal.type === 'Lost' ? outcomeModal.reason : undefined,
-      proposalCreatedAt: proposal.proposalCreatedAt || new Date().toISOString()
+      proposalCreatedAt: proposal.proposalCreatedAt || new Date().toISOString(),
+      followUpDate: outcomeModal.type === 'Follow-Up' ? outcomeModal.date : proposal.followUpDate
     };
     await updatePackageProposal(selectedPatient.id, updatedProposal);
     setOutcomeModal({ ...outcomeModal, show: false });
@@ -402,7 +411,18 @@ export const PackageTeamDashboard: React.FC = () => {
                       <div className="mt-2 text-[9px] text-slate-400 font-black uppercase tracking-widest flex flex-wrap items-center gap-2">
                         <span>{p.condition}</span>
                         <span className="w-1 h-1 bg-slate-200 rounded-full"></span>
-                        <span className="text-hospital-600 font-bold">{formatDate(p.entry_date)}</span>
+                        <div className="flex flex-col gap-0.5">
+                          <div className="flex items-center gap-1">
+                            <span className="text-slate-400 font-black">ARRIVED</span>
+                            <span className="text-hospital-600 font-bold">{formatDate(p.entry_date)}</span>
+                          </div>
+                          {listCategory === 'FOLLOWUP' && p.packageProposal?.followUpDate && (
+                            <div className="flex flex-col gap-0.5 mt-0.5 border-t border-slate-50 pt-0.5">
+                              <span className="text-blue-600 font-black">FOLLOW-UP DATE:</span>
+                              <span className="text-blue-600 font-bold">{formatDate(p.packageProposal.followUpDate)}</span>
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </div>
                   ))}
