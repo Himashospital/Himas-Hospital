@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { Patient, DoctorAssessment, PackageProposal, Role, StaffUser, Appointment, Condition, SurgeonCode, PainSeverity, Affordability, ConversionReadiness, ProposalOutcome, Gender } from '../types';
 import { supabase } from '../services/supabaseClient';
@@ -66,7 +67,7 @@ const mapRowToPatient = (row: any): Patient => {
     uiProposal = {
       outcome: (outcomeStatus || undefined) as ProposalOutcome,
       modeOfPayment: dbProposal?.paymentMode || undefined,
-      surgeryDate: row.surgery_date || dbProposal?.outcomeDate || undefined,
+      surgeryDate: row.surgery_date || dbProposal?.surgeryDate || dbProposal?.outcomeDate || undefined,
       outcomeDate: row.completed_surgery || row.surgery_lost_date || dbProposal?.outcomeDate || undefined,
       roomType: dbProposal?.roomType || undefined,
       stayDays: dbProposal?.stayDays || undefined,
@@ -116,6 +117,10 @@ const mapRowToPatient = (row: any): Patient => {
     status: row.booking_status || 'Scheduled',
     packageProposal: uiProposal,
     doctorAssessment: uiAssessment,
+    surgery_date: row.surgery_date || '',
+    followup_date: row.followup_date || '',
+    surgery_lost_date: row.surgery_lost_date || '',
+    completed_surgery: row.completed_surgery || '',
     sourceTable: 'himas_appointments'
   };
 };
@@ -233,6 +238,30 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
     }
   };
 
+  /**
+   * Internal function to update the counseling_records sub-table.
+   * Ensures relevant columns are updated without interfering with main flow.
+   */
+  const updateCounselingRecord = async (patientId: string, data: {
+    surgery_date?: string | null;
+    followup_date?: string | null;
+    surgery_lost_date?: string | null;
+    completed_surgery?: string | null;
+  }) => {
+    try {
+      const { error } = await supabase
+        .from('counseling_records')
+        .upsert({
+          patient_id: patientId,
+          ...data,
+          updated_at: new Date().toISOString()
+        }, { onConflict: 'patient_id' });
+      if (error) throw error;
+    } catch (err) {
+      console.error('Update Counseling Record Error:', err);
+    }
+  };
+
   const updatePatient = async (targetId: string, patient: Patient) => {
     setSaveStatus('saving');
     try {
@@ -305,6 +334,15 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
       
       const { error } = await supabase.from('himas_appointments').update(updateData).eq('id', targetId);
       if (error) throw error;
+
+      // Also sync to the sub-table specifically
+      await updateCounselingRecord(targetId, {
+        surgery_date: surgeryDateVal,
+        followup_date: followUpDateVal,
+        surgery_lost_date: surgeryLostDateVal,
+        completed_surgery: completedSurgeryVal
+      });
+
       await refreshData();
       setSaveStatus('saved');
     } catch (err) {

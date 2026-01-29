@@ -1,8 +1,9 @@
+
 import React, { useState, useEffect } from 'react';
 import { useHospital } from '../context/HospitalContext';
 import { ExportButtons } from '../components/ExportButtons';
 import { Patient, PackageProposal, Role, SurgeonCode, ProposalOutcome } from '../types';
-import { Briefcase, Calendar, Users, BadgeCheck, User, Activity, ShieldCheck, Banknote, Trash2, Clock, X, Share2, Stethoscope, LayoutList, Columns, Search, Phone, Filter, Tag } from 'lucide-react';
+import { Briefcase, Calendar, Users, BadgeCheck, User, Activity, ShieldCheck, Banknote, Trash2, Clock, X, Share2, Stethoscope, LayoutList, Columns, Search, Phone, Filter, Tag, CalendarClock, Ban } from 'lucide-react';
 
 const lostReasons = [
   "Cost / Financial Constraints",
@@ -134,8 +135,8 @@ export const PackageTeamDashboard: React.FC = () => {
     return true;
   }).sort((a, b) => {
     if (listCategory === 'FOLLOWUP') {
-      const dateA = a.packageProposal?.followUpDate ? new Date(a.packageProposal.followUpDate).getTime() : Infinity;
-      const dateB = b.packageProposal?.followUpDate ? new Date(b.packageProposal.followUpDate).getTime() : Infinity;
+      const dateA = a.followup_date || a.packageProposal?.followUpDate ? new Date(a.followup_date || a.packageProposal!.followUpDate).getTime() : Infinity;
+      const dateB = b.followup_date || b.packageProposal?.followUpDate ? new Date(b.followup_date || b.packageProposal!.followUpDate).getTime() : Infinity;
       return dateA - dateB; 
     }
     const dateA = a.entry_date ? new Date(a.entry_date).getTime() : new Date(a.registeredAt).getTime();
@@ -361,15 +362,38 @@ export const PackageTeamDashboard: React.FC = () => {
                             <span className="text-hospital-600 font-bold">{formatToDDMMYYYY(p.entry_date)}</span>
                           </div>
                         </div>
+                        
+                        {/* Status-specific Date Display */}
+                        {listCategory === 'SCHEDULED' && (
+                          <div className="text-slate-400 font-black mt-1 flex items-center gap-1">
+                            <CalendarClock className="w-3 h-3 text-emerald-500" />
+                            <span>Surgery:</span>
+                            <span className="text-emerald-600 font-black">{formatToDDMMYYYY(p.surgery_date || p.packageProposal?.surgeryDate) || 'NOT SET'}</span>
+                          </div>
+                        )}
                         {listCategory === 'FOLLOWUP' && (
                           <div className="text-slate-400 font-black mt-1 flex items-center gap-1">
                             <Clock className="w-3 h-3 text-blue-500" />
                             <span>Follow-Up:</span>
                             <span className="text-blue-600 font-black">
-                              {formatToDDMMYYYY(p.packageProposal?.followUpDate) || 
+                              {formatToDDMMYYYY(p.followup_date || p.packageProposal?.followUpDate) || 
                                formatToDDMMYYYY(p.doctorAssessment?.tentativeSurgeryDate) || 
                                'PENDING'}
                             </span>
+                          </div>
+                        )}
+                        {listCategory === 'COMPLETED' && (
+                          <div className="text-slate-400 font-black mt-1 flex items-center gap-1">
+                            <BadgeCheck className="w-3 h-3 text-teal-500" />
+                            <span>Completed:</span>
+                            <span className="text-teal-600 font-black">{formatToDDMMYYYY(p.completed_surgery || p.packageProposal?.outcomeDate) || 'NOT SET'}</span>
+                          </div>
+                        )}
+                        {listCategory === 'LOST' && (
+                          <div className="text-slate-400 font-black mt-1 flex items-center gap-1">
+                            <Ban className="w-3 h-3 text-rose-500" />
+                            <span>Lost Date:</span>
+                            <span className="text-rose-600 font-black">{formatToDDMMYYYY(p.surgery_lost_date || p.packageProposal?.outcomeDate) || 'NOT SET'}</span>
                           </div>
                         )}
                       </div>
@@ -400,7 +424,6 @@ export const PackageTeamDashboard: React.FC = () => {
                           <div className="flex items-center gap-1.5 mb-1"><ShieldCheck className="w-3 h-3 text-rose-500" /><span className="text-[8px] font-black text-rose-400 uppercase tracking-widest">Insurance Name</span></div>
                           <div className="text-sm font-black text-rose-900 truncate leading-tight">{selectedPatient.insuranceName || 'No'}</div>
                         </div>
-                        {/* New Occupation and Condition cards */}
                         <div className="bg-white border border-amber-100 p-3 rounded-2xl shadow-sm">
                           <div className="flex items-center gap-1.5 mb-1"><Briefcase className="w-3 h-3 text-amber-500" /><span className="text-[8px] font-black text-amber-400 uppercase tracking-widest">Occupation</span></div>
                           <div className="text-sm font-black text-amber-900 truncate leading-tight">{selectedPatient.occupation || '---'}</div>
@@ -522,9 +545,31 @@ export const PackageTeamDashboard: React.FC = () => {
                             <div>
                               <div className="text-[10px] font-black uppercase tracking-widest mb-1">Final Outcome</div>
                               <div className="text-lg font-black uppercase">Surgery Successfully Completed</div>
+                              <div className="text-[10px] font-bold mt-1 text-teal-600">DATE: {formatToDDMMYYYY(selectedPatient.completed_surgery || selectedPatient.packageProposal?.outcomeDate)}</div>
                             </div>
                           </div>
-                        ) : (
+                        ) : selectedPatient.packageProposal?.outcome === 'Lost' ? (
+                          <div className="bg-rose-50 border border-rose-100 p-6 rounded-[2rem] flex items-center gap-4 text-rose-800 animate-in fade-in">
+                            <Ban className="w-10 h-10 opacity-40" />
+                            <div>
+                              <div className="text-[10px] font-black uppercase tracking-widest mb-1">Final Outcome</div>
+                              <div className="text-lg font-black uppercase">Surgery Lead Lost</div>
+                              <div className="text-[10px] font-bold mt-1 text-rose-600">LOST DATE: {formatToDDMMYYYY(selectedPatient.surgery_lost_date || selectedPatient.packageProposal?.outcomeDate)}</div>
+                              <div className="text-[10px] font-bold text-rose-400 mt-1 uppercase tracking-tight">Reason: {selectedPatient.packageProposal?.lostReason || 'Not Specified'}</div>
+                            </div>
+                          </div>
+                        ) : selectedPatient.packageProposal?.outcome === 'Scheduled' ? (
+                           <div className="bg-emerald-50 border border-emerald-100 p-6 rounded-[2rem] flex items-center gap-4 text-emerald-800 mb-6 animate-in fade-in">
+                            <CalendarClock className="w-10 h-10 opacity-40" />
+                            <div>
+                              <div className="text-[10px] font-black uppercase tracking-widest mb-1">Status</div>
+                              <div className="text-lg font-black uppercase">Surgery Scheduled</div>
+                              <div className="text-[10px] font-bold mt-1 text-emerald-600">SURGERY DATE: {formatToDDMMYYYY(selectedPatient.surgery_date || selectedPatient.packageProposal?.surgeryDate)}</div>
+                            </div>
+                          </div>
+                        ) : null}
+                        
+                        {(selectedPatient.packageProposal?.outcome !== 'Completed') && (
                           <div className="space-y-6 animate-in slide-in-from-bottom-2">
                              {renderActionButtons(selectedPatient.packageProposal?.outcome)}
                           </div>
@@ -561,7 +606,7 @@ export const PackageTeamDashboard: React.FC = () => {
             <div className="p-10 space-y-8">
                {outcomeModal.type !== 'Lost' ? (
                  <div className="space-y-4">
-                    <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest">Select Date</label>
+                    <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest">Select {outcomeModal.type === 'Follow-Up' ? 'Follow-Up' : 'Surgery'} Date</label>
                     <input type="date" className="w-full p-4 bg-slate-50 border-2 border-slate-100 rounded-2xl text-sm font-black outline-none focus:border-hospital-500 transition-all" value={outcomeModal.date} onChange={e => setOutcomeModal({ ...outcomeModal, date: e.target.value })} />
                  </div>
                ) : (

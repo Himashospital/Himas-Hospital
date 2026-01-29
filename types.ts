@@ -102,6 +102,12 @@ export interface Patient {
   arrivalTime?: string;
   status?: string;
   
+  // Counseling Sub-table Native Fields
+  surgery_date?: string;
+  followup_date?: string;
+  surgery_lost_date?: string;
+  completed_surgery?: string;
+  
   // Metadata for multi-table support
   sourceTable?: 'himas_data' | 'himas_appointments';
 
