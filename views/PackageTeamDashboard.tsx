@@ -2,9 +2,18 @@ import React, { useState, useEffect } from 'react';
 import { useHospital } from '../context/HospitalContext';
 import { ExportButtons } from '../components/ExportButtons';
 import { Patient, PackageProposal, Role, SurgeonCode, ProposalOutcome } from '../types';
-import { Briefcase, Calendar, Users, BadgeCheck, User, Activity, ShieldCheck, Banknote, Trash2, Clock, X, Share2, Stethoscope, LayoutList, Columns, Search, Phone } from 'lucide-react';
+import { Briefcase, Calendar, Users, BadgeCheck, User, Activity, ShieldCheck, Banknote, Trash2, Clock, X, Share2, Stethoscope, LayoutList, Columns, Search, Phone, Filter, Tag } from 'lucide-react';
 
-// Helper to format any ISO/YYYY-MM-DD date to DD-MM-YYYY
+const lostReasons = [
+  "Cost / Financial Constraints",
+  "Family not in agreement",
+  "Opted for Conservative Treatment",
+  "Sought Second Opinion Elsewhere",
+  "Insurance Rejection",
+  "Fear of Surgery",
+  "Personal / Non-Medical Reasons"
+];
+
 const formatToDDMMYYYY = (dateString: string | undefined | null): string => {
   if (!dateString) return '';
   const datePart = dateString.split('T')[0];
@@ -26,6 +35,10 @@ export const PackageTeamDashboard: React.FC = () => {
   const [viewMode, setViewMode] = useState<'split' | 'table'>('split');
   const [searchTerm, setSearchTerm] = useState('');
 
+  // Date Filters
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
   const [filter, setFilter] = useState<'ALL' | 'CR1' | 'CR2' | 'CR3' | 'CR4'>('ALL');
   
@@ -38,7 +51,7 @@ export const PackageTeamDashboard: React.FC = () => {
     show: false,
     type: null,
     date: new Date().toISOString().split('T')[0],
-    reason: ''
+    reason: lostReasons[0]
   });
 
   const initialProposalState: Partial<PackageProposal> = {
@@ -84,16 +97,6 @@ export const PackageTeamDashboard: React.FC = () => {
     }
   }, [selectedPatient]);
 
-  const lostReasons = [
-    "Cost / Financial Constraints",
-    "Family not in agreement",
-    "Opted for Conservative Treatment",
-    "Sought Second Opinion Elsewhere",
-    "Insurance Rejection",
-    "Fear of Surgery",
-    "Personal / Non-Medical Reasons"
-  ];
-
   const allPatients = [...patients].filter(p => {
     if (p.doctorAssessment?.quickCode !== SurgeonCode.S1) return false;
     
@@ -112,6 +115,12 @@ export const PackageTeamDashboard: React.FC = () => {
 
     if (listCategory === 'PENDING' && filter !== 'ALL') {
       if (!p.doctorAssessment?.conversionReadiness?.startsWith(filter)) return false;
+    }
+
+    if (startDate || endDate) {
+      const pDate = p.entry_date || '';
+      if (startDate && pDate < startDate) return false;
+      if (endDate && pDate > endDate) return false;
     }
 
     if (searchTerm) {
@@ -225,9 +234,12 @@ export const PackageTeamDashboard: React.FC = () => {
     }
     if (currentOutcome === 'Follow-Up') {
       return (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <button type="button" onClick={() => handleOpenOutcomeModal('Scheduled')} className="py-4 sm:py-6 bg-emerald-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg hover:bg-emerald-700 transition-all flex flex-col items-center gap-2">
             <Calendar className="w-5 h-5" /> Scheduled
+          </button>
+          <button type="button" onClick={() => handleOpenOutcomeModal('Follow-Up')} className="py-4 sm:py-6 bg-blue-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg hover:bg-blue-700 transition-all flex flex-col items-center gap-2">
+            <Clock className="w-5 h-5" /> Follow-Up
           </button>
           <button type="button" onClick={() => handleOpenOutcomeModal('Lost')} className="py-4 sm:py-6 bg-rose-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg hover:bg-rose-700 transition-all flex flex-col items-center gap-2">
             <Trash2 className="w-5 h-5" /> Surgery Lost
@@ -262,6 +274,8 @@ export const PackageTeamDashboard: React.FC = () => {
     );
   };
 
+  const filterInputClasses = "h-10 w-full bg-slate-50 border border-slate-100 rounded-xl px-3 text-[10px] font-bold focus:ring-2 focus:ring-hospital-500 outline-none transition-all appearance-none";
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row justify-between items-end gap-4">
@@ -281,10 +295,12 @@ export const PackageTeamDashboard: React.FC = () => {
 
       {activeTab === 'counseling' ? (
         <div className="space-y-6">
-          <div className="flex flex-col xl:flex-row justify-between items-center gap-4">
-            <div className="flex bg-slate-100 p-1 rounded-2xl w-full xl:w-auto overflow-x-auto whitespace-nowrap scrollbar-hide">
+          {/* Main Filter Bar - Categories on top row, filters on bottom row */}
+          <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-50 space-y-5">
+            {/* Top Row: Categories Tabs */}
+            <div className="flex bg-slate-100 p-1 rounded-2xl w-full overflow-x-auto whitespace-nowrap scrollbar-hide">
               {['PENDING', 'SCHEDULED', 'FOLLOWUP', 'COMPLETED', 'LOST'].map((cat) => (
-                <button key={cat} onClick={() => setListCategory(cat as any)} className={`px-4 lg:px-5 py-2.5 rounded-xl text-[10px] font-black uppercase transition-all flex items-center gap-2 ${listCategory === cat ? 'bg-slate-900 text-white shadow-md' : 'text-slate-500 hover:text-slate-700'}`}>
+                <button key={cat} onClick={() => setListCategory(cat as any)} className={`flex-1 px-4 lg:px-5 py-2.5 rounded-xl text-[10px] font-black uppercase transition-all flex items-center justify-center gap-2 ${listCategory === cat ? 'bg-slate-900 text-white shadow-md' : 'text-slate-500 hover:text-slate-700'}`}>
                   {cat === 'PENDING' && <Activity className="w-4 h-4" />}
                   {cat === 'SCHEDULED' && <Calendar className="w-4 h-4" />}
                   {cat === 'FOLLOWUP' && <Clock className="w-4 h-4" />}
@@ -294,16 +310,31 @@ export const PackageTeamDashboard: React.FC = () => {
                 </button>
               ))}
             </div>
-            <div className="flex items-center gap-3 w-full xl:w-auto justify-end">
-              <div className="relative w-full sm:w-64">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
-                <input type="text" placeholder="Quick Search..." className="w-full pl-9 pr-3 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-bold focus:ring-2 focus:ring-hospital-500 outline-none transition-all shadow-sm" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+
+            {/* Bottom Row: Date Range, Search & Actions */}
+            <div className="flex flex-col xl:flex-row justify-between items-center gap-4">
+              <div className="flex flex-col sm:flex-row items-center gap-2 w-full xl:w-auto">
+                <div className="flex items-center gap-1.5 w-full sm:w-auto">
+                  <span className="text-[9px] font-black uppercase text-slate-400 shrink-0">From</span>
+                  <input type="date" className={filterInputClasses} value={startDate} onChange={e => setStartDate(e.target.value)} />
+                </div>
+                <div className="flex items-center gap-1.5 w-full sm:w-auto">
+                  <span className="text-[9px] font-black uppercase text-slate-400 shrink-0">To</span>
+                  <input type="date" className={filterInputClasses} value={endDate} onChange={e => setEndDate(e.target.value)} />
+                </div>
               </div>
-              <div className="bg-white border p-1 rounded-xl flex shadow-sm">
-                <button onClick={() => setViewMode('split')} className={`p-2 rounded-lg transition-all ${viewMode === 'split' ? 'bg-slate-100 text-slate-900' : 'text-slate-400'}`}><Columns className="w-4 h-4" /></button>
-                <button onClick={() => setViewMode('table')} className={`p-2 rounded-lg transition-all ${viewMode === 'table' ? 'bg-slate-100 text-slate-900' : 'text-slate-400'}`}><LayoutList className="w-4 h-4" /></button>
+
+              <div className="flex items-center gap-3 w-full xl:w-auto justify-end">
+                <div className="relative w-full sm:w-64">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
+                  <input type="text" placeholder="Quick Search..." className="w-full pl-9 pr-3 py-2.5 bg-slate-50 border border-slate-100 rounded-xl text-xs font-bold focus:ring-2 focus:ring-hospital-500 outline-none transition-all shadow-sm" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+                </div>
+                <div className="bg-white border p-1 rounded-xl flex shadow-sm">
+                  <button onClick={() => setViewMode('split')} className={`p-2 rounded-lg transition-all ${viewMode === 'split' ? 'bg-slate-100 text-slate-900' : 'text-slate-400'}`}><Columns className="w-4 h-4" /></button>
+                  <button onClick={() => setViewMode('table')} className={`p-2 rounded-lg transition-all ${viewMode === 'table' ? 'bg-slate-100 text-slate-900' : 'text-slate-400'}`}><LayoutList className="w-4 h-4" /></button>
+                </div>
+                <ExportButtons patients={patients} role="package_team" selectedPatient={selectedPatient} />
               </div>
-              <ExportButtons patients={patients} role="package_team" selectedPatient={selectedPatient} />
             </div>
           </div>
 
@@ -352,7 +383,7 @@ export const PackageTeamDashboard: React.FC = () => {
                 {selectedPatient ? (
                   <div className="flex flex-col h-full">
                     <div className="p-4 sm:p-6 bg-slate-50 border-b">
-                      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
                         <div className="bg-white border border-indigo-100 p-3 rounded-2xl shadow-sm">
                           <div className="flex items-center gap-1.5 mb-1"><User className="w-3 h-3 text-indigo-500" /><span className="text-[8px] font-black text-indigo-400 uppercase tracking-widest">Name</span></div>
                           <div className="text-sm font-black text-indigo-900 truncate leading-tight">{selectedPatient.name}</div>
@@ -369,10 +400,18 @@ export const PackageTeamDashboard: React.FC = () => {
                           <div className="flex items-center gap-1.5 mb-1"><ShieldCheck className="w-3 h-3 text-rose-500" /><span className="text-[8px] font-black text-rose-400 uppercase tracking-widest">Insurance Name</span></div>
                           <div className="text-sm font-black text-rose-900 truncate leading-tight">{selectedPatient.insuranceName || 'No'}</div>
                         </div>
+                        {/* New Occupation and Condition cards */}
+                        <div className="bg-white border border-amber-100 p-3 rounded-2xl shadow-sm">
+                          <div className="flex items-center gap-1.5 mb-1"><Briefcase className="w-3 h-3 text-amber-500" /><span className="text-[8px] font-black text-amber-400 uppercase tracking-widest">Occupation</span></div>
+                          <div className="text-sm font-black text-amber-900 truncate leading-tight">{selectedPatient.occupation || '---'}</div>
+                        </div>
+                        <div className="bg-white border border-purple-100 p-3 rounded-2xl shadow-sm">
+                          <div className="flex items-center gap-1.5 mb-1"><Tag className="w-3 h-3 text-purple-500" /><span className="text-[8px] font-black text-purple-400 uppercase tracking-widest">Condition</span></div>
+                          <div className="text-sm font-black text-purple-900 truncate leading-tight">{selectedPatient.condition}</div>
+                        </div>
                       </div>
                     </div>
                     <form onSubmit={handleSaveProposal} className="flex-1 overflow-y-auto p-4 sm:p-8 space-y-10">
-                      {/* Doctor Recommendation Summary */}
                       <div className="bg-blue-50/50 border border-blue-100 p-6 rounded-[2rem] space-y-5">
                          <div className="flex items-center justify-between">
                            <div className="flex items-center gap-2 text-[10px] font-black uppercase text-blue-600 tracking-[0.2em]"><Stethoscope className="w-4 h-4" /> Recommendation</div>
@@ -399,7 +438,6 @@ export const PackageTeamDashboard: React.FC = () => {
                       <div className="space-y-8">
                          <div className="flex items-center gap-2 text-[10px] font-black uppercase text-hospital-600 tracking-[0.2em]"><Banknote className="w-4 h-4" /> Package & Financials</div>
                          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-x-8 gap-y-6">
-                            {/* Mode of Payment */}
                             <div className="sm:col-span-2 xl:col-span-1">
                                <label className="block text-[10px] font-black uppercase text-slate-400 mb-3 tracking-widest">Mode of Payment</label>
                                <div className="flex flex-wrap gap-2">
@@ -408,20 +446,14 @@ export const PackageTeamDashboard: React.FC = () => {
                                   ))}
                                </div>
                             </div>
-
-                            {/* Package Amount */}
                             <div>
                                <label className="block text-[10px] font-black uppercase text-slate-400 mb-3 tracking-widest">Package Amount (₹)</label>
                                <input type="text" className="w-full p-3 bg-slate-50 border-2 border-transparent rounded-xl text-sm font-black focus:bg-white focus:border-hospital-500 outline-none" value={proposal.packageAmount || ''} onChange={e => setProposal({...proposal, packageAmount: e.target.value})} placeholder="e.g. 50,000" />
                             </div>
-
-                            {/* Stay Days */}
                             <div>
                                <label className="block text-[10px] font-black uppercase text-slate-400 mb-3 tracking-widest">Stay (Days)</label>
                                <input type="number" className="w-full p-3 bg-slate-50 border-2 border-transparent rounded-xl text-sm font-black focus:bg-white focus:border-hospital-500 outline-none" value={proposal.stayDays || ''} onChange={e => setProposal({...proposal, stayDays: e.target.value ? parseInt(e.target.value, 10) : undefined})} placeholder="0" />
                             </div>
-
-                            {/* Room Type */}
                             <div className="sm:col-span-2 xl:col-span-3">
                                <label className="block text-[10px] font-black uppercase text-slate-400 mb-3 tracking-widest">Room Type</label>
                                <div className="flex flex-wrap gap-2">
@@ -430,11 +462,8 @@ export const PackageTeamDashboard: React.FC = () => {
                                   ))}
                                </div>
                             </div>
-
-                            {/* Detailed Inclusions */}
                             <div className="sm:col-span-2 xl:col-span-3 pt-6 border-t border-slate-50">
-                               <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-                                  {/* Medicines */}
+                               <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
                                   <div className="space-y-3">
                                      <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest">Medicines</label>
                                      <div className="flex gap-1">
@@ -443,8 +472,6 @@ export const PackageTeamDashboard: React.FC = () => {
                                         ))}
                                      </div>
                                   </div>
-
-                                  {/* ICU Charges */}
                                   <div className="space-y-3">
                                      <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest">ICU Charges</label>
                                      <div className="flex gap-1">
@@ -453,8 +480,6 @@ export const PackageTeamDashboard: React.FC = () => {
                                         ))}
                                      </div>
                                   </div>
-
-                                  {/* Pre-Op Investigation */}
                                   <div className="space-y-3">
                                      <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest">Pre-Op Invest.</label>
                                      <div className="flex gap-1">
@@ -463,20 +488,8 @@ export const PackageTeamDashboard: React.FC = () => {
                                         ))}
                                      </div>
                                   </div>
-
-                                  {/* Equipment */}
-                                  <div className="space-y-3">
-                                     <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest">Equipment</label>
-                                     <div className="flex gap-1">
-                                        {['Included', 'Excluded'].map(opt => (
-                                          <ToggleButton key={opt} label={opt} value={opt} current={proposal.equipment} onClick={v => setProposal({...proposal, equipment: v})} />
-                                        ))}
-                                     </div>
-                                  </div>
                                </div>
                             </div>
-
-                            {/* Post-Op Follow-Up */}
                             <div className="sm:col-span-2 xl:col-span-3 pt-6 border-t border-slate-50 space-y-4">
                                <div>
                                   <label className="block text-[10px] font-black uppercase text-slate-400 mb-3 tracking-widest">Post-Op Follow-Up</label>
@@ -502,7 +515,6 @@ export const PackageTeamDashboard: React.FC = () => {
                          </div>
                       </div>
 
-                      {/* Outcome Actions */}
                       <div className="pt-8 border-t border-slate-100">
                         {selectedPatient.packageProposal?.outcome === 'Completed' ? (
                           <div className="bg-teal-50 border border-teal-100 p-6 rounded-[2rem] flex items-center gap-4 text-teal-800 animate-in fade-in">
@@ -539,7 +551,6 @@ export const PackageTeamDashboard: React.FC = () => {
         <div className="bg-white rounded-[2rem] shadow-sm border border-slate-200 p-20 text-center text-slate-400 font-black uppercase tracking-widest text-[10px]">Staff Management View</div>
       )}
 
-      {/* Outcome Modal */}
       {outcomeModal.show && (
         <div className="fixed inset-0 z-[150] bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in">
           <div className="bg-white w-full max-w-2xl rounded-[2.5rem] shadow-2xl overflow-hidden border border-white/20">

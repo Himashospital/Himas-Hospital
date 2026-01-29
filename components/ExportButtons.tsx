@@ -75,35 +75,40 @@ export const ExportButtons: React.FC<ExportButtonsProps> = ({ patients, role, se
             body { 
               font-family: 'Inter', sans-serif; 
               color: #1e293b; 
-              padding: 40px; 
+              padding: 30px 40px; 
               max-width: 800px; 
               margin: auto;
-              line-height: 1.5;
+              line-height: 1.4;
             }
-            .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 40px; }
+            .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 30px; }
             .header-left h1 { font-size: 24px; font-weight: 900; margin: 0; text-transform: uppercase; letter-spacing: -0.02em; }
             .header-left p { font-size: 14px; color: #64748b; font-weight: 700; margin-top: 4px; }
             .logo-box { text-align: right; }
             .logo-text { font-size: 20px; font-weight: 900; color: #0284c7; text-transform: uppercase; margin: 0; }
             .logo-subtext { font-size: 9px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.1em; }
             
-            table { width: 100%; border-collapse: collapse; margin-bottom: 30px; }
-            th, td { border: 1.5px solid #1e293b; padding: 12px 15px; text-align: left; font-size: 12px; }
+            table { width: 100%; border-collapse: collapse; margin-bottom: 25px; }
+            th, td { border: 1.5px solid #1e293b; padding: 10px 15px; text-align: left; font-size: 12px; }
             th { width: 40%; font-weight: 800; text-transform: uppercase; color: #475569; background-color: #ffffff; }
             td { font-weight: 700; color: #1e293b; text-transform: uppercase; }
             .pkg-row { font-size: 14px; }
             
-            .section-title { font-size: 14px; font-weight: 900; text-transform: uppercase; margin: 30px 0 15px 0; border-bottom: 2px solid #f1f5f9; padding-bottom: 8px; }
+            .section-title { font-size: 14px; font-weight: 900; text-transform: uppercase; margin: 25px 0 10px 0; border-bottom: 2px solid #f1f5f9; padding-bottom: 8px; }
             .facilities-list { list-style: none; padding: 0; font-size: 12px; font-weight: 500; }
-            .facilities-list li { margin-bottom: 8px; }
+            .facilities-list li { margin-bottom: 6px; }
             .facilities-list b { color: #0284c7; text-decoration: underline; }
             
-            .terms { font-size: 11px; color: #475569; margin-top: 30px; }
+            .terms { font-size: 11px; color: #475569; margin-top: 25px; }
             .terms ol { padding-left: 20px; }
-            .terms li { margin-bottom: 6px; }
+            .terms li { margin-bottom: 5px; }
             
-            .signatures { display: flex; justify-content: space-between; margin-top: 80px; }
+            .signatures { display: flex; justify-content: space-between; margin-top: 60px; page-break-inside: avoid; }
             .sig-line { width: 250px; border-top: 1.5px solid #1e293b; text-align: center; padding-top: 8px; font-size: 10px; font-weight: 900; text-transform: uppercase; color: #64748b; }
+            
+            @media print {
+              body { padding: 20px 40px; }
+              .signatures { margin-top: 50px; }
+            }
           </style>
         </head>
         <body>
@@ -135,7 +140,6 @@ export const ExportButtons: React.FC<ExportButtonsProps> = ({ patients, role, se
             <li>• Medicines: <b>${prop.surgeryMedicines || '---'}</b></li>
             <li>• ICU Charges: <b>${prop.icuCharges || '---'}</b></li>
             <li>• Pre-Op Investigation: <b>${prop.preOpInvestigation || '---'}</b></li>
-            <li>• Equipment: <b>${prop.equipment || '---'}</b></li>
             <li>• Post-Op Follow-Up: <b>${followUpDisplay}</b></li>
           </ul>
 
@@ -144,7 +148,7 @@ export const ExportButtons: React.FC<ExportButtonsProps> = ({ patients, role, se
             <ol>
               <li>Special investigations or consultations beyond basic package are CHARGED EXTRA.</li>
               <li>Advance of ₹ 20,000 required for date confirmation.</li>
-              <li>ICU Charges (if required) are ₹ 15,000/day excluding Ventilator support.</li>
+              <li>ICU Charges (if required): ₹15,000 per day; with ventilator support: ₹25,000 per day.</li>
             </ol>
           </div>
 
