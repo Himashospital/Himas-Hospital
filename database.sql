@@ -1,9 +1,27 @@
 -- =================================================================
 -- HIMAS HOSPITAL MANAGEMENT DATABASE SCHEMA
--- Version: 2.2 (Native Follow-Up Column Support)
+-- Version: 2.7 (Extended Counseling Tracking)
 -- =================================================================
 
--- Single consolidated table for all patient and appointment data.
+-- 1. MIGRATION SCRIPT FOR EXISTING TABLES (Run this in your SQL Editor):
+ALTER TABLE public.himas_appointments 
+ADD COLUMN IF NOT EXISTS followup_date DATE,
+ADD COLUMN IF NOT EXISTS surgery_date DATE,
+ADD COLUMN IF NOT EXISTS surgery_lost_date DATE,
+ADD COLUMN IF NOT EXISTS completed_surgery DATE;
+
+-- 2. CREATE COUNSELING RECORDS SUB-TABLE (If you prefer a separate table):
+CREATE TABLE IF NOT EXISTS public.counseling_records (
+    patient_id TEXT PRIMARY KEY REFERENCES public.himas_appointments(id) ON DELETE CASCADE,
+    surgery_date DATE,
+    followup_date DATE,
+    surgery_lost_date DATE,
+    completed_surgery DATE,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 3. FULL TABLE DEFINITION (For reference or new setups):
 CREATE TABLE IF NOT EXISTS public.himas_appointments (
     id TEXT PRIMARY KEY,
     hospital_id TEXT DEFAULT 'himas_facility_01',
@@ -25,8 +43,12 @@ CREATE TABLE IF NOT EXISTS public.himas_appointments (
     booking_status TEXT DEFAULT 'Scheduled', 
     is_follow_up BOOLEAN DEFAULT FALSE,
     
-    -- Native Follow-Up Column for optimized sorting and querying
-    follow_up_date DATE,
+    -- Native tracking columns for counseling and outcomes
+    follow_up_date DATE,       -- Primary follow-up column used by the app
+    followup_date DATE,        -- Dedicated counseling follow-up date
+    surgery_date DATE,         -- Scheduled/Performed surgery date
+    surgery_lost_date DATE,    -- Date lead was marked as lost
+    completed_surgery DATE,    -- Date surgery was completed
     
     -- Structured JSON objects for complex assessment data
     doctor_assessment JSONB,
@@ -50,15 +72,20 @@ CREATE TABLE IF NOT EXISTS public.staff_users (
 -- RLS CONFIGURATION
 ALTER TABLE public.himas_appointments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.staff_users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.counseling_records ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "Allow Public Access on Appointments" ON public.himas_appointments;
 DROP POLICY IF EXISTS "Allow Public Access on Staff" ON public.staff_users;
+DROP POLICY IF EXISTS "Allow Public Access on Counseling Records" ON public.counseling_records;
 
 CREATE POLICY "Allow Public Access on Appointments" 
 ON public.himas_appointments FOR ALL TO public USING (true) WITH CHECK (true);
 
 CREATE POLICY "Allow Public Access on Staff" 
 ON public.staff_users FOR ALL TO public USING (true) WITH CHECK (true);
+
+CREATE POLICY "Allow Public Access on Counseling Records" 
+ON public.counseling_records FOR ALL TO public USING (true) WITH CHECK (true);
 
 -- ID Trimming Trigger
 CREATE OR REPLACE FUNCTION trim_id_on_insert()

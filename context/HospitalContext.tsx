@@ -53,7 +53,7 @@ const mapRowToPatient = (row: any): Patient => {
   const dbProposal = row.package_proposal;
   let uiProposal: PackageProposal | undefined = undefined;
 
-  if (dbProposal || row.follow_up_date) {
+  if (dbProposal || row.follow_up_date || row.surgery_date || row.completed_surgery || row.surgery_lost_date) {
     let outcomeStatus = dbProposal?.status;
     if (outcomeStatus === 'Surgery Fixed' || outcomeStatus === 'Schedule Surgery') {
       outcomeStatus = 'Scheduled';
@@ -66,8 +66,8 @@ const mapRowToPatient = (row: any): Patient => {
     uiProposal = {
       outcome: (outcomeStatus || undefined) as ProposalOutcome,
       modeOfPayment: dbProposal?.paymentMode || undefined,
-      surgeryDate: dbProposal?.outcomeDate || undefined,
-      outcomeDate: dbProposal?.outcomeDate || undefined,
+      surgeryDate: row.surgery_date || dbProposal?.outcomeDate || undefined,
+      outcomeDate: row.completed_surgery || row.surgery_lost_date || dbProposal?.outcomeDate || undefined,
       roomType: dbProposal?.roomType || undefined,
       stayDays: dbProposal?.stayDays || undefined,
       icuCharges: dbProposal?.icuCharges || undefined,
@@ -82,8 +82,7 @@ const mapRowToPatient = (row: any): Patient => {
       decisionPattern: dbProposal?.decisionPattern || '',
       objectionIdentified: dbProposal?.objectionIdentified || '',
       counselingStrategy: dbProposal?.counselingStrategy || '',
-      // Fix: Use camelCase followUpDate to match interface
-      followUpDate: row.follow_up_date || dbProposal?.followUpDate || '',
+      followUpDate: row.followup_date || row.follow_up_date || dbProposal?.followUpDate || '',
       proposalCreatedAt: dbProposal?.proposalCreatedAt || new Date().toISOString(),
     };
   }
@@ -239,14 +238,25 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
     try {
       let dbPackageProposal = null;
       let followUpDateVal = null;
+      let surgeryDateVal = null;
+      let surgeryLostDateVal = null;
+      let completedSurgeryVal = null;
 
       if (patient.packageProposal) {
         const uiProposal = patient.packageProposal;
         followUpDateVal = nullify(uiProposal.followUpDate);
+        surgeryDateVal = nullify(uiProposal.surgeryDate);
+        
+        if (uiProposal.outcome === 'Lost') {
+          surgeryLostDateVal = nullify(uiProposal.outcomeDate);
+        } else if (uiProposal.outcome === 'Completed') {
+          completedSurgeryVal = nullify(uiProposal.outcomeDate);
+        }
+
         dbPackageProposal = {
           status: uiProposal.outcome ? (uiProposal.outcome === 'Scheduled' ? 'Surgery Fixed' : (uiProposal.outcome === 'Completed' ? 'Surgery Completed' : uiProposal.outcome)) : null,
           paymentMode: nullify(uiProposal.modeOfPayment),
-          outcomeDate: nullify(uiProposal.surgeryDate || uiProposal.outcomeDate),
+          outcomeDate: nullify(uiProposal.outcomeDate || uiProposal.surgeryDate),
           roomType: nullify(uiProposal.roomType),
           stayDays: nullify(uiProposal.stayDays),
           icuCharges: nullify(uiProposal.icuCharges),
@@ -284,8 +294,13 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
         booking_status: patient.status || 'Arrived',
         package_proposal: dbPackageProposal,
         doctor_assessment: patient.doctorAssessment || null,
-        // Persist followUpDate to the native column
-        follow_up_date: followUpDateVal
+        
+        // Persist outcome-specific dates to native columns for reporting
+        follow_up_date: followUpDateVal,
+        followup_date: followUpDateVal,
+        surgery_date: surgeryDateVal,
+        surgery_lost_date: surgeryLostDateVal,
+        completed_surgery: completedSurgeryVal
       };
       
       const { error } = await supabase.from('himas_appointments').update(updateData).eq('id', targetId);
