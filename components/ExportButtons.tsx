@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Download, Printer, Calendar as CalendarIcon, X, FileSpreadsheet } from 'lucide-react';
 import { Patient, PackageProposal } from '../types';
@@ -30,28 +29,41 @@ export const ExportButtons: React.FC<ExportButtonsProps> = ({ patients, role, se
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
 
-  // Fixed: Added resetForm to clear local state when modal is closed
   const resetForm = () => {
     setStartDate('');
     setEndDate('');
   };
 
   const handlePrint = () => {
-    // Detect if we are in Package Team view and have a selected patient with a completed package
     if (role === 'package_team' && selectedPatient && selectedPatient.packageProposal) {
       const p = selectedPatient;
-      const prop = p.packageProposal as PackageProposal; // Explicit cast after guard
+      const prop = p.packageProposal as PackageProposal;
       const printWindow = window.open('', '_blank');
       if (!printWindow) return;
 
       const today = formatDate(prop.outcomeDate || prop.proposalCreatedAt || new Date().toISOString());
       const stayText = prop.stayDays ? `${prop.stayDays} DAYS` : '---';
-      const packageAmt = prop.packageAmount ? `₹ ${parseInt(prop.packageAmount).toLocaleString()}` : '₹ 0';
+      const packageAmt = prop.packageAmount ? `₹ ${parseInt(prop.packageAmount.replace(/,/g, '')).toLocaleString()}` : '₹ 0';
       const displaySource = p.source === 'Doctor Recommended' ? `DR. ${p.sourceDoctorName || 'RECOMMENDED'}` : p.source;
 
       const surgeryText = p.doctorAssessment?.surgeryProcedure === 'Other'
         ? (p.doctorAssessment?.otherSurgeryName || 'OTHER PROCEDURE')
         : (p.doctorAssessment?.surgeryProcedure || '---');
+
+      // Logic to determine Post-Op Follow-Up display string
+      let followUpDisplay = '---';
+      if (prop.postFollowUp === 'Excluded') {
+        followUpDisplay = 'NO';
+      } else if (prop.postFollowUp === 'Included') {
+        if (prop.postFollowUpCount) {
+          followUpDisplay = `${prop.postFollowUpCount} ${prop.postFollowUpCount === 1 ? 'DAY' : 'DAYS'}`;
+        } else {
+          followUpDisplay = 'INCLUDED';
+        }
+      } else if (prop.postFollowUp) {
+        // Support legacy values if they exist
+        followUpDisplay = prop.postFollowUp.toUpperCase();
+      }
 
       const html = `
         <!DOCTYPE html>
@@ -122,7 +134,9 @@ export const ExportButtons: React.FC<ExportButtonsProps> = ({ patients, role, se
             <li>• Room Category: <b>${prop.roomType || '---'}</b></li>
             <li>• Medicines: <b>${prop.surgeryMedicines || '---'}</b></li>
             <li>• ICU Charges: <b>${prop.icuCharges || '---'}</b></li>
-            <li>• Post-Op Follow-Up: <b>${prop.postFollowUp === 'Excluded' ? 'NO' : (prop.postFollowUpCount ? prop.postFollowUpCount + ' VISITS' : (prop.postFollowUp === 'Included' ? 'YES' : '---'))}</b></li>
+            <li>• Pre-Op Investigation: <b>${prop.preOpInvestigation || '---'}</b></li>
+            <li>• Equipment: <b>${prop.equipment || '---'}</b></li>
+            <li>• Post-Op Follow-Up: <b>${followUpDisplay}</b></li>
           </ul>
 
           <div class="section-title">IMPORTANT TERMS</div>

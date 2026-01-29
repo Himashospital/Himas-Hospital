@@ -82,7 +82,7 @@ const mapRowToPatient = (row: any): Patient => {
       decisionPattern: dbProposal?.decisionPattern || '',
       objectionIdentified: dbProposal?.objectionIdentified || '',
       counselingStrategy: dbProposal?.counselingStrategy || '',
-      // Sync from new native column with fallback to JSON
+      // Fix: Use camelCase followUpDate to match interface
       followUpDate: row.follow_up_date || dbProposal?.followUpDate || '',
       proposalCreatedAt: dbProposal?.proposalCreatedAt || new Date().toISOString(),
     };
