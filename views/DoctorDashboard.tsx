@@ -289,6 +289,20 @@ export const DoctorDashboard: React.FC = () => {
             </div>
 
             <div className="flex-1 overflow-y-auto p-4 sm:p-8 space-y-8">
+              {/* Primary Condition Read-Only Field */}
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Primary Condition / Disease</label>
+                <div className="flex items-center gap-3 p-4 bg-slate-50 rounded-xl border border-slate-100 shadow-sm animate-in fade-in duration-500">
+                  <div className="bg-hospital-100 p-2 rounded-lg">
+                    <Activity className="w-5 h-5 text-hospital-600" />
+                  </div>
+                  <div>
+                    <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Registered Diagnosis</div>
+                    <div className="text-lg font-black text-slate-900 uppercase leading-none">{selectedPatient.condition}</div>
+                  </div>
+                </div>
+              </div>
+
               <div>
                 <label className="block text-xs font-bold text-gray-500 uppercase mb-3">Quick Code Assessment</label>
                 <div className="flex flex-col sm:flex-row gap-4">
