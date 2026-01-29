@@ -1,9 +1,8 @@
-
 import React, { useState, useEffect } from 'react';
 import { useHospital } from '../context/HospitalContext';
 import { ExportButtons } from '../components/ExportButtons';
 import { Patient, PackageProposal, Role, SurgeonCode, ProposalOutcome } from '../types';
-import { Briefcase, Calendar, Users, BadgeCheck, User, Activity, ShieldCheck, Banknote, Trash2, Clock, X, Share2, Stethoscope, LayoutList, Columns, Search, Phone, Filter, Tag, CalendarClock, Ban } from 'lucide-react';
+import { Briefcase, Calendar, Users, BadgeCheck, User, Activity, ShieldCheck, Banknote, Trash2, Clock, X, Share2, Stethoscope, LayoutList, Columns, Search, Phone, Filter, Tag, CalendarClock, Ban, ChevronLeft, ChevronRight, LayoutPanelLeft } from 'lucide-react';
 
 const lostReasons = [
   "Cost / Financial Constraints",
@@ -35,6 +34,7 @@ export const PackageTeamDashboard: React.FC = () => {
   const [listCategory, setListCategory] = useState<'PENDING' | 'SCHEDULED' | 'FOLLOWUP' | 'COMPLETED' | 'LOST'>('PENDING');
   const [viewMode, setViewMode] = useState<'split' | 'table'>('split');
   const [searchTerm, setSearchTerm] = useState('');
+  const [isSidebarMinimized, setIsSidebarMinimized] = useState(false);
 
   // Date Filters
   const [startDate, setStartDate] = useState('');
@@ -118,10 +118,22 @@ export const PackageTeamDashboard: React.FC = () => {
       if (!p.doctorAssessment?.conversionReadiness?.startsWith(filter)) return false;
     }
 
+    // Dynamic Date Filter Logic based on Status Category
     if (startDate || endDate) {
-      const pDate = p.entry_date || '';
-      if (startDate && pDate < startDate) return false;
-      if (endDate && pDate > endDate) return false;
+      let filterDate = p.entry_date || '';
+      
+      if (listCategory === 'SCHEDULED') {
+        filterDate = p.surgery_date || p.packageProposal?.surgeryDate || '';
+      } else if (listCategory === 'FOLLOWUP') {
+        filterDate = p.followup_date || p.packageProposal?.followUpDate || '';
+      } else if (listCategory === 'COMPLETED') {
+        filterDate = p.completed_surgery || p.packageProposal?.outcomeDate || '';
+      } else if (listCategory === 'LOST') {
+        filterDate = p.surgery_lost_date || p.packageProposal?.outcomeDate || '';
+      }
+
+      if (startDate && filterDate < startDate) return false;
+      if (endDate && filterDate > endDate) return false;
     }
 
     if (searchTerm) {
@@ -331,8 +343,8 @@ export const PackageTeamDashboard: React.FC = () => {
                   <input type="text" placeholder="Quick Search..." className="w-full pl-9 pr-3 py-2.5 bg-slate-50 border border-slate-100 rounded-xl text-xs font-bold focus:ring-2 focus:ring-hospital-500 outline-none transition-all shadow-sm" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
                 </div>
                 <div className="bg-white border p-1 rounded-xl flex shadow-sm">
-                  <button onClick={() => setViewMode('split')} className={`p-2 rounded-lg transition-all ${viewMode === 'split' ? 'bg-slate-100 text-slate-900' : 'text-slate-400'}`}><Columns className="w-4 h-4" /></button>
-                  <button onClick={() => setViewMode('table')} className={`p-2 rounded-lg transition-all ${viewMode === 'table' ? 'bg-slate-100 text-slate-900' : 'text-slate-400'}`}><LayoutList className="w-4 h-4" /></button>
+                  <button onClick={() => { setViewMode('split'); setIsSidebarMinimized(false); }} className={`p-2 rounded-lg transition-all ${viewMode === 'split' ? 'bg-slate-100 text-slate-900' : 'text-slate-400'}`}><Columns className="w-4 h-4" /></button>
+                  <button onClick={() => { setViewMode('table'); setIsSidebarMinimized(false); }} className={`p-2 rounded-lg transition-all ${viewMode === 'table' ? 'bg-slate-100 text-slate-900' : 'text-slate-400'}`}><LayoutList className="w-4 h-4" /></button>
                 </div>
                 <ExportButtons patients={patients} role="package_team" selectedPatient={selectedPatient} />
               </div>
@@ -340,73 +352,95 @@ export const PackageTeamDashboard: React.FC = () => {
           </div>
 
           {viewMode === 'split' ? (
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <div className="bg-white rounded-[2rem] shadow-sm border border-slate-100 overflow-hidden h-[400px] lg:h-[750px] flex flex-col">
-                <div className="p-5 border-b bg-slate-50/50 flex justify-between items-center">
-                  <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">{listCategory} Directory</span>
-                  <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${listCategory === 'LOST' ? 'bg-rose-50 text-rose-600' : 'bg-hospital-50 text-hospital-600'}`}>{allPatients.length}</span>
-                </div>
-                <div className="overflow-y-auto flex-1 p-3 space-y-2">
-                  {allPatients.map(p => (
-                    <div key={p.id} onClick={() => handlePatientSelect(p)} className={`p-4 rounded-2xl border transition-all ${selectedPatient?.id === p.id ? 'border-hospital-500 bg-hospital-50 shadow-md' : 'border-slate-50 hover:border-slate-200 bg-white'}`}>
-                      <div className="flex justify-between mb-2">
-                        <span className="font-bold text-slate-800 text-sm">{p.name}</span>
-                        <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded-full ${p.packageProposal?.outcome === 'Scheduled' ? 'bg-emerald-50 text-emerald-600' : p.packageProposal?.outcome === 'Completed' ? 'bg-teal-50 text-teal-600' : p.packageProposal?.outcome === 'Follow-Up' ? 'bg-blue-50 text-blue-600' : p.packageProposal?.outcome === 'Lost' ? 'bg-rose-50 text-rose-600' : 'bg-amber-50 text-amber-600'}`}>{p.packageProposal?.outcome || 'Pending'}</span>
-                      </div>
-                      <div className="mt-2 text-[9px] text-slate-400 font-black uppercase tracking-widest">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span>{p.condition}</span>
-                          <span className="w-1 h-1 bg-slate-200 rounded-full"></span>
-                          <div className="flex items-center gap-1">
-                            <span className="text-slate-400 font-black uppercase">Arrived</span>
-                            <span className="text-hospital-600 font-bold">{formatToDDMMYYYY(p.entry_date)}</span>
-                          </div>
-                        </div>
-                        
-                        {/* Status-specific Date Display */}
-                        {listCategory === 'SCHEDULED' && (
-                          <div className="text-slate-400 font-black mt-1 flex items-center gap-1">
-                            <CalendarClock className="w-3 h-3 text-emerald-500" />
-                            <span>Surgery:</span>
-                            <span className="text-emerald-600 font-black">{formatToDDMMYYYY(p.surgery_date || p.packageProposal?.surgeryDate) || 'NOT SET'}</span>
-                          </div>
-                        )}
-                        {listCategory === 'FOLLOWUP' && (
-                          <div className="text-slate-400 font-black mt-1 flex items-center gap-1">
-                            <Clock className="w-3 h-3 text-blue-500" />
-                            <span>Follow-Up:</span>
-                            <span className="text-blue-600 font-black">
-                              {formatToDDMMYYYY(p.followup_date || p.packageProposal?.followUpDate) || 
-                               formatToDDMMYYYY(p.doctorAssessment?.tentativeSurgeryDate) || 
-                               'PENDING'}
-                            </span>
-                          </div>
-                        )}
-                        {listCategory === 'COMPLETED' && (
-                          <div className="text-slate-400 font-black mt-1 flex items-center gap-1">
-                            <BadgeCheck className="w-3 h-3 text-teal-500" />
-                            <span>Completed:</span>
-                            <span className="text-teal-600 font-black">{formatToDDMMYYYY(p.completed_surgery || p.packageProposal?.outcomeDate) || 'NOT SET'}</span>
-                          </div>
-                        )}
-                        {listCategory === 'LOST' && (
-                          <div className="text-slate-400 font-black mt-1 flex items-center gap-1">
-                            <Ban className="w-3 h-3 text-rose-500" />
-                            <span>Lost Date:</span>
-                            <span className="text-rose-600 font-black">{formatToDDMMYYYY(p.surgery_lost_date || p.packageProposal?.outcomeDate) || 'NOT SET'}</span>
-                          </div>
-                        )}
-                      </div>
+            <div className={`grid grid-cols-1 ${isSidebarMinimized ? 'lg:grid-cols-1' : 'lg:grid-cols-3'} gap-6 transition-all duration-300`}>
+              {!isSidebarMinimized && (
+                <div className="bg-white rounded-[2rem] shadow-sm border border-slate-100 overflow-hidden h-[400px] lg:h-[750px] flex flex-col animate-in slide-in-from-left-4">
+                  <div className="p-5 border-b bg-slate-50/50 flex justify-between items-center">
+                    <div className="flex items-center gap-3">
+                      <button 
+                        onClick={() => setIsSidebarMinimized(true)} 
+                        className="p-1.5 rounded-lg hover:bg-slate-200 text-slate-400 hover:text-slate-600 transition-colors"
+                        title="Minimize Directory"
+                      >
+                        <ChevronLeft className="w-4 h-4" />
+                      </button>
+                      <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">{listCategory} Directory</span>
                     </div>
-                  ))}
-                  {allPatients.length === 0 && <div className="p-10 text-center text-slate-300 text-[10px] font-black uppercase tracking-widest">No patients found</div>}
+                    <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${listCategory === 'LOST' ? 'bg-rose-50 text-rose-600' : 'bg-hospital-50 text-hospital-600'}`}>{allPatients.length}</span>
+                  </div>
+                  <div className="overflow-y-auto flex-1 p-3 space-y-2">
+                    {allPatients.map(p => (
+                      <div key={p.id} onClick={() => handlePatientSelect(p)} className={`p-4 rounded-2xl border transition-all ${selectedPatient?.id === p.id ? 'border-hospital-500 bg-hospital-50 shadow-md' : 'border-slate-50 hover:border-slate-200 bg-white'}`}>
+                        <div className="flex justify-between mb-2">
+                          <span className="font-bold text-slate-800 text-sm">{p.name}</span>
+                          <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded-full ${p.packageProposal?.outcome === 'Scheduled' ? 'bg-emerald-50 text-emerald-600' : p.packageProposal?.outcome === 'Completed' ? 'bg-teal-50 text-teal-600' : p.packageProposal?.outcome === 'Follow-Up' ? 'bg-blue-50 text-blue-600' : p.packageProposal?.outcome === 'Lost' ? 'bg-rose-50 text-rose-600' : 'bg-amber-50 text-amber-600'}`}>{p.packageProposal?.outcome || 'Pending'}</span>
+                        </div>
+                        <div className="mt-2 text-[9px] text-slate-400 font-black uppercase tracking-widest">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span>{p.condition}</span>
+                            <span className="w-1 h-1 bg-slate-200 rounded-full"></span>
+                            <div className="flex items-center gap-1">
+                              <span className="text-slate-400 font-black uppercase">Arrived</span>
+                              <span className="text-hospital-600 font-bold">{formatToDDMMYYYY(p.entry_date)}</span>
+                            </div>
+                          </div>
+                          
+                          {/* Status-specific Date Display */}
+                          {listCategory === 'SCHEDULED' && (
+                            <div className="text-slate-400 font-black mt-1 flex items-center gap-1">
+                              <CalendarClock className="w-3 h-3 text-emerald-500" />
+                              <span>Surgery:</span>
+                              <span className="text-emerald-600 font-black">{formatToDDMMYYYY(p.surgery_date || p.packageProposal?.surgeryDate) || 'NOT SET'}</span>
+                            </div>
+                          )}
+                          {listCategory === 'FOLLOWUP' && (
+                            <div className="text-slate-400 font-black mt-1 flex items-center gap-1">
+                              <Clock className="w-3 h-3 text-blue-500" />
+                              <span>Follow-Up:</span>
+                              <span className="text-blue-600 font-black">
+                                {formatToDDMMYYYY(p.followup_date || p.packageProposal?.followUpDate) || 
+                                 formatToDDMMYYYY(p.doctorAssessment?.tentativeSurgeryDate) || 
+                                 'PENDING'}
+                              </span>
+                            </div>
+                          )}
+                          {listCategory === 'COMPLETED' && (
+                            <div className="text-slate-400 font-black mt-1 flex items-center gap-1">
+                              <BadgeCheck className="w-3 h-3 text-teal-500" />
+                              <span>Completed:</span>
+                              <span className="text-teal-600 font-black">{formatToDDMMYYYY(p.completed_surgery || p.packageProposal?.outcomeDate) || 'NOT SET'}</span>
+                            </div>
+                          )}
+                          {listCategory === 'LOST' && (
+                            <div className="text-slate-400 font-black mt-1 flex items-center gap-1">
+                              <Ban className="w-3 h-3 text-rose-500" />
+                              <span>Lost Date:</span>
+                              <span className="text-rose-600 font-black">{formatToDDMMYYYY(p.surgery_lost_date || p.packageProposal?.outcomeDate) || 'NOT SET'}</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                    {allPatients.length === 0 && <div className="p-10 text-center text-slate-300 text-[10px] font-black uppercase tracking-widest">No patients found</div>}
+                  </div>
                 </div>
-              </div>
+              )}
 
-              <div className="bg-white rounded-[2rem] shadow-sm border border-slate-100 overflow-hidden lg:col-span-2 flex flex-col min-h-[500px] lg:h-[750px]">
+              <div className={`bg-white rounded-[2rem] shadow-sm border border-slate-100 overflow-hidden ${isSidebarMinimized ? 'lg:col-span-1' : 'lg:col-span-2'} flex flex-col min-h-[500px] lg:h-[750px] transition-all duration-300`}>
                 {selectedPatient ? (
-                  <div className="flex flex-col h-full">
-                    <div className="p-4 sm:p-6 bg-slate-50 border-b">
+                  <div className="flex flex-col h-full relative">
+                    {/* Restore Directory Button Overlay */}
+                    {isSidebarMinimized && (
+                      <button 
+                        onClick={() => setIsSidebarMinimized(false)}
+                        className="absolute left-6 top-6 z-10 p-3 bg-white border border-slate-100 rounded-2xl shadow-xl text-hospital-600 hover:text-hospital-700 hover:scale-105 transition-all animate-in zoom-in-50"
+                        title="Show Directory"
+                      >
+                        <LayoutPanelLeft className="w-5 h-5" />
+                      </button>
+                    )}
+
+                    <div className={`p-4 sm:p-6 bg-slate-50 border-b ${isSidebarMinimized ? 'pl-20' : ''}`}>
                       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
                         <div className="bg-white border border-indigo-100 p-3 rounded-2xl shadow-sm">
                           <div className="flex items-center gap-1.5 mb-1"><User className="w-3 h-3 text-indigo-500" /><span className="text-[8px] font-black text-indigo-400 uppercase tracking-widest">Name</span></div>
@@ -418,7 +452,12 @@ export const PackageTeamDashboard: React.FC = () => {
                         </div>
                         <div className="bg-white border border-teal-100 p-3 rounded-2xl shadow-sm">
                           <div className="flex items-center gap-1.5 mb-1"><Share2 className="w-3 h-3 text-teal-500" /><span className="text-[8px] font-black text-teal-400 uppercase tracking-widest">Source</span></div>
-                          <div className="text-sm font-black text-teal-900 truncate leading-tight">{selectedPatient.source}</div>
+                          <div className="text-sm font-black text-teal-900 truncate leading-tight uppercase">
+                            {selectedPatient.source === 'Doctor Recommended' 
+                              ? `Dr. ${selectedPatient.sourceDoctorName || 'Recommended'}` 
+                              : (selectedPatient.source.startsWith('Other: ') ? selectedPatient.source.substring(7) : selectedPatient.source)
+                            }
+                          </div>
                         </div>
                         <div className="bg-white border border-rose-100 p-3 rounded-2xl shadow-sm">
                           <div className="flex items-center gap-1.5 mb-1"><ShieldCheck className="w-3 h-3 text-rose-500" /><span className="text-[8px] font-black text-rose-400 uppercase tracking-widest">Insurance Name</span></div>
@@ -441,7 +480,11 @@ export const PackageTeamDashboard: React.FC = () => {
                          </div>
                          <div className="bg-white p-4 rounded-2xl border border-blue-100 shadow-sm">
                            <div className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Recommended Procedure</div>
-                           <div className="text-sm font-black text-blue-700 uppercase">{selectedPatient.doctorAssessment?.surgeryProcedure || 'NOT SPECIFIED'}</div>
+                           <div className="text-sm font-black text-blue-700 uppercase">
+                             {selectedPatient.doctorAssessment?.surgeryProcedure === 'Other' 
+                               ? (selectedPatient.doctorAssessment?.otherSurgeryName || 'OTHER PROCEDURE') 
+                               : (selectedPatient.doctorAssessment?.surgeryProcedure || 'NOT SPECIFIED')}
+                           </div>
                          </div>
                          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                             {['Evaluator', 'Pain', 'Affordability', 'Readiness'].map((label, idx) => (
@@ -579,7 +622,17 @@ export const PackageTeamDashboard: React.FC = () => {
                     </form>
                   </div>
                 ) : (
-                  <div className="flex-1 flex flex-col items-center justify-center text-slate-300 p-10">
+                  <div className="flex-1 flex flex-col items-center justify-center text-slate-300 p-10 relative">
+                     {/* Restore Directory Button Overlay */}
+                     {isSidebarMinimized && (
+                      <button 
+                        onClick={() => setIsSidebarMinimized(false)}
+                        className="absolute left-6 top-6 z-10 p-3 bg-white border border-slate-100 rounded-2xl shadow-xl text-hospital-600 hover:text-hospital-700 hover:scale-105 transition-all animate-in zoom-in-50"
+                        title="Show Directory"
+                      >
+                        <LayoutPanelLeft className="w-5 h-5" />
+                      </button>
+                    )}
                     <Briefcase className="w-20 h-20 mb-6" />
                     <p className="text-[10px] font-black uppercase tracking-[0.3em] text-center">Select a candidate from the directory</p>
                   </div>
