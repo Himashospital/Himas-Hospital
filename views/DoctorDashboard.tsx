@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useHospital } from '../context/HospitalContext';
 import { SurgeonCode, PainSeverity, Affordability, ConversionReadiness, Patient, DoctorAssessment } from '../types';
-import { Stethoscope, Check, ChevronRight, User, Calendar, Save, Briefcase, CreditCard, Activity, Tag, FileText, Database, Clock, Share2, ShieldCheck, Search } from 'lucide-react';
+import { Stethoscope, Check, ChevronRight, User, Calendar, Save, Briefcase, CreditCard, Activity, Tag, FileText, Database, Clock, Share2, ShieldCheck, Search, Filter, History, ClipboardList } from 'lucide-react';
 
 const PROCEDURES = [
   "Lap Cholecystectomy",
@@ -21,6 +21,10 @@ export const DoctorDashboard: React.FC = () => {
   const { patients, updateDoctorAssessment } = useHospital();
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  
+  // Updated state for Date Range
+  const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
+  const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
 
   const [formState, setFormState] = useState<Partial<DoctorAssessment>>({
     quickCode: undefined,
@@ -76,9 +80,20 @@ export const DoctorDashboard: React.FC = () => {
     setSelectedPatient(null);
   };
 
+  // Filter patients based on Date Range and visibility criteria
   const allPatients = [...patients]
-    .filter(p => p.status === 'Arrived' || p.doctorAssessment !== undefined)
+    .filter(p => {
+      // Base visibility: Must be arrived or have an assessment
+      const isVisible = p.status === 'Arrived' || p.doctorAssessment !== undefined;
+      
+      // Date range filter: Check if entry_date is within [startDate, endDate]
+      const entryDateStr = p.entry_date || '';
+      const inRange = entryDateStr >= startDate && entryDateStr <= endDate;
+      
+      return isVisible && inRange;
+    })
     .sort((a, b) => {
+      // Sort: Pending first, then by time DESC
       const aIsPending = a.status === 'Arrived' && !a.doctorAssessment;
       const bIsPending = b.status === 'Arrived' && !b.doctorAssessment;
       if (aIsPending && !bIsPending) return -1;
@@ -91,19 +106,56 @@ export const DoctorDashboard: React.FC = () => {
   const filteredDirectoryPatients = allPatients.filter(p => {
     const s = searchTerm.toLowerCase();
     return p.name.toLowerCase().includes(s) || 
-           p.id.toLowerCase().includes(s) || 
+           (p.id && p.id.toLowerCase().includes(s)) || 
            p.mobile.includes(s);
   });
+
+  // Derived lists for Pending and Done sections
+  const pendingPatients = filteredDirectoryPatients.filter(p => !p.doctorAssessment);
+  const donePatients = filteredDirectoryPatients.filter(p => !!p.doctorAssessment);
 
   const pendingCount = allPatients.filter(p => p.status === 'Arrived' && !p.doctorAssessment).length;
   const doneCount = allPatients.filter(p => !!p.doctorAssessment).length;
     
   const isSurgery = formState.quickCode === SurgeonCode.S1;
 
+  // Reusable Patient Card component for the directory
+  // Fixed: Use React.FC to properly handle key prop and avoid TS mapping errors
+  const PatientCard: React.FC<{ p: Patient }> = ({ p }) => (
+    <div 
+      onClick={() => setSelectedPatient(p)} 
+      className={`p-4 rounded-xl border cursor-pointer hover:shadow-md transition-all ${
+        selectedPatient?.id === p.id 
+          ? 'border-hospital-500 bg-hospital-50 shadow-sm' 
+          : p.doctorAssessment 
+            ? 'border-gray-100 bg-gray-50' 
+            : 'border-slate-100 bg-white'
+      }`}
+    >
+      <div className="flex justify-between items-start">
+        <div className="flex-1">
+          <div className="font-bold text-gray-800">{p.name}</div>
+          <div className="text-[10px] text-gray-500 font-medium uppercase mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
+            <span>{p.age}Y • {p.gender} • {p.condition}</span>
+            <span className="hidden sm:inline w-1 h-1 bg-slate-200 rounded-full"></span>
+            <span className="flex items-center gap-1 text-hospital-600 font-bold">
+              <Clock className="w-3 h-3" /> {p.entry_date}
+            </span>
+          </div>
+        </div>
+        {p.doctorAssessment ? (
+          <Check className="w-5 h-5 text-green-500 bg-green-100 rounded-full p-1" />
+        ) : (
+          <ChevronRight className="w-4 h-4 text-gray-300" />
+        )}
+      </div>
+    </div>
+  );
+
   return (
     <div className="flex flex-col lg:flex-row lg:h-[calc(100vh-100px)] gap-6">
-      <div className="w-full lg:w-1/3 bg-white rounded-xl shadow-sm border border-gray-100 flex flex-col overflow-hidden h-[400px] lg:h-full">
-        <div className="p-4 border-b bg-gray-50 flex justify-between items-center">
+      <div className="w-full lg:w-1/3 bg-white rounded-xl shadow-sm border border-gray-100 flex flex-col overflow-hidden h-[450px] lg:h-full">
+        <div className="p-4 border-b bg-gray-50 flex justify-between items-center shrink-0">
            <h3 className="font-bold text-gray-700 flex items-center gap-2">
              <User className="w-5 h-5 text-hospital-600" /> Patient Directory
            </h3>
@@ -119,8 +171,8 @@ export const DoctorDashboard: React.FC = () => {
            </div>
         </div>
 
-        {/* Directory Search */}
-        <div className="p-3 bg-white border-b">
+        {/* Directory Filters */}
+        <div className="p-3 bg-white border-b space-y-3 shrink-0">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
             <input
@@ -131,33 +183,68 @@ export const DoctorDashboard: React.FC = () => {
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
+          <div className="flex flex-col sm:flex-row gap-2">
+            <div className="flex-1 relative flex items-center gap-2 px-3 py-1.5 bg-gray-50 border border-gray-100 rounded-lg">
+              <span className="text-[8px] font-black text-gray-400 uppercase tracking-tighter shrink-0">From</span>
+              <input
+                type="date"
+                className="w-full bg-transparent text-[11px] font-bold outline-none"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+              />
+            </div>
+            <div className="flex-1 relative flex items-center gap-2 px-3 py-1.5 bg-gray-50 border border-gray-100 rounded-lg">
+              <span className="text-[8px] font-black text-gray-400 uppercase tracking-tighter shrink-0">To</span>
+              <input
+                type="date"
+                className="w-full bg-transparent text-[11px] font-bold outline-none"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+              />
+            </div>
+          </div>
         </div>
 
-        <div className="overflow-y-auto flex-1 p-2 space-y-2">
-          {filteredDirectoryPatients.map(p => (
-            <div key={p.id} onClick={() => setSelectedPatient(p)} className={`p-4 rounded-xl border cursor-pointer hover:shadow-md transition-all ${selectedPatient?.id === p.id ? 'border-hospital-500 bg-hospital-50 shadow-sm' : p.doctorAssessment ? 'border-gray-100 bg-gray-50' : 'border-slate-100 bg-white'}`}>
-              <div className="flex justify-between items-start">
-                <div className="flex-1">
-                  <div className="font-bold text-gray-800">{p.name}</div>
-                  <div className="text-[10px] text-gray-500 font-medium uppercase mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
-                    <span>{p.age}Y • {p.gender} • {p.condition}</span>
-                    <span className="hidden sm:inline w-1 h-1 bg-slate-200 rounded-full"></span>
-                    <span className="flex items-center gap-1 text-hospital-600 font-bold">
-                      <Clock className="w-3 h-3" /> Arrived: {p.entry_date}
-                    </span>
-                  </div>
-                </div>
-                {p.doctorAssessment ? (
-                  <Check className="w-5 h-5 text-green-500 bg-green-100 rounded-full p-1" />
-                ) : (
-                  <ChevronRight className="w-4 h-4 text-gray-300" />
-                )}
-              </div>
+        <div className="overflow-y-auto flex-1 p-3 space-y-6">
+          {/* Pending Section */}
+          <div>
+            <div className="flex items-center justify-between mb-3 px-1">
+              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
+                <Clock className="w-3.5 h-3.5 text-amber-500" /> Pending Assessments
+              </span>
+              <span className="text-[10px] font-black text-amber-600 bg-amber-50 px-2 rounded-full">{pendingPatients.length}</span>
             </div>
-          ))}
+            <div className="space-y-2">
+              {pendingPatients.map(p => <PatientCard key={p.id} p={p} />)}
+              {pendingPatients.length === 0 && (
+                <div className="p-4 text-center text-slate-300 text-[10px] font-black uppercase tracking-widest border border-dashed border-slate-100 rounded-xl bg-slate-50/30">
+                  No Pending patients
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Done Section */}
+          <div>
+            <div className="flex items-center justify-between mb-3 px-1">
+              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
+                <ClipboardList className="w-3.5 h-3.5 text-emerald-500" /> Completed Today
+              </span>
+              <span className="text-[10px] font-black text-emerald-600 bg-emerald-50 px-2 rounded-full">{donePatients.length}</span>
+            </div>
+            <div className="space-y-2">
+              {donePatients.map(p => <PatientCard key={p.id} p={p} />)}
+              {donePatients.length === 0 && (
+                <div className="p-4 text-center text-slate-300 text-[10px] font-black uppercase tracking-widest border border-dashed border-slate-100 rounded-xl bg-slate-50/30">
+                  No Completed assessments
+                </div>
+              )}
+            </div>
+          </div>
+
           {filteredDirectoryPatients.length === 0 && (
-            <div className="p-10 text-center text-slate-300 text-xs font-black uppercase tracking-widest">
-              {searchTerm ? 'No results found' : 'No patients arrived'}
+            <div className="pt-10 text-center text-slate-300 text-xs font-black uppercase tracking-widest">
+              No results for this date range
             </div>
           )}
         </div>
@@ -166,7 +253,7 @@ export const DoctorDashboard: React.FC = () => {
       <div className="w-full lg:w-2/3 bg-white rounded-xl shadow-sm border border-gray-100 flex flex-col overflow-hidden">
         {selectedPatient ? (
           <form onSubmit={handleSave} className="flex flex-col h-full">
-            <div className="p-4 sm:p-6 border-b bg-white">
+            <div className="p-4 sm:p-6 border-b bg-white shrink-0">
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                 <div className="bg-gradient-to-br from-indigo-50 to-white border border-indigo-100 p-3 rounded-2xl shadow-sm">
                   <div className="flex items-center gap-1.5 mb-1">
@@ -289,7 +376,7 @@ export const DoctorDashboard: React.FC = () => {
               </div>
 
             </div>
-            <div className="p-6 border-t bg-gray-50 flex justify-end">
+            <div className="p-6 border-t bg-gray-50 flex justify-end shrink-0">
               <button type="submit" className="w-full sm:w-auto bg-hospital-600 text-white px-6 py-3 rounded-lg font-bold flex items-center justify-center gap-2 hover:bg-hospital-700 transition-all">
                 <Save className="w-5 h-5" /> Save Assessment
               </button>
