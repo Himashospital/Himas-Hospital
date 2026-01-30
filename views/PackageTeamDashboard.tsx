@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useHospital } from '../context/HospitalContext';
 import { ExportButtons } from '../components/ExportButtons';
 import { Patient, PackageProposal, Role, SurgeonCode, ProposalOutcome } from '../types';
-import { Briefcase, Calendar, Users, BadgeCheck, User, Activity, ShieldCheck, Banknote, Trash2, Clock, X, Share2, Stethoscope, LayoutList, Columns, Search, Phone, Filter, Tag, CalendarClock, Ban, ChevronLeft, ChevronRight, LayoutPanelLeft } from 'lucide-react';
+import { Briefcase, Calendar, Users, BadgeCheck, User, Activity, ShieldCheck, Banknote, Trash2, Clock, X, Share2, Stethoscope, LayoutList, Columns, Search, Phone, Filter, Tag, CalendarClock, Ban, ChevronLeft, ChevronRight, LayoutPanelLeft, MessageSquareQuote, FileText } from 'lucide-react';
 
 const lostReasons = [
   "Cost / Financial Constraints",
@@ -211,7 +211,7 @@ export const PackageTeamDashboard: React.FC = () => {
         ...proposal as PackageProposal,
         proposalCreatedAt: proposal.proposalCreatedAt || new Date().toISOString()
       });
-      alert("Basic proposal details saved.");
+      alert("Proposal details saved.");
     }
   };
 
@@ -577,6 +577,31 @@ export const PackageTeamDashboard: React.FC = () => {
                                      />
                                   </div>
                                )}
+                            </div>
+                         </div>
+                      </div>
+
+                      <div className="pt-8 border-t border-slate-100 space-y-8">
+                         <div className="flex items-center gap-2 text-[10px] font-black uppercase text-indigo-600 tracking-[0.2em]"><MessageSquareQuote className="w-4 h-4" /> Counseling Insights</div>
+                         <div className="grid grid-cols-1 gap-6">
+                            <div>
+                               <label className="block text-[10px] font-black uppercase text-slate-400 mb-3 tracking-widest">Decision Pattern</label>
+                               <div className="flex flex-wrap gap-2">
+                                  {['Trust', 'PDC', 'Package Not Proposed', 'Standard'].map(pattern => (
+                                    <ToggleButton key={pattern} label={pattern} value={pattern} current={proposal.decisionPattern} onClick={v => setProposal({...proposal, decisionPattern: v})} />
+                                  ))}
+                               </div>
+                            </div>
+                            <div>
+                               <label className="block text-[10px] font-black uppercase text-slate-400 mb-3 tracking-widest flex items-center gap-2">
+                                 <FileText className="w-3 h-3" /> Counseling Notes / Remarks
+                               </label>
+                               <textarea 
+                                 className="w-full p-4 bg-slate-50 border-2 border-transparent rounded-2xl text-sm font-bold focus:bg-white focus:border-hospital-500 outline-none min-h-[120px] transition-all" 
+                                 value={proposal.remarks || ''} 
+                                 onChange={e => setProposal({...proposal, remarks: e.target.value})} 
+                                 placeholder="Enter strict reference notes, observations, or specific remarks here..."
+                               />
                             </div>
                          </div>
                       </div>

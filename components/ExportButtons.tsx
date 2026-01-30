@@ -215,7 +215,8 @@ export const ExportButtons: React.FC<ExportButtonsProps> = ({ patients, role, se
       'Decision Pattern',
       'Objection',
       'Strategy',
-      'Follow Up Date'
+      'Follow Up Date',
+      'Remark'
     ];
 
     const rows = filteredPatients.map(p => [
@@ -247,7 +248,8 @@ export const ExportButtons: React.FC<ExportButtonsProps> = ({ patients, role, se
       p.packageProposal?.decisionPattern || '',
       p.packageProposal?.objectionIdentified || '',
       p.packageProposal?.counselingStrategy || '',
-      formatDate(p.packageProposal?.followUpDate)
+      formatDate(p.packageProposal?.followUpDate),
+      p.packageProposal?.remarks || ''
     ].map(cell => `"${(cell || '').toString().replace(/"/g, '""')}"`).join(','));
 
     const csvContent = [headers.join(','), ...rows].join('\n');

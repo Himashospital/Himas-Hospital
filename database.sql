@@ -1,6 +1,7 @@
+
 -- =================================================================
 -- HIMAS HOSPITAL MANAGEMENT DATABASE SCHEMA
--- Version: 2.7 (Extended Counseling Tracking)
+-- Version: 2.8 (Strict Counseling Notes Support)
 -- =================================================================
 
 -- 1. MIGRATION SCRIPT FOR EXISTING TABLES (Run this in your SQL Editor):
@@ -8,7 +9,8 @@ ALTER TABLE public.himas_appointments
 ADD COLUMN IF NOT EXISTS followup_date DATE,
 ADD COLUMN IF NOT EXISTS surgery_date DATE,
 ADD COLUMN IF NOT EXISTS surgery_lost_date DATE,
-ADD COLUMN IF NOT EXISTS completed_surgery DATE;
+ADD COLUMN IF NOT EXISTS completed_surgery DATE,
+ADD COLUMN IF NOT EXISTS remarks TEXT; -- Native column for strict reference notes
 
 -- 2. CREATE COUNSELING RECORDS SUB-TABLE (If you prefer a separate table):
 CREATE TABLE IF NOT EXISTS public.counseling_records (
@@ -44,6 +46,7 @@ CREATE TABLE IF NOT EXISTS public.himas_appointments (
     is_follow_up BOOLEAN DEFAULT FALSE,
     
     -- Native tracking columns for counseling and outcomes
+    remarks TEXT,              -- Strict reference counseling notes
     follow_up_date DATE,       -- Primary follow-up column used by the app
     followup_date DATE,        -- Dedicated counseling follow-up date
     surgery_date DATE,         -- Scheduled/Performed surgery date

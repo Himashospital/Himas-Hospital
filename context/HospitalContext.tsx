@@ -75,7 +75,7 @@ const mapRowToPatient = (row: any): Patient => {
       surgeryMedicines: dbProposal?.surgeryMedicines || undefined,
       preOpInvestigation: dbProposal?.preOpInvestigation || undefined,
       lostReason: dbProposal?.lostReason || undefined,
-      remarks: dbProposal?.remarks || undefined,
+      remarks: row.remarks || dbProposal?.remarks || undefined,
       postFollowUp: dbProposal?.postOpFollowUp || undefined,
       postFollowUpCount: dbProposal?.postOpFollowUpCount || undefined,
       packageAmount: dbProposal?.packageAmount != null ? String(dbProposal.packageAmount) : undefined,
@@ -270,11 +270,13 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
       let surgeryDateVal = null;
       let surgeryLostDateVal = null;
       let completedSurgeryVal = null;
+      let remarksVal = null;
 
       if (patient.packageProposal) {
         const uiProposal = patient.packageProposal;
         followUpDateVal = nullify(uiProposal.followUpDate);
         surgeryDateVal = nullify(uiProposal.surgeryDate);
+        remarksVal = nullify(uiProposal.remarks);
         
         if (uiProposal.outcome === 'Lost') {
           surgeryLostDateVal = nullify(uiProposal.outcomeDate);
@@ -297,7 +299,7 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
           preOpInvestigation: nullify(uiProposal.preOpInvestigation),
           objectionIdentified: nullify(uiProposal.objectionIdentified),
           lostReason: nullify(uiProposal.lostReason),
-          remarks: nullify(uiProposal.remarks),
+          remarks: remarksVal,
           postOpFollowUp: nullify(uiProposal.postFollowUp),
           postOpFollowUpCount: nullify(uiProposal.postFollowUpCount),
           packageAmount: uiProposal.packageAmount ? parseInt(uiProposal.packageAmount.replace(/,/g, ''), 10) : null,
@@ -324,7 +326,8 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
         package_proposal: dbPackageProposal,
         doctor_assessment: patient.doctorAssessment || null,
         
-        // Persist outcome-specific dates to native columns for reporting
+        // Sync Counseling Fields to Native Columns
+        remarks: remarksVal,
         follow_up_date: followUpDateVal,
         followup_date: followUpDateVal,
         surgery_date: surgeryDateVal,
