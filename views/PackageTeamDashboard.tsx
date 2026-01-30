@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useHospital } from '../context/HospitalContext';
 import { ExportButtons } from '../components/ExportButtons';
 import { Patient, PackageProposal, Role, SurgeonCode, ProposalOutcome } from '../types';
-import { Briefcase, Calendar, Users, BadgeCheck, User, Activity, ShieldCheck, Banknote, Trash2, Clock, X, Share2, Stethoscope, LayoutList, Columns, Search, Phone, Filter, Tag, CalendarClock, Ban, ChevronLeft, ChevronRight, LayoutPanelLeft, MessageSquareQuote, FileText } from 'lucide-react';
+import { Briefcase, Calendar, Users, BadgeCheck, User, Activity, ShieldCheck, Banknote, Trash2, Clock, X, Share2, Stethoscope, LayoutList, Columns, Search, Phone, Filter, Tag, CalendarClock, Ban, ChevronLeft, ChevronRight, LayoutPanelLeft, MessageSquareQuote, FileText, ChevronDown } from 'lucide-react';
 
 const lostReasons = [
   "Cost / Financial Constraints",
@@ -215,19 +215,7 @@ export const PackageTeamDashboard: React.FC = () => {
     }
   };
 
-  const ToggleButton: React.FC<{ label: string, value: any, current: any, onClick: (v: any) => void }> = ({ label, value, current, onClick }) => (
-    <button
-      type="button"
-      onClick={() => onClick(value)}
-      className={`flex-1 py-2 px-3 text-[10px] font-black uppercase rounded-lg border transition-all ${
-        current === value 
-          ? 'bg-hospital-600 text-white border-hospital-600 shadow-sm' 
-          : 'bg-white text-slate-400 border-slate-100 hover:border-slate-300'
-      }`}
-    >
-      {label}
-    </button>
-  );
+  const selectClasses = "w-full p-3 bg-slate-50 border-2 border-transparent rounded-xl text-[10px] font-black uppercase outline-none focus:bg-white focus:border-hospital-500 transition-all appearance-none cursor-pointer pr-10";
 
   const renderActionButtons = (currentOutcome: ProposalOutcome | undefined) => {
     if (currentOutcome === 'Scheduled') {
@@ -506,10 +494,18 @@ export const PackageTeamDashboard: React.FC = () => {
                          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-x-8 gap-y-6">
                             <div className="sm:col-span-2 xl:col-span-1">
                                <label className="block text-[10px] font-black uppercase text-slate-400 mb-3 tracking-widest">Mode of Payment</label>
-                               <div className="flex flex-wrap gap-2">
-                                  {['Cash', 'Insurance', 'Partly', 'Insurance Approved'].map(mode => (
-                                    <ToggleButton key={mode} label={mode} value={mode} current={proposal.modeOfPayment} onClick={v => setProposal({...proposal, modeOfPayment: v})} />
-                                  ))}
+                               <div className="relative">
+                                  <select 
+                                    className={selectClasses} 
+                                    value={proposal.modeOfPayment || ''} 
+                                    onChange={e => setProposal({...proposal, modeOfPayment: e.target.value as any})}
+                                  >
+                                    <option value="" disabled>Select Payment Mode</option>
+                                    {['Cash', 'Insurance', 'Partly', 'Insurance Approved'].map(mode => (
+                                      <option key={mode} value={mode}>{mode}</option>
+                                    ))}
+                                  </select>
+                                  <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
                                </div>
                             </div>
                             <div>
@@ -522,36 +518,68 @@ export const PackageTeamDashboard: React.FC = () => {
                             </div>
                             <div className="sm:col-span-2 xl:col-span-3">
                                <label className="block text-[10px] font-black uppercase text-slate-400 mb-3 tracking-widest">Room Type</label>
-                               <div className="flex flex-wrap gap-2">
-                                  {['Private', 'Deluxe', 'Semi', 'Economy'].map(room => (
-                                    <ToggleButton key={room} label={room} value={room} current={proposal.roomType} onClick={v => setProposal({...proposal, roomType: v})} />
-                                  ))}
+                               <div className="relative">
+                                  <select 
+                                    className={selectClasses} 
+                                    value={proposal.roomType || ''} 
+                                    onChange={v => setProposal({...proposal, roomType: v.target.value as any})}
+                                  >
+                                    <option value="" disabled>Select Room Category</option>
+                                    {['Private', 'Deluxe', 'Semi', 'Economy'].map(room => (
+                                      <option key={room} value={room}>{room}</option>
+                                    ))}
+                                  </select>
+                                  <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
                                </div>
                             </div>
                             <div className="sm:col-span-2 xl:col-span-3 pt-6 border-t border-slate-50">
                                <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
                                   <div className="space-y-3">
                                      <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest">Medicines</label>
-                                     <div className="flex gap-1">
-                                        {['Included', 'Excluded'].map(opt => (
-                                          <ToggleButton key={opt} label={opt} value={opt} current={proposal.surgeryMedicines} onClick={v => setProposal({...proposal, surgeryMedicines: v})} />
-                                        ))}
+                                     <div className="relative">
+                                        <select 
+                                          className={selectClasses} 
+                                          value={proposal.surgeryMedicines || ''} 
+                                          onChange={v => setProposal({...proposal, surgeryMedicines: v.target.value as any})}
+                                        >
+                                          <option value="" disabled>Select</option>
+                                          {['Included', 'Excluded'].map(opt => (
+                                            <option key={opt} value={opt}>{opt}</option>
+                                          ))}
+                                        </select>
+                                        <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
                                      </div>
                                   </div>
                                   <div className="space-y-3">
                                      <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest">ICU Charges</label>
-                                     <div className="flex gap-1">
-                                        {['Included', 'Excluded'].map(opt => (
-                                          <ToggleButton key={opt} label={opt} value={opt} current={proposal.icuCharges} onClick={v => setProposal({...proposal, icuCharges: v})} />
-                                        ))}
+                                     <div className="relative">
+                                        <select 
+                                          className={selectClasses} 
+                                          value={proposal.icuCharges || ''} 
+                                          onChange={v => setProposal({...proposal, icuCharges: v.target.value as any})}
+                                        >
+                                          <option value="" disabled>Select</option>
+                                          {['Included', 'Excluded'].map(opt => (
+                                            <option key={opt} value={opt}>{opt}</option>
+                                          ))}
+                                        </select>
+                                        <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
                                      </div>
                                   </div>
                                   <div className="space-y-3">
                                      <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest">Pre-Op Invest.</label>
-                                     <div className="flex gap-1">
-                                        {['Included', 'Excluded'].map(opt => (
-                                          <ToggleButton key={opt} label={opt} value={opt} current={proposal.preOpInvestigation} onClick={v => setProposal({...proposal, preOpInvestigation: v})} />
-                                        ))}
+                                     <div className="relative">
+                                        <select 
+                                          className={selectClasses} 
+                                          value={proposal.preOpInvestigation || ''} 
+                                          onChange={v => setProposal({...proposal, preOpInvestigation: v.target.value as any})}
+                                        >
+                                          <option value="" disabled>Select</option>
+                                          {['Included', 'Excluded'].map(opt => (
+                                            <option key={opt} value={opt}>{opt}</option>
+                                          ))}
+                                        </select>
+                                        <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
                                      </div>
                                   </div>
                                </div>
@@ -559,10 +587,18 @@ export const PackageTeamDashboard: React.FC = () => {
                             <div className="sm:col-span-2 xl:col-span-3 pt-6 border-t border-slate-50 space-y-4">
                                <div>
                                   <label className="block text-[10px] font-black uppercase text-slate-400 mb-3 tracking-widest">Post-Op Follow-Up</label>
-                                  <div className="flex flex-wrap gap-2">
-                                     {['Included', 'Excluded'].map(opt => (
-                                       <ToggleButton key={opt} label={opt} value={opt} current={proposal.postFollowUp} onClick={v => setProposal({...proposal, postFollowUp: v})} />
-                                     ))}
+                                  <div className="relative">
+                                     <select 
+                                       className={selectClasses} 
+                                       value={proposal.postFollowUp || ''} 
+                                       onChange={v => setProposal({...proposal, postFollowUp: v.target.value as any})}
+                                     >
+                                       <option value="" disabled>Select Option</option>
+                                       {['Included', 'Excluded'].map(opt => (
+                                         <option key={opt} value={opt}>{opt}</option>
+                                       ))}
+                                     </select>
+                                     <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
                                   </div>
                                </div>
                                {proposal.postFollowUp === 'Included' && (
@@ -586,10 +622,18 @@ export const PackageTeamDashboard: React.FC = () => {
                          <div className="grid grid-cols-1 gap-6">
                             <div>
                                <label className="block text-[10px] font-black uppercase text-slate-400 mb-3 tracking-widest">Decision Pattern</label>
-                               <div className="flex flex-wrap gap-2">
-                                  {['Trust', 'PDC', 'Package Not Proposed', 'Standard'].map(pattern => (
-                                    <ToggleButton key={pattern} label={pattern} value={pattern} current={proposal.decisionPattern} onClick={v => setProposal({...proposal, decisionPattern: v})} />
-                                  ))}
+                               <div className="relative">
+                                  <select 
+                                    className={selectClasses} 
+                                    value={proposal.decisionPattern || ''} 
+                                    onChange={v => setProposal({...proposal, decisionPattern: v.target.value})}
+                                  >
+                                    <option value="" disabled>Select Decision Pattern</option>
+                                    {['Trust', 'PDC', 'Package Not Proposed', 'Standard', 'General Procedure'].map(pattern => (
+                                      <option key={pattern} value={pattern}>{pattern}</option>
+                                    ))}
+                                  </select>
+                                  <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
                                </div>
                             </div>
                             <div>
