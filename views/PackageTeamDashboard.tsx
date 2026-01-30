@@ -629,7 +629,7 @@ export const PackageTeamDashboard: React.FC = () => {
                                     onChange={v => setProposal({...proposal, decisionPattern: v.target.value})}
                                   >
                                     <option value="" disabled>Select Decision Pattern</option>
-                                    {['Trust', 'PDC', 'Package Not Proposed', 'Standard', 'General Procedure'].map(pattern => (
+                                    {['Trust', 'PDC', 'Package Not Proposed', 'Standard', 'General Procedure', 'Management Disconnect'].map(pattern => (
                                       <option key={pattern} value={pattern}>{pattern}</option>
                                     ))}
                                   </select>
