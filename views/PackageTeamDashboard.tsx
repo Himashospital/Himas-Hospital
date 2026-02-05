@@ -189,11 +189,18 @@ export const PackageTeamDashboard: React.FC = () => {
       const aHasOutcome = !!a.packageProposal?.outcome;
       const bHasOutcome = !!b.packageProposal?.outcome;
       
-      // Divide directory: Leads at top, Done Data at bottom
+      // Divide directory: Leads (no outcome) at top, Done Data (has outcome) at bottom
       if (!aHasOutcome && bHasOutcome) return -1;
       if (aHasOutcome && !bHasOutcome) return 1;
       
-      // Inside Done Data: Sort by transition date DESC
+      // Inside Leads section: Sort by most recent arrival (registeredAt) DESC
+      if (!aHasOutcome && !bHasOutcome) {
+        const timeA = new Date(a.registeredAt).getTime();
+        const timeB = new Date(b.registeredAt).getTime();
+        return timeB - timeA;
+      }
+      
+      // Inside Done Data section: Sort by transition date (status_updated_at) DESC
       if (aHasOutcome && bHasOutcome) {
         const timeA = new Date(a.status_updated_at || a.updated_at || 0).getTime();
         const timeB = new Date(b.status_updated_at || b.updated_at || 0).getTime();
@@ -201,8 +208,9 @@ export const PackageTeamDashboard: React.FC = () => {
       }
     }
 
+    // Default sort for other tabs: Newest first
     const dateA = a.entry_date ? new Date(a.entry_date).getTime() : new Date(a.registeredAt).getTime();
-    const dateB = b.entry_date ? new Date(b.entry_date).getTime() : new Date(a.registeredAt).getTime();
+    const dateB = b.entry_date ? new Date(b.entry_date).getTime() : new Date(b.registeredAt).getTime();
     if (dateB !== dateA) return dateB - dateA;
     return new Date(b.registeredAt).getTime() - new Date(a.registeredAt).getTime();
   });
@@ -368,9 +376,9 @@ export const PackageTeamDashboard: React.FC = () => {
               <div className="flex flex-col sm:flex-row items-center gap-4 w-full xl:w-auto flex-wrap">
                 <div className="flex items-center gap-2">
                   <span className="text-[9px] font-black uppercase text-slate-400 shrink-0">Filter From</span>
-                  <input type="date" className={filterInputClasses + " w-32"} value={startDate} onChange={e => setStartDate(e.target.value)} />
+                  <input type="date" className={filterInputClasses} value={startDate} onChange={e => setStartDate(e.target.value)} />
                   <span className="text-[9px] font-black uppercase text-slate-400 shrink-0">To</span>
-                  <input type="date" className={filterInputClasses + " w-32"} value={endDate} onChange={e => setEndDate(e.target.value)} />
+                  <input type="date" className={filterInputClasses} value={endDate} onChange={e => setEndDate(e.target.value)} />
                 </div>
               </div>
 
