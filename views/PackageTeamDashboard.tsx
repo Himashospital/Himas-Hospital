@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useHospital } from '../context/HospitalContext';
 import { ExportButtons } from '../components/ExportButtons';
 import { Patient, PackageProposal, Role, SurgeonCode, ProposalOutcome } from '../types';
-import { Briefcase, Calendar, Users, BadgeCheck, User, Activity, ShieldCheck, Banknote, Trash2, Clock, X, Share2, Stethoscope, LayoutList, Columns, Search, Phone, Filter, Tag, CalendarClock, Ban, ChevronLeft, ChevronRight, LayoutPanelLeft, MessageSquareQuote, FileText, ChevronDown } from 'lucide-react';
+import { Briefcase, Calendar, Users, BadgeCheck, User, Activity, ShieldCheck, Banknote, Trash2, Clock, X, Share2, Stethoscope, LayoutList, Columns, Search, Phone, Filter, Tag, CalendarClock, Ban, ChevronLeft, ChevronRight, LayoutPanelLeft, MessageSquareQuote, FileText, ChevronDown, AlertCircle } from 'lucide-react';
 
 const lostReasons = [
   "Cost / Financial Constraints",
@@ -102,8 +102,21 @@ export const PackageTeamDashboard: React.FC = () => {
     if (p.doctorAssessment?.quickCode !== SurgeonCode.S1) return false;
     
     const outcome = p.packageProposal?.outcome;
+    const today = new Date().toISOString().split('T')[0];
+    const compDate = p.completed_surgery || p.packageProposal?.outcomeDate;
+
     if (listCategory === 'PENDING') {
-      if (outcome) return false;
+      // Logic for "Daily Completed Data": Show pending items OR items completed in the current range (defaulting to today)
+      const isCompletedInActiveRange = outcome === 'Completed' && (
+        (startDate || endDate)
+          ? ((!startDate || (compDate && compDate >= startDate)) && (!endDate || (compDate && compDate <= endDate)))
+          : (compDate === today)
+      );
+
+      // Hide if it has an outcome that is NOT 'Completed'
+      if (outcome && outcome !== 'Completed') return false;
+      // Hide if it IS 'Completed' but NOT in the active range (today or filter)
+      if (outcome === 'Completed' && !isCompletedInActiveRange) return false;
     } else if (listCategory === 'SCHEDULED') {
       if (outcome !== 'Scheduled') return false;
     } else if (listCategory === 'FOLLOWUP') {
@@ -114,7 +127,7 @@ export const PackageTeamDashboard: React.FC = () => {
       if (outcome !== 'Lost') return false;
     }
 
-    if (listCategory === 'PENDING' && filter !== 'ALL') {
+    if (listCategory === 'PENDING' && filter !== 'ALL' && !outcome) {
       if (!p.doctorAssessment?.conversionReadiness?.startsWith(filter)) return false;
     }
 
@@ -130,6 +143,8 @@ export const PackageTeamDashboard: React.FC = () => {
         filterDate = p.completed_surgery || p.packageProposal?.outcomeDate || '';
       } else if (listCategory === 'LOST') {
         filterDate = p.surgery_lost_date || p.packageProposal?.outcomeDate || '';
+      } else if (listCategory === 'PENDING' && outcome === 'Completed') {
+        filterDate = compDate || '';
       }
 
       if (startDate && filterDate < startDate) return false;
@@ -150,6 +165,13 @@ export const PackageTeamDashboard: React.FC = () => {
       const dateA = a.followup_date || a.packageProposal?.followUpDate ? new Date(a.followup_date || a.packageProposal!.followUpDate).getTime() : Infinity;
       const dateB = b.followup_date || b.packageProposal?.followUpDate ? new Date(b.followup_date || b.packageProposal!.followUpDate).getTime() : Infinity;
       return dateA - dateB; 
+    }
+    // Put completed items at top of pending list if applicable
+    if (listCategory === 'PENDING') {
+      const aComp = a.packageProposal?.outcome === 'Completed';
+      const bComp = b.packageProposal?.outcome === 'Completed';
+      if (aComp && !bComp) return -1;
+      if (!aComp && bComp) return 1;
     }
     const dateA = a.entry_date ? new Date(a.entry_date).getTime() : new Date(a.registeredAt).getTime();
     const dateB = b.entry_date ? new Date(b.entry_date).getTime() : new Date(a.registeredAt).getTime();
@@ -201,7 +223,7 @@ export const PackageTeamDashboard: React.FC = () => {
       proposalCreatedAt: proposal.proposalCreatedAt || new Date().toISOString()
     };
     await updatePackageProposal(selectedPatient.id, updatedProposal);
-    setListCategory('COMPLETED');
+    setListCategory('PENDING'); // Stay in pending to see the summary of completion
   };
 
   const handleSaveProposal = async (e: React.FormEvent) => {
@@ -276,6 +298,12 @@ export const PackageTeamDashboard: React.FC = () => {
   };
 
   const filterInputClasses = "h-10 w-full bg-slate-50 border border-slate-100 rounded-xl px-3 text-[10px] font-bold focus:ring-2 focus:ring-hospital-500 outline-none transition-all appearance-none";
+
+  // Calculate detailed counts for the PENDING directory
+  const pendingOnlyCount = allPatients.filter(p => !p.packageProposal?.outcome).length;
+  const completedTodayCount = allPatients.filter(p => p.packageProposal?.outcome === 'Completed').length;
+
+  const todayStr = new Date().toISOString().split('T')[0];
 
   return (
     <div className="space-y-6">
@@ -354,61 +382,92 @@ export const PackageTeamDashboard: React.FC = () => {
                       </button>
                       <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">{listCategory} Directory</span>
                     </div>
-                    <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${listCategory === 'LOST' ? 'bg-rose-50 text-rose-600' : 'bg-hospital-50 text-hospital-600'}`}>{allPatients.length}</span>
+                    <div className="flex gap-2">
+                       {listCategory === 'PENDING' ? (
+                         <>
+                           <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-hospital-50 text-hospital-600 border border-hospital-100">Leads: {pendingOnlyCount}</span>
+                           <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-100">Done: {completedTodayCount}</span>
+                         </>
+                       ) : (
+                         <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${listCategory === 'LOST' ? 'bg-rose-50 text-rose-600 border border-rose-100' : 'bg-hospital-50 text-hospital-600 border border-hospital-100'}`}>{allPatients.length}</span>
+                       )}
+                    </div>
                   </div>
                   <div className="overflow-y-auto flex-1 p-3 space-y-2">
-                    {allPatients.map(p => (
-                      <div key={p.id} onClick={() => handlePatientSelect(p)} className={`p-4 rounded-2xl border transition-all ${selectedPatient?.id === p.id ? 'border-hospital-500 bg-hospital-50 shadow-md' : 'border-slate-50 hover:border-slate-200 bg-white'}`}>
-                        <div className="flex justify-between mb-2">
-                          <span className="font-bold text-slate-800 text-sm">{p.name}</span>
-                          <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded-full ${p.packageProposal?.outcome === 'Scheduled' ? 'bg-emerald-50 text-emerald-600' : p.packageProposal?.outcome === 'Completed' ? 'bg-teal-50 text-teal-600' : p.packageProposal?.outcome === 'Follow-Up' ? 'bg-blue-50 text-blue-600' : p.packageProposal?.outcome === 'Lost' ? 'bg-rose-50 text-rose-600' : 'bg-amber-50 text-amber-600'}`}>{p.packageProposal?.outcome || 'Pending'}</span>
-                        </div>
-                        <div className="mt-2 text-[9px] text-slate-400 font-black uppercase tracking-widest">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span>{p.condition}</span>
-                            <span className="w-1 h-1 bg-slate-200 rounded-full"></span>
-                            <div className="flex items-center gap-1">
-                              <span className="text-slate-400 font-black uppercase">Arrived</span>
-                              <span className="text-hospital-600 font-bold">{formatToDDMMYYYY(p.entry_date)}</span>
+                    {allPatients.map(p => {
+                      const followUpDateVal = p.followup_date || p.packageProposal?.followUpDate;
+                      const isOverdue = listCategory === 'FOLLOWUP' && followUpDateVal && followUpDateVal < todayStr;
+
+                      return (
+                        <div 
+                          key={p.id} 
+                          onClick={() => handlePatientSelect(p)} 
+                          className={`p-4 rounded-2xl border transition-all relative ${
+                            selectedPatient?.id === p.id 
+                              ? 'border-hospital-500 bg-hospital-50 shadow-md' 
+                              : isOverdue
+                                ? 'border-rose-300 bg-rose-50/50 hover:border-rose-400 shadow-sm'
+                                : 'border-slate-50 hover:border-slate-200 bg-white'
+                          }`}
+                        >
+                          <div className="flex justify-between mb-2">
+                            <span className="font-bold text-slate-800 text-sm">{p.name}</span>
+                            <div className="flex gap-2 items-center">
+                              {isOverdue && (
+                                <span className="text-[8px] font-black uppercase px-2 py-0.5 rounded-full bg-rose-600 text-white flex items-center gap-1 animate-pulse">
+                                  <AlertCircle className="w-2 h-2" /> OVERDUE
+                                </span>
+                              )}
+                              <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded-full ${p.packageProposal?.outcome === 'Scheduled' ? 'bg-emerald-50 text-emerald-600' : p.packageProposal?.outcome === 'Completed' ? 'bg-teal-50 text-teal-600' : p.packageProposal?.outcome === 'Follow-Up' ? 'bg-blue-50 text-blue-600' : p.packageProposal?.outcome === 'Lost' ? 'bg-rose-50 text-rose-600' : 'bg-amber-50 text-amber-600'}`}>{p.packageProposal?.outcome || 'Pending'}</span>
                             </div>
                           </div>
-                          
-                          {/* Status-specific Date Display */}
-                          {listCategory === 'SCHEDULED' && (
-                            <div className="text-slate-400 font-black mt-1 flex items-center gap-1">
-                              <CalendarClock className="w-3 h-3 text-emerald-500" />
-                              <span>Surgery:</span>
-                              <span className="text-emerald-600 font-black">{formatToDDMMYYYY(p.surgery_date || p.packageProposal?.surgeryDate) || 'NOT SET'}</span>
+                          <div className="mt-2 text-[9px] text-slate-400 font-black uppercase tracking-widest">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span>{p.condition}</span>
+                              <span className="w-1 h-1 bg-slate-200 rounded-full"></span>
+                              <div className="flex items-center gap-1">
+                                <span className="text-slate-400 font-black uppercase">Arrived</span>
+                                <span className="text-hospital-600 font-bold">{formatToDDMMYYYY(p.entry_date)}</span>
+                              </div>
                             </div>
-                          )}
-                          {listCategory === 'FOLLOWUP' && (
-                            <div className="text-slate-400 font-black mt-1 flex items-center gap-1">
-                              <Clock className="w-3 h-3 text-blue-500" />
-                              <span>Follow-Up:</span>
-                              <span className="text-blue-600 font-black">
-                                {formatToDDMMYYYY(p.followup_date || p.packageProposal?.followUpDate) || 
-                                 formatToDDMMYYYY(p.doctorAssessment?.tentativeSurgeryDate) || 
-                                 'PENDING'}
-                              </span>
-                            </div>
-                          )}
-                          {listCategory === 'COMPLETED' && (
-                            <div className="text-slate-400 font-black mt-1 flex items-center gap-1">
-                              <BadgeCheck className="w-3 h-3 text-teal-500" />
-                              <span>Completed:</span>
-                              <span className="text-teal-600 font-black">{formatToDDMMYYYY(p.completed_surgery || p.packageProposal?.outcomeDate) || 'NOT SET'}</span>
-                            </div>
-                          )}
-                          {listCategory === 'LOST' && (
-                            <div className="text-slate-400 font-black mt-1 flex items-center gap-1">
-                              <Ban className="w-3 h-3 text-rose-500" />
-                              <span>Lost Date:</span>
-                              <span className="text-rose-600 font-black">{formatToDDMMYYYY(p.surgery_lost_date || p.packageProposal?.outcomeDate) || 'NOT SET'}</span>
-                            </div>
-                          )}
+                            
+                            {/* Status-specific Date Display */}
+                            {listCategory === 'SCHEDULED' && (
+                              <div className="text-slate-400 font-black mt-1 flex items-center gap-1">
+                                <CalendarClock className="w-3 h-3 text-emerald-500" />
+                                <span>Surgery:</span>
+                                <span className="text-emerald-600 font-black">{formatToDDMMYYYY(p.surgery_date || p.packageProposal?.surgeryDate) || 'NOT SET'}</span>
+                              </div>
+                            )}
+                            {listCategory === 'FOLLOWUP' && (
+                              <div className="text-slate-400 font-black mt-1 flex items-center gap-1">
+                                <Clock className={`w-3 h-3 ${isOverdue ? 'text-rose-500' : 'text-blue-500'}`} />
+                                <span>Follow-Up:</span>
+                                <span className={`font-black ${isOverdue ? 'text-rose-600' : 'text-blue-600'}`}>
+                                  {formatToDDMMYYYY(followUpDateVal) || 
+                                   formatToDDMMYYYY(p.doctorAssessment?.tentativeSurgeryDate) || 
+                                   'PENDING'}
+                                </span>
+                              </div>
+                            )}
+                            {(listCategory === 'COMPLETED' || (listCategory === 'PENDING' && p.packageProposal?.outcome === 'Completed')) && (
+                              <div className="text-slate-400 font-black mt-1 flex items-center gap-1">
+                                <BadgeCheck className="w-3 h-3 text-teal-500" />
+                                <span>Completed Date:</span>
+                                <span className="text-teal-600 font-black">{formatToDDMMYYYY(p.completed_surgery || p.packageProposal?.outcomeDate) || 'NOT SET'}</span>
+                              </div>
+                            )}
+                            {listCategory === 'LOST' && (
+                              <div className="text-slate-400 font-black mt-1 flex items-center gap-1">
+                                <Ban className="w-3 h-3 text-rose-500" />
+                                <span>Lost Date:</span>
+                                <span className="text-rose-600 font-black">{formatToDDMMYYYY(p.surgery_lost_date || p.packageProposal?.outcomeDate) || 'NOT SET'}</span>
+                              </div>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                     {allPatients.length === 0 && <div className="p-10 text-center text-slate-300 text-[10px] font-black uppercase tracking-widest">No patients found</div>}
                   </div>
                 </div>
@@ -629,7 +688,7 @@ export const PackageTeamDashboard: React.FC = () => {
                                     onChange={v => setProposal({...proposal, decisionPattern: v.target.value})}
                                   >
                                     <option value="" disabled>Select Decision Pattern</option>
-                                    {['Trust', 'PDC', 'Package Not Proposed', 'Standard', 'General Procedure', 'Management Disconnect'].map(pattern => (
+                                    {['Trust', 'PDC', 'Package Not Proposed', 'Standard', 'General Procedure', 'Management Discount'].map(pattern => (
                                       <option key={pattern} value={pattern}>{pattern}</option>
                                     ))}
                                   </select>
@@ -657,7 +716,7 @@ export const PackageTeamDashboard: React.FC = () => {
                             <div>
                               <div className="text-[10px] font-black uppercase tracking-widest mb-1">Final Outcome</div>
                               <div className="text-lg font-black uppercase">Surgery Successfully Completed</div>
-                              <div className="text-[10px] font-bold mt-1 text-teal-600">DATE: {formatToDDMMYYYY(selectedPatient.completed_surgery || selectedPatient.packageProposal?.outcomeDate)}</div>
+                              <div className="text-[10px] font-bold mt-1 text-teal-600">COMPLETED DATE: {formatToDDMMYYYY(selectedPatient.completed_surgery || selectedPatient.packageProposal?.outcomeDate)}</div>
                             </div>
                           </div>
                         ) : selectedPatient.packageProposal?.outcome === 'Lost' ? (

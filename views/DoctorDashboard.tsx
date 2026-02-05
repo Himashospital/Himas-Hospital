@@ -254,7 +254,7 @@ export const DoctorDashboard: React.FC = () => {
         {selectedPatient ? (
           <form onSubmit={handleSave} className="flex flex-col h-full">
             <div className="p-4 sm:p-6 border-b bg-white shrink-0">
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
                 <div className="bg-gradient-to-br from-indigo-50 to-white border border-indigo-100 p-3 rounded-2xl shadow-sm">
                   <div className="flex items-center gap-1.5 mb-1">
                     <User className="w-3 h-3 text-indigo-500" />
@@ -268,6 +268,13 @@ export const DoctorDashboard: React.FC = () => {
                     <span className="text-[8px] font-black text-blue-400 uppercase tracking-widest">Age / Gender</span>
                   </div>
                   <div className="text-sm font-black text-blue-900 leading-tight">{selectedPatient.age}Y <span className="text-blue-200">|</span> {selectedPatient.gender}</div>
+                </div>
+                <div className="bg-gradient-to-br from-amber-50 to-white border border-amber-100 p-3 rounded-2xl shadow-sm">
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <Briefcase className="w-3 h-3 text-amber-500" />
+                    <span className="text-[8px] font-black text-amber-400 uppercase tracking-widest">Occupation</span>
+                  </div>
+                  <div className="text-sm font-black text-amber-900 truncate leading-tight">{selectedPatient.occupation || '---'}</div>
                 </div>
                 <div className="bg-gradient-to-br from-teal-50 to-white border border-teal-100 p-3 rounded-2xl shadow-sm">
                   <div className="flex items-center gap-1.5 mb-1">
