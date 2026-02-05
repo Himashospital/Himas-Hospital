@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { Patient, DoctorAssessment, PackageProposal, Role, StaffUser, Appointment, Condition, SurgeonCode, PainSeverity, Affordability, ConversionReadiness, ProposalOutcome, Gender } from '../types';
 import { supabase } from '../services/supabaseClient';
@@ -114,7 +115,7 @@ const mapRowToPatient = (row: any): Patient => {
     status_updated_at: row.status_updated_at || null,
     entry_date: row.entry_date || '',
     arrivalTime: row.arrival_time || '',
-    status: row.booking_status || 'Scheduled',
+    status: row.booking_status || 'Arrived',
     packageProposal: uiProposal,
     doctorAssessment: uiAssessment,
     surgery_date: row.surgery_date || '',
@@ -145,6 +146,21 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
     setCurrentUserRoleState(role);
     if (role) localStorage.setItem(STORAGE_KEY_ROLE, role);
     else localStorage.removeItem(STORAGE_KEY_ROLE);
+  };
+
+  const syncToSheets = async (patient: any) => {
+    const url = process.env.VITE_APPSCRIPT_URL;
+    if (!url) return;
+    try {
+      // Fire and forget, using no-cors to avoid GAS redirect issues on POST
+      fetch(url, {
+        method: 'POST',
+        body: JSON.stringify(patient),
+        mode: 'no-cors',
+      });
+    } catch (e) {
+      console.warn('Google Sheets sync background error:', e);
+    }
   };
 
   const refreshData = async () => {
@@ -231,6 +247,10 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
       
       const { error } = await supabase.from('himas_appointments').insert(dbRecord);
       if (error) throw error;
+      
+      // Sync to Sheets
+      syncToSheets({ ...patientData, registeredAt: dbRecord.updated_at, status: 'Arrived' });
+      
       await refreshData();
       setSaveStatus('saved');
     } catch (err) {
@@ -306,6 +326,7 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
         is_follow_up: patient.visitType === 'Follow Up',
         has_insurance: patient.hasInsurance,
         insurance_name: patient.insuranceName,
+        // Fixed: Property patient.source_doctor_name was replaced with camelCase version patient.sourceDoctorName as defined in the Patient interface
         source_doctor_name: patient.sourceDoctorName,
         entry_date: nullify(patient.entry_date) || new Date().toISOString().split('T')[0],
         arrival_time: nullify(patient.arrivalTime) || new Date().toTimeString().split(' ')[0],
@@ -325,6 +346,10 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
       
       const { error } = await supabase.from('himas_appointments').update(updateData).eq('id', targetId);
       if (error) throw error;
+      
+      // Sync to Sheets
+      syncToSheets(patient);
+      
       await refreshData();
       setSaveStatus('saved');
     } catch (err) {
@@ -372,6 +397,10 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
         const { error: insertError } = await supabase.from('himas_appointments').insert(dbRecord);
         if (insertError) throw insertError;
         const { error: deleteError } = await supabase.from('himas_appointments').delete().eq('id', appointmentId);
+        
+        // Sync to Sheets
+        syncToSheets({ ...patientData, registeredAt: dbRecord.updated_at, status: 'Arrived' });
+
         await refreshData();
         setSaveStatus('saved');
     } catch (err) {
@@ -398,6 +427,10 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
             })
             .eq('id', patientId);
         if (error) throw error;
+
+        // Sync to Sheets
+        syncToSheets({ ...patient, doctorAssessment: updatedAssessment });
+
         await refreshData();
         setSaveStatus('saved');
     } catch (err) {
