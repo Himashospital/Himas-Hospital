@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useHospital } from '../context/HospitalContext';
 import { SurgeonCode, PainSeverity, Affordability, ConversionReadiness, Patient, DoctorAssessment } from '../types';
-import { Stethoscope, Check, ChevronRight, User, Calendar, Save, Briefcase, CreditCard, Activity, Tag, FileText, Database, Clock, Share2, ShieldCheck, Search, Filter, History, ClipboardList } from 'lucide-react';
+import { Stethoscope, Check, ChevronRight, User, Calendar, Save, Briefcase, CreditCard, Activity, Tag, FileText, Database, Clock, Share2, ShieldCheck, Search, Filter, History, ClipboardList, RefreshCcw } from 'lucide-react';
 
 const PROCEDURES = [
   "Lap Cholecystectomy",
@@ -16,6 +16,20 @@ const PROCEDURES = [
   "Stapler Haemorrhoidectomy",
   "Other"
 ];
+
+const formatToDateTime = (dateString: string | undefined | null): string => {
+  if (!dateString) return '';
+  const date = new Date(dateString);
+  if (isNaN(date.getTime())) return '';
+  
+  const d = date.getDate().toString().padStart(2, '0');
+  const m = (date.getMonth() + 1).toString().padStart(2, '0');
+  const y = date.getFullYear();
+  const h = date.getHours().toString().padStart(2, '0');
+  const min = date.getMinutes().toString().padStart(2, '0');
+  
+  return `${d}-${m}-${y} ${h}:${min}`;
+};
 
 export const DoctorDashboard: React.FC = () => {
   const { patients, updateDoctorAssessment } = useHospital();
@@ -142,6 +156,11 @@ export const DoctorDashboard: React.FC = () => {
               <Clock className="w-3 h-3" /> {p.entry_date}
             </span>
           </div>
+          {p.updated_at && (
+            <div className="text-[8px] font-black text-slate-400 uppercase tracking-tighter mt-1.5 flex items-center gap-1">
+              <RefreshCcw className="w-2.5 h-2.5" /> Updated: {formatToDateTime(p.updated_at)}
+            </div>
+          )}
         </div>
         {p.doctorAssessment ? (
           <Check className="w-5 h-5 text-green-500 bg-green-100 rounded-full p-1" />

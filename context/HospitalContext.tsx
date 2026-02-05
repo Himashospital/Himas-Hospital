@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { Patient, DoctorAssessment, PackageProposal, Role, StaffUser, Appointment, Condition, SurgeonCode, PainSeverity, Affordability, ConversionReadiness, ProposalOutcome, Gender } from '../types';
 import { supabase } from '../services/supabaseClient';
@@ -49,7 +48,6 @@ const nullify = (val: any) => {
   return val;
 };
 
-// Map database row to internal Patient type
 const mapRowToPatient = (row: any): Patient => {
   const dbProposal = row.package_proposal;
   let uiProposal: PackageProposal | undefined = undefined;
@@ -112,6 +110,8 @@ const mapRowToPatient = (row: any): Patient => {
     condition: (row.condition || Condition.Other) as Condition,
     visitType: row.is_follow_up ? 'Follow Up' : 'OPD',
     registeredAt: row.created_at || new Date().toISOString(),
+    updated_at: row.updated_at || row.created_at || new Date().toISOString(),
+    status_updated_at: row.status_updated_at || null,
     entry_date: row.entry_date || '',
     arrivalTime: row.arrival_time || '',
     status: row.booking_status || 'Scheduled',
@@ -225,7 +225,8 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
         booking_status: 'Arrived',
         entry_date: patientData.entry_date || new Date().toISOString().split('T')[0],
         arrival_time: patientData.arrivalTime || new Date().toTimeString().split(' ')[0],
-        hospital_id: 'himas_facility_01'
+        hospital_id: 'himas_facility_01',
+        updated_at: new Date().toISOString()
       };
       
       const { error } = await supabase.from('himas_appointments').insert(dbRecord);
@@ -238,39 +239,25 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
     }
   };
 
-  /**
-   * Internal function to update the counseling_records sub-table.
-   * Ensures relevant columns are updated without interfering with main flow.
-   */
-  const updateCounselingRecord = async (patientId: string, data: {
-    surgery_date?: string | null;
-    followup_date?: string | null;
-    surgery_lost_date?: string | null;
-    completed_surgery?: string | null;
-  }) => {
-    try {
-      const { error } = await supabase
-        .from('counseling_records')
-        .upsert({
-          patient_id: patientId,
-          ...data,
-          updated_at: new Date().toISOString()
-        }, { onConflict: 'patient_id' });
-      if (error) throw error;
-    } catch (err) {
-      console.error('Update Counseling Record Error:', err);
-    }
-  };
-
   const updatePatient = async (targetId: string, patient: Patient) => {
     setSaveStatus('saving');
     try {
+      const existingPatient = patients.find(p => p.id === targetId);
       let dbPackageProposal = null;
       let followUpDateVal = null;
       let surgeryDateVal = null;
       let surgeryLostDateVal = null;
       let completedSurgeryVal = null;
       let remarksVal = null;
+      
+      // Determine status transition timestamp
+      const oldOutcome = existingPatient?.packageProposal?.outcome;
+      const newOutcome = patient.packageProposal?.outcome;
+      let statusUpdatedAtVal = existingPatient?.status_updated_at;
+
+      if (newOutcome && newOutcome !== oldOutcome) {
+        statusUpdatedAtVal = new Date().toISOString();
+      }
 
       if (patient.packageProposal) {
         const uiProposal = patient.packageProposal;
@@ -326,26 +313,18 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
         package_proposal: dbPackageProposal,
         doctor_assessment: patient.doctorAssessment || null,
         
-        // Sync Counseling Fields to Native Columns
         remarks: remarksVal,
         follow_up_date: followUpDateVal,
         followup_date: followUpDateVal,
         surgery_date: surgeryDateVal,
         surgery_lost_date: surgeryLostDateVal,
-        completed_surgery: completedSurgeryVal
+        completed_surgery: completedSurgeryVal,
+        status_updated_at: statusUpdatedAtVal,
+        updated_at: new Date().toISOString()
       };
       
       const { error } = await supabase.from('himas_appointments').update(updateData).eq('id', targetId);
       if (error) throw error;
-
-      // Also sync to the sub-table specifically
-      await updateCounselingRecord(targetId, {
-        surgery_date: surgeryDateVal,
-        followup_date: followUpDateVal,
-        surgery_lost_date: surgeryLostDateVal,
-        completed_surgery: completedSurgeryVal
-      });
-
       await refreshData();
       setSaveStatus('saved');
     } catch (err) {
@@ -386,21 +365,16 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
             booking_status: 'Arrived',
             entry_date: patientData.entry_date || new Date().toISOString().split('T')[0],
             arrival_time: patientData.arrivalTime || new Date().toTimeString().split(' ')[0],
-            hospital_id: 'himas_facility_01'
+            hospital_id: 'himas_facility_01',
+            updated_at: new Date().toISOString()
         };
         
         const { error: insertError } = await supabase.from('himas_appointments').insert(dbRecord);
         if (insertError) throw insertError;
-
         const { error: deleteError } = await supabase.from('himas_appointments').delete().eq('id', appointmentId);
-        if (deleteError) {
-            console.warn(`Cleanup warning: Old lead ${appointmentId} was not removed.`);
-        }
-
         await refreshData();
         setSaveStatus('saved');
     } catch (err) {
-        console.error('Convert Appointment Error:', err);
         setSaveStatus('error');
     }
   };
@@ -410,24 +384,23 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
     try {
         const patient = patients.find(p => p.id === patientId);
         if (!patient) throw new Error("Patient not found");
-
         const existingAssessment = patient.doctorAssessment || {};
         const updatedAssessment = {
             ...existingAssessment,
             ...assessmentData,
             assessedAt: new Date().toISOString()
         };
-
         const { error } = await supabase
             .from('himas_appointments')
-            .update({ doctor_assessment: updatedAssessment })
+            .update({ 
+                doctor_assessment: updatedAssessment,
+                updated_at: new Date().toISOString()
+            })
             .eq('id', patientId);
-
         if (error) throw error;
         await refreshData();
         setSaveStatus('saved');
     } catch (err) {
-        console.error('Update Doctor Assessment Error:', err);
         setSaveStatus('error');
     }
   };
@@ -438,10 +411,7 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
   };
 
   const getPatientById = (id: string) => patients.find(p => p.id === id);
-
-  const fetchFilteredPatients = async (filters: PatientFilters, page: number, pageSize: number) => {
-    return { data: patients, count: patients.length };
-  };
+  const fetchFilteredPatients = async (filters: PatientFilters, page: number, pageSize: number) => { return { data: patients, count: patients.length }; };
 
   const addAppointment = async (appointmentData: Omit<Appointment, 'id' | 'createdAt' | 'hospital_id' | 'status'>) => {
     setSaveStatus('saving');
@@ -457,14 +427,14 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
         booking_time: nullify(appointmentData.time),
         is_follow_up: appointmentData.bookingType === 'Follow Up',
         booking_status: appointmentData.bookingType || 'Scheduled',
-        hospital_id: 'himas_facility_01'
+        hospital_id: 'himas_facility_01',
+        updated_at: new Date().toISOString()
       };
       const { error } = await supabase.from('himas_appointments').insert(dbRecord);
       if (error) throw error;
       await refreshData();
       setSaveStatus('saved');
     } catch (err) {
-      console.error('Add Appointment Error:', err);
       setSaveStatus('error');
     }
   };
@@ -481,14 +451,14 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
         entry_date: nullify(appointment.date),
         booking_time: nullify(appointment.time),
         booking_status: appointment.bookingType, 
-        is_follow_up: appointment.bookingType === 'Follow Up'
+        is_follow_up: appointment.bookingType === 'Follow Up',
+        updated_at: new Date().toISOString()
       };
       const { error } = await supabase.from('himas_appointments').update(updateData).eq('id', appointment.id);
       if (error) throw error;
       await refreshData();
       setSaveStatus('saved');
     } catch (err) {
-      console.error('Update Appointment Error:', err);
       setSaveStatus('error');
     }
   };

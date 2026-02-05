@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useHospital } from '../context/HospitalContext';
 import { ExportButtons } from '../components/ExportButtons';
 import { Patient, PackageProposal, Role, SurgeonCode, ProposalOutcome } from '../types';
-import { Briefcase, Calendar, Users, BadgeCheck, User, Activity, ShieldCheck, Banknote, Trash2, Clock, X, Share2, Stethoscope, LayoutList, Columns, Search, Phone, Filter, Tag, CalendarClock, Ban, ChevronLeft, ChevronRight, LayoutPanelLeft, MessageSquareQuote, FileText, ChevronDown, AlertCircle } from 'lucide-react';
+// Added Database to lucide-react imports
+import { Briefcase, Calendar, Users, BadgeCheck, User, Activity, ShieldCheck, Banknote, Trash2, Clock, X, Share2, Stethoscope, LayoutList, Columns, Search, Phone, Filter, Tag, CalendarClock, Ban, ChevronLeft, ChevronRight, LayoutPanelLeft, MessageSquareQuote, FileText, ChevronDown, AlertCircle, RefreshCcw, Database } from 'lucide-react';
 
 const lostReasons = [
   "Cost / Financial Constraints",
@@ -27,6 +28,20 @@ const formatToDDMMYYYY = (dateString: string | undefined | null): string => {
   return dateString;
 };
 
+const formatToDateTime = (dateString: string | undefined | null): string => {
+  if (!dateString) return '';
+  const date = new Date(dateString);
+  if (isNaN(date.getTime())) return '';
+  
+  const d = date.getDate().toString().padStart(2, '0');
+  const m = (date.getMonth() + 1).toString().padStart(2, '0');
+  const y = date.getFullYear();
+  const h = date.getHours().toString().padStart(2, '0');
+  const min = date.getMinutes().toString().padStart(2, '0');
+  
+  return `${d}-${m}-${y} ${h}:${min}`;
+};
+
 export const PackageTeamDashboard: React.FC = () => {
   const { patients, updatePackageProposal, staffUsers, registerStaff } = useHospital();
   
@@ -36,10 +51,14 @@ export const PackageTeamDashboard: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [isSidebarMinimized, setIsSidebarMinimized] = useState(false);
 
-  // Date Filters
+  // General Date Filters (Used for Arrival in Pending or native dates in other tabs)
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
 
+  // Specific Moved On Date Filters for "Done Data" in Pending tab
+  const [movedStartDate, setMovedStartDate] = useState(new Date().toISOString().split('T')[0]);
+  const [movedEndDate, setMovedEndDate] = useState(new Date().toISOString().split('T')[0]);
+  
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
   const [filter, setFilter] = useState<'ALL' | 'CR1' | 'CR2' | 'CR3' | 'CR4'>('ALL');
   
@@ -103,20 +122,10 @@ export const PackageTeamDashboard: React.FC = () => {
     
     const outcome = p.packageProposal?.outcome;
     const today = new Date().toISOString().split('T')[0];
-    const compDate = p.completed_surgery || p.packageProposal?.outcomeDate;
 
+    // Filter by Directory Category
     if (listCategory === 'PENDING') {
-      // Logic for "Daily Completed Data": Show pending items OR items completed in the current range (defaulting to today)
-      const isCompletedInActiveRange = outcome === 'Completed' && (
-        (startDate || endDate)
-          ? ((!startDate || (compDate && compDate >= startDate)) && (!endDate || (compDate && compDate <= endDate)))
-          : (compDate === today)
-      );
-
-      // Hide if it has an outcome that is NOT 'Completed'
-      if (outcome && outcome !== 'Completed') return false;
-      // Hide if it IS 'Completed' but NOT in the active range (today or filter)
-      if (outcome === 'Completed' && !isCompletedInActiveRange) return false;
+      // Logic for Pending tab includes Leads (no outcome) and Done Data (has outcome)
     } else if (listCategory === 'SCHEDULED') {
       if (outcome !== 'Scheduled') return false;
     } else if (listCategory === 'FOLLOWUP') {
@@ -127,30 +136,43 @@ export const PackageTeamDashboard: React.FC = () => {
       if (outcome !== 'Lost') return false;
     }
 
+    // Filter by Readiness (CR1-CR4) only for true Pending leads
     if (listCategory === 'PENDING' && filter !== 'ALL' && !outcome) {
       if (!p.doctorAssessment?.conversionReadiness?.startsWith(filter)) return false;
     }
 
-    // Dynamic Date Filter Logic based on Status Category
-    if (startDate || endDate) {
-      let filterDate = p.entry_date || '';
-      
-      if (listCategory === 'SCHEDULED') {
-        filterDate = p.surgery_date || p.packageProposal?.surgeryDate || '';
-      } else if (listCategory === 'FOLLOWUP') {
-        filterDate = p.followup_date || p.packageProposal?.followUpDate || '';
-      } else if (listCategory === 'COMPLETED') {
-        filterDate = p.completed_surgery || p.packageProposal?.outcomeDate || '';
-      } else if (listCategory === 'LOST') {
-        filterDate = p.surgery_lost_date || p.packageProposal?.outcomeDate || '';
-      } else if (listCategory === 'PENDING' && outcome === 'Completed') {
-        filterDate = compDate || '';
+    // Filtering Logic based on Section
+    if (listCategory === 'PENDING') {
+      if (!outcome) {
+        // Pending Lead Section: Filter by Arrival Date (startDate/endDate)
+        if (startDate || endDate) {
+          const filterDate = p.entry_date || '';
+          if (startDate && filterDate < startDate) return false;
+          if (endDate && filterDate > endDate) return false;
+        }
+      } else {
+        // Done Data Section: Filter by Moved On Date (status_updated_at)
+        if (movedStartDate || movedEndDate) {
+          const filterDate = p.status_updated_at ? p.status_updated_at.split('T')[0] : '';
+          if (movedStartDate && filterDate < movedStartDate) return false;
+          if (movedEndDate && filterDate > movedEndDate) return false;
+        }
       }
+    } else {
+      // Standard Filter Logic for other tabs
+      if (startDate || endDate) {
+        let filterDate = p.entry_date || '';
+        if (listCategory === 'SCHEDULED') filterDate = p.surgery_date || p.packageProposal?.surgeryDate || '';
+        else if (listCategory === 'FOLLOWUP') filterDate = p.followup_date || p.packageProposal?.followUpDate || '';
+        else if (listCategory === 'COMPLETED') filterDate = p.completed_surgery || p.packageProposal?.outcomeDate || '';
+        else if (listCategory === 'LOST') filterDate = p.surgery_lost_date || p.packageProposal?.outcomeDate || '';
 
-      if (startDate && filterDate < startDate) return false;
-      if (endDate && filterDate > endDate) return false;
+        if (startDate && filterDate < startDate) return false;
+        if (endDate && filterDate > endDate) return false;
+      }
     }
 
+    // Quick Search
     if (searchTerm) {
       const s = searchTerm.toLowerCase();
       const match = p.name.toLowerCase().includes(s) || 
@@ -166,13 +188,23 @@ export const PackageTeamDashboard: React.FC = () => {
       const dateB = b.followup_date || b.packageProposal?.followUpDate ? new Date(b.followup_date || b.packageProposal!.followUpDate).getTime() : Infinity;
       return dateA - dateB; 
     }
-    // Put completed items at top of pending list if applicable
+    
     if (listCategory === 'PENDING') {
-      const aComp = a.packageProposal?.outcome === 'Completed';
-      const bComp = b.packageProposal?.outcome === 'Completed';
-      if (aComp && !bComp) return -1;
-      if (!aComp && bComp) return 1;
+      const aHasOutcome = !!a.packageProposal?.outcome;
+      const bHasOutcome = !!b.packageProposal?.outcome;
+      
+      // Divide directory: Leads at top, Done Data at bottom
+      if (!aHasOutcome && bHasOutcome) return -1;
+      if (aHasOutcome && !bHasOutcome) return 1;
+      
+      // Inside Done Data: Sort by transition date DESC
+      if (aHasOutcome && bHasOutcome) {
+        const timeA = new Date(a.status_updated_at || a.updated_at || 0).getTime();
+        const timeB = new Date(b.status_updated_at || b.updated_at || 0).getTime();
+        return timeB - timeA;
+      }
     }
+
     const dateA = a.entry_date ? new Date(a.entry_date).getTime() : new Date(a.registeredAt).getTime();
     const dateB = b.entry_date ? new Date(b.entry_date).getTime() : new Date(a.registeredAt).getTime();
     if (dateB !== dateA) return dateB - dateA;
@@ -223,7 +255,7 @@ export const PackageTeamDashboard: React.FC = () => {
       proposalCreatedAt: proposal.proposalCreatedAt || new Date().toISOString()
     };
     await updatePackageProposal(selectedPatient.id, updatedProposal);
-    setListCategory('PENDING'); // Stay in pending to see the summary of completion
+    setListCategory('PENDING'); 
   };
 
   const handleSaveProposal = async (e: React.FormEvent) => {
@@ -299,10 +331,8 @@ export const PackageTeamDashboard: React.FC = () => {
 
   const filterInputClasses = "h-10 w-full bg-slate-50 border border-slate-100 rounded-xl px-3 text-[10px] font-bold focus:ring-2 focus:ring-hospital-500 outline-none transition-all appearance-none";
 
-  // Calculate detailed counts for the PENDING directory
   const pendingOnlyCount = allPatients.filter(p => !p.packageProposal?.outcome).length;
-  const completedTodayCount = allPatients.filter(p => p.packageProposal?.outcome === 'Completed').length;
-
+  const movedTotalCount = allPatients.filter(p => !!p.packageProposal?.outcome).length;
   const todayStr = new Date().toISOString().split('T')[0];
 
   return (
@@ -324,9 +354,7 @@ export const PackageTeamDashboard: React.FC = () => {
 
       {activeTab === 'counseling' ? (
         <div className="space-y-6">
-          {/* Main Filter Bar - Categories on top row, filters on bottom row */}
           <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-50 space-y-5">
-            {/* Top Row: Categories Tabs */}
             <div className="flex bg-slate-100 p-1 rounded-2xl w-full overflow-x-auto whitespace-nowrap scrollbar-hide">
               {['PENDING', 'SCHEDULED', 'FOLLOWUP', 'COMPLETED', 'LOST'].map((cat) => (
                 <button key={cat} onClick={() => setListCategory(cat as any)} className={`flex-1 px-4 lg:px-5 py-2.5 rounded-xl text-[10px] font-black uppercase transition-all flex items-center justify-center gap-2 ${listCategory === cat ? 'bg-slate-900 text-white shadow-md' : 'text-slate-500 hover:text-slate-700'}`}>
@@ -340,17 +368,23 @@ export const PackageTeamDashboard: React.FC = () => {
               ))}
             </div>
 
-            {/* Bottom Row: Date Range, Search & Actions */}
             <div className="flex flex-col xl:flex-row justify-between items-center gap-4">
-              <div className="flex flex-col sm:flex-row items-center gap-2 w-full xl:w-auto">
-                <div className="flex items-center gap-1.5 w-full sm:w-auto">
-                  <span className="text-[9px] font-black uppercase text-slate-400 shrink-0">From</span>
-                  <input type="date" className={filterInputClasses} value={startDate} onChange={e => setStartDate(e.target.value)} />
-                </div>
-                <div className="flex items-center gap-1.5 w-full sm:w-auto">
+              <div className="flex flex-col sm:flex-row items-center gap-4 w-full xl:w-auto flex-wrap">
+                <div className="flex items-center gap-2">
+                  <span className="text-[9px] font-black uppercase text-slate-400 shrink-0">Arrival From</span>
+                  <input type="date" className={filterInputClasses + " w-32"} value={startDate} onChange={e => setStartDate(e.target.value)} />
                   <span className="text-[9px] font-black uppercase text-slate-400 shrink-0">To</span>
-                  <input type="date" className={filterInputClasses} value={endDate} onChange={e => setEndDate(e.target.value)} />
+                  <input type="date" className={filterInputClasses + " w-32"} value={endDate} onChange={e => setEndDate(e.target.value)} />
                 </div>
+                
+                {listCategory === 'PENDING' && (
+                  <div className="flex items-center gap-2 border-l border-slate-200 pl-4 ml-2 animate-in slide-in-from-left-2">
+                    <span className="text-[9px] font-black uppercase text-emerald-500 shrink-0 flex items-center gap-1"><RefreshCcw className="w-3 h-3" /> Moved On From</span>
+                    <input type="date" className={filterInputClasses + " w-32 border-emerald-100 focus:ring-emerald-500"} value={movedStartDate} onChange={e => setMovedStartDate(e.target.value)} />
+                    <span className="text-[9px] font-black uppercase text-slate-400 shrink-0">To</span>
+                    <input type="date" className={filterInputClasses + " w-32 border-emerald-100 focus:ring-emerald-500"} value={movedEndDate} onChange={e => setMovedEndDate(e.target.value)} />
+                  </div>
+                )}
               </div>
 
               <div className="flex items-center gap-3 w-full xl:w-auto justify-end">
@@ -386,7 +420,7 @@ export const PackageTeamDashboard: React.FC = () => {
                        {listCategory === 'PENDING' ? (
                          <>
                            <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-hospital-50 text-hospital-600 border border-hospital-100">Leads: {pendingOnlyCount}</span>
-                           <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-100">Done: {completedTodayCount}</span>
+                           <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-100">Done: {movedTotalCount}</span>
                          </>
                        ) : (
                          <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${listCategory === 'LOST' ? 'bg-rose-50 text-rose-600 border border-rose-100' : 'bg-hospital-50 text-hospital-600 border border-hospital-100'}`}>{allPatients.length}</span>
@@ -394,81 +428,119 @@ export const PackageTeamDashboard: React.FC = () => {
                     </div>
                   </div>
                   <div className="overflow-y-auto flex-1 p-3 space-y-2">
-                    {allPatients.map(p => {
+                    {allPatients.map((p, index) => {
                       const followUpDateVal = p.followup_date || p.packageProposal?.followUpDate;
-                      const isOverdue = listCategory === 'FOLLOWUP' && followUpDateVal && followUpDateVal < todayStr;
+                      const hasOutcome = !!p.packageProposal?.outcome;
+                      const isOverdue = followUpDateVal && 
+                                      followUpDateVal < todayStr && 
+                                      !hasOutcome && 
+                                      p.packageProposal?.outcome !== 'Lost';
+
+                      // Section Splitter logic for Pending Tab
+                      const prevP = allPatients[index - 1];
+                      const isFirstMoved = listCategory === 'PENDING' && hasOutcome && (!prevP || !prevP.packageProposal?.outcome);
+                      
+                      const currentStatusUpdate = p.status_updated_at || p.updated_at || '';
+                      const currentUpdateDate = currentStatusUpdate.split('T')[0];
+                      const prevStatusUpdate = prevP?.status_updated_at || prevP?.updated_at || '';
+                      const prevUpdateDate = prevStatusUpdate.split('T')[0];
+                      const isNewDayInMoved = listCategory === 'PENDING' && hasOutcome && !!prevP?.packageProposal?.outcome && currentUpdateDate !== prevUpdateDate;
 
                       return (
-                        <div 
-                          key={p.id} 
-                          onClick={() => handlePatientSelect(p)} 
-                          className={`p-4 rounded-2xl border transition-all relative ${
-                            selectedPatient?.id === p.id 
-                              ? 'border-hospital-500 bg-hospital-50 shadow-md' 
-                              : isOverdue
-                                ? 'border-rose-300 bg-rose-50/50 hover:border-rose-400 shadow-sm'
-                                : 'border-slate-50 hover:border-slate-200 bg-white'
-                          }`}
-                        >
-                          <div className="flex justify-between mb-2">
-                            <span className="font-bold text-slate-800 text-sm">{p.name}</span>
-                            <div className="flex gap-2 items-center">
-                              {isOverdue && (
-                                <span className="text-[8px] font-black uppercase px-2 py-0.5 rounded-full bg-rose-600 text-white flex items-center gap-1 animate-pulse">
-                                  <AlertCircle className="w-2 h-2" /> OVERDUE
-                                </span>
-                              )}
-                              <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded-full ${p.packageProposal?.outcome === 'Scheduled' ? 'bg-emerald-50 text-emerald-600' : p.packageProposal?.outcome === 'Completed' ? 'bg-teal-50 text-teal-600' : p.packageProposal?.outcome === 'Follow-Up' ? 'bg-blue-50 text-blue-600' : p.packageProposal?.outcome === 'Lost' ? 'bg-rose-50 text-rose-600' : 'bg-amber-50 text-amber-600'}`}>{p.packageProposal?.outcome || 'Pending'}</span>
+                        <React.Fragment key={p.id}>
+                          {isFirstMoved && (
+                            <div className="py-6 px-2 animate-in fade-in duration-500">
+                              <div className="flex items-center gap-2 mb-2">
+                                <div className="h-px bg-emerald-100 flex-1"></div>
+                                <span className="text-[10px] font-black text-emerald-600 uppercase tracking-[0.2em] flex items-center gap-2"><RefreshCcw className="w-3 h-3" /> Done Data (Moved)</span>
+                                <div className="h-px bg-emerald-100 flex-1"></div>
+                              </div>
                             </div>
-                          </div>
-                          <div className="mt-2 text-[9px] text-slate-400 font-black uppercase tracking-widest">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <span>{p.condition}</span>
-                              <span className="w-1 h-1 bg-slate-200 rounded-full"></span>
-                              <div className="flex items-center gap-1">
-                                <span className="text-slate-400 font-black uppercase">Arrived</span>
-                                <span className="text-hospital-600 font-bold">{formatToDDMMYYYY(p.entry_date)}</span>
+                          )}
+                          {(isFirstMoved || isNewDayInMoved) && hasOutcome && (
+                             <div className="px-3 mb-2">
+                               <span className="text-[9px] font-black text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-100 shadow-sm flex items-center gap-2 w-fit">
+                                 <Calendar className="w-3 h-3" /> {formatToDDMMYYYY(currentUpdateDate)}
+                               </span>
+                             </div>
+                          )}
+
+                          <div 
+                            onClick={() => handlePatientSelect(p)} 
+                            className={`p-4 rounded-2xl border transition-all relative ${
+                              selectedPatient?.id === p.id 
+                                ? 'border-hospital-500 bg-hospital-50 shadow-md' 
+                                : isOverdue
+                                  ? 'border-rose-300 bg-rose-50/50 hover:border-rose-400 shadow-sm'
+                                  : hasOutcome && listCategory === 'PENDING'
+                                    ? 'border-emerald-50 bg-emerald-50/30 hover:border-emerald-200'
+                                    : 'border-slate-50 hover:border-slate-200 bg-white'
+                            }`}
+                          >
+                            <div className="flex justify-between mb-2">
+                              <span className="font-bold text-slate-800 text-sm">{p.name}</span>
+                              <div className="flex gap-2 items-center">
+                                {isOverdue && (
+                                  <span className="text-[8px] font-black uppercase px-2 py-0.5 rounded-full bg-rose-600 text-white flex items-center gap-1 animate-pulse">
+                                    <AlertCircle className="w-2 h-2" /> OVERDUE
+                                  </span>
+                                )}
+                                <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded-full shadow-sm border border-transparent ${p.packageProposal?.outcome === 'Scheduled' ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : p.packageProposal?.outcome === 'Completed' ? 'bg-teal-100 text-teal-700 border-teal-200' : p.packageProposal?.outcome === 'Follow-Up' ? 'bg-blue-100 text-blue-700 border-blue-200' : p.packageProposal?.outcome === 'Lost' ? 'bg-rose-100 text-rose-700 border-rose-200' : 'bg-amber-50 text-amber-600'}`}>{p.packageProposal?.outcome || 'Pending Lead'}</span>
                               </div>
                             </div>
                             
-                            {/* Status-specific Date Display */}
-                            {listCategory === 'SCHEDULED' && (
-                              <div className="text-slate-400 font-black mt-1 flex items-center gap-1">
-                                <CalendarClock className="w-3 h-3 text-emerald-500" />
-                                <span>Surgery:</span>
-                                <span className="text-emerald-600 font-black">{formatToDDMMYYYY(p.surgery_date || p.packageProposal?.surgeryDate) || 'NOT SET'}</span>
+                            <div className="mt-2 text-[9px] text-slate-400 font-black uppercase tracking-widest">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span>{p.condition}</span>
+                                <span className="w-1 h-1 bg-slate-200 rounded-full"></span>
+                                
+                                {listCategory === 'PENDING' && hasOutcome ? (
+                                  <div className="flex items-center gap-1 bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-md border border-emerald-100">
+                                    <span className="opacity-70">Moved On:</span>
+                                    <span className="font-bold">{formatToDDMMYYYY(p.status_updated_at || p.updated_at)}</span>
+                                  </div>
+                                ) : (
+                                  <div className="flex items-center gap-1">
+                                    <span className="opacity-70 text-slate-400 uppercase">Arrived:</span>
+                                    <span className="text-hospital-600 font-bold">{formatToDDMMYYYY(p.entry_date)}</span>
+                                  </div>
+                                )}
                               </div>
-                            )}
-                            {listCategory === 'FOLLOWUP' && (
-                              <div className="text-slate-400 font-black mt-1 flex items-center gap-1">
-                                <Clock className={`w-3 h-3 ${isOverdue ? 'text-rose-500' : 'text-blue-500'}`} />
-                                <span>Follow-Up:</span>
-                                <span className={`font-black ${isOverdue ? 'text-rose-600' : 'text-blue-600'}`}>
-                                  {formatToDDMMYYYY(followUpDateVal) || 
-                                   formatToDDMMYYYY(p.doctorAssessment?.tentativeSurgeryDate) || 
-                                   'PENDING'}
-                                </span>
-                              </div>
-                            )}
-                            {(listCategory === 'COMPLETED' || (listCategory === 'PENDING' && p.packageProposal?.outcome === 'Completed')) && (
-                              <div className="text-slate-400 font-black mt-1 flex items-center gap-1">
-                                <BadgeCheck className="w-3 h-3 text-teal-500" />
-                                <span>Completed Date:</span>
-                                <span className="text-teal-600 font-black">{formatToDDMMYYYY(p.completed_surgery || p.packageProposal?.outcomeDate) || 'NOT SET'}</span>
-                              </div>
-                            )}
-                            {listCategory === 'LOST' && (
-                              <div className="text-slate-400 font-black mt-1 flex items-center gap-1">
-                                <Ban className="w-3 h-3 text-rose-500" />
-                                <span>Lost Date:</span>
-                                <span className="text-rose-600 font-black">{formatToDDMMYYYY(p.surgery_lost_date || p.packageProposal?.outcomeDate) || 'NOT SET'}</span>
-                              </div>
-                            )}
+                              
+                              {listCategory === 'SCHEDULED' && (
+                                <div className="text-slate-400 font-black mt-1 flex items-center gap-1">
+                                  <CalendarClock className="w-3 h-3 text-emerald-500" />
+                                  <span>Surgery:</span>
+                                  <span className="text-emerald-600 font-black">{formatToDDMMYYYY(p.surgery_date || p.packageProposal?.surgeryDate) || 'NOT SET'}</span>
+                                </div>
+                              )}
+                              
+                              {listCategory === 'FOLLOWUP' && (
+                                <div className="text-slate-400 font-black mt-1 flex items-center gap-1">
+                                  <Clock className={`w-3 h-3 ${isOverdue ? 'text-rose-500' : 'text-blue-500'}`} />
+                                  <span>Follow-Up:</span>
+                                  <span className={`font-black ${isOverdue ? 'text-rose-600' : 'text-blue-600'}`}>
+                                    {formatToDDMMYYYY(followUpDateVal) || formatToDDMMYYYY(p.doctorAssessment?.tentativeSurgeryDate) || 'PENDING'}
+                                  </span>
+                                </div>
+                              )}
+
+                              {(p.status_updated_at || p.updated_at) && (
+                                  <div className="text-[8px] font-black text-slate-300 uppercase tracking-tighter mt-1.5 flex items-center gap-1">
+                                      <RefreshCcw className="w-2.5 h-2.5" /> Updated: {formatToDateTime(p.status_updated_at || p.updated_at).split(' ')[1]}
+                                  </div>
+                              )}
+                            </div>
                           </div>
-                        </div>
+                        </React.Fragment>
                       );
                     })}
-                    {allPatients.length === 0 && <div className="p-10 text-center text-slate-300 text-[10px] font-black uppercase tracking-widest">No patients found</div>}
+                    {allPatients.length === 0 && (
+                      <div className="p-10 text-center space-y-3">
+                        <Database className="w-12 h-12 text-slate-100 mx-auto" />
+                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-300">No matching records</p>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
@@ -476,7 +548,6 @@ export const PackageTeamDashboard: React.FC = () => {
               <div className={`bg-white rounded-[2rem] shadow-sm border border-slate-100 overflow-hidden ${isSidebarMinimized ? 'lg:col-span-1' : 'lg:col-span-2'} flex flex-col min-h-[500px] lg:h-[750px] transition-all duration-300`}>
                 {selectedPatient ? (
                   <div className="flex flex-col h-full relative">
-                    {/* Restore Directory Button Overlay */}
                     {isSidebarMinimized && (
                       <button 
                         onClick={() => setIsSidebarMinimized(false)}
@@ -488,7 +559,7 @@ export const PackageTeamDashboard: React.FC = () => {
                     )}
 
                     <div className={`p-4 sm:p-6 bg-slate-50 border-b ${isSidebarMinimized ? 'pl-20' : ''}`}>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-7 gap-3">
                         <div className="bg-white border border-indigo-100 p-3 rounded-2xl shadow-sm">
                           <div className="flex items-center gap-1.5 mb-1"><User className="w-3 h-3 text-indigo-500" /><span className="text-[8px] font-black text-indigo-400 uppercase tracking-widest">Name</span></div>
                           <div className="text-sm font-black text-indigo-900 truncate leading-tight">{selectedPatient.name}</div>
@@ -517,6 +588,12 @@ export const PackageTeamDashboard: React.FC = () => {
                         <div className="bg-white border border-purple-100 p-3 rounded-2xl shadow-sm">
                           <div className="flex items-center gap-1.5 mb-1"><Tag className="w-3 h-3 text-purple-500" /><span className="text-[8px] font-black text-purple-400 uppercase tracking-widest">Condition</span></div>
                           <div className="text-sm font-black text-purple-900 truncate leading-tight">{selectedPatient.condition}</div>
+                        </div>
+                        <div className="bg-emerald-50 border border-emerald-100 p-3 rounded-2xl shadow-sm">
+                          <div className="flex items-center gap-1.5 mb-1"><Clock className="w-3 h-3 text-emerald-500" /><span className="text-[8px] font-black text-emerald-400 uppercase tracking-widest">Status Date</span></div>
+                          <div className="text-sm font-black text-emerald-900 truncate leading-tight">
+                            {selectedPatient.status_updated_at ? formatToDDMMYYYY(selectedPatient.status_updated_at) : '---'}
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -751,7 +828,6 @@ export const PackageTeamDashboard: React.FC = () => {
                   </div>
                 ) : (
                   <div className="flex-1 flex flex-col items-center justify-center text-slate-300 p-10 relative">
-                     {/* Restore Directory Button Overlay */}
                      {isSidebarMinimized && (
                       <button 
                         onClick={() => setIsSidebarMinimized(false)}
@@ -761,7 +837,7 @@ export const PackageTeamDashboard: React.FC = () => {
                         <LayoutPanelLeft className="w-5 h-5" />
                       </button>
                     )}
-                    <Briefcase className="w-20 h-20 mb-6" />
+                    <Briefcase className="w-24 h-24 mb-6" />
                     <p className="text-[10px] font-black uppercase tracking-[0.3em] text-center">Select a candidate from the directory</p>
                   </div>
                 )}

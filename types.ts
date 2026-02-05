@@ -1,4 +1,3 @@
-
 export type Role = 'FRONT_OFFICE' | 'DOCTOR' | 'PACKAGE_TEAM' | null;
 
 export enum Gender {
@@ -98,6 +97,8 @@ export interface Patient {
   condition: Condition;
   visitType: 'OPD' | 'Follow Up';
   registeredAt: string;
+  updated_at?: string;
+  status_updated_at?: string;
   entry_date?: string;
   arrivalTime?: string;
   status?: string;
