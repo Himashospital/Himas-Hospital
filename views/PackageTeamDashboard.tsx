@@ -51,13 +51,9 @@ export const PackageTeamDashboard: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [isSidebarMinimized, setIsSidebarMinimized] = useState(false);
 
-  // General Date Filters (Used for Arrival in Pending or native dates in other tabs)
+  // Common Date Filter for both PENDING (Leads) and DONE (Moved) sections
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
-
-  // Specific Moved On Date Filters for "Done Data" in Pending tab
-  const [movedStartDate, setMovedStartDate] = useState(new Date().toISOString().split('T')[0]);
-  const [movedEndDate, setMovedEndDate] = useState(new Date().toISOString().split('T')[0]);
   
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
   const [filter, setFilter] = useState<'ALL' | 'CR1' | 'CR2' | 'CR3' | 'CR4'>('ALL');
@@ -141,7 +137,7 @@ export const PackageTeamDashboard: React.FC = () => {
       if (!p.doctorAssessment?.conversionReadiness?.startsWith(filter)) return false;
     }
 
-    // Filtering Logic based on Section
+    // Advanced Filtering Logic based on Section using Common Date Filter
     if (listCategory === 'PENDING') {
       if (!outcome) {
         // Pending Lead Section: Filter by Arrival Date (startDate/endDate)
@@ -151,11 +147,11 @@ export const PackageTeamDashboard: React.FC = () => {
           if (endDate && filterDate > endDate) return false;
         }
       } else {
-        // Done Data Section: Filter by Moved On Date (status_updated_at)
-        if (movedStartDate || movedEndDate) {
+        // Done Data Section: Filter by Updated Date (status_updated_at) using the same startDate/endDate
+        if (startDate || endDate) {
           const filterDate = p.status_updated_at ? p.status_updated_at.split('T')[0] : '';
-          if (movedStartDate && filterDate < movedStartDate) return false;
-          if (movedEndDate && filterDate > movedEndDate) return false;
+          if (startDate && filterDate < startDate) return false;
+          if (endDate && filterDate > endDate) return false;
         }
       }
     } else {
@@ -331,8 +327,8 @@ export const PackageTeamDashboard: React.FC = () => {
 
   const filterInputClasses = "h-10 w-full bg-slate-50 border border-slate-100 rounded-xl px-3 text-[10px] font-bold focus:ring-2 focus:ring-hospital-500 outline-none transition-all appearance-none";
 
-  const pendingOnlyCount = allPatients.filter(p => !p.packageProposal?.outcome).length;
-  const movedTotalCount = allPatients.filter(p => !!p.packageProposal?.outcome).length;
+  const pendingOnlyCount = patients.filter(p => p.doctorAssessment?.quickCode === SurgeonCode.S1 && !p.packageProposal?.outcome).length;
+  const movedTotalCount = patients.filter(p => p.doctorAssessment?.quickCode === SurgeonCode.S1 && !!p.packageProposal?.outcome).length;
   const todayStr = new Date().toISOString().split('T')[0];
 
   return (
@@ -371,20 +367,11 @@ export const PackageTeamDashboard: React.FC = () => {
             <div className="flex flex-col xl:flex-row justify-between items-center gap-4">
               <div className="flex flex-col sm:flex-row items-center gap-4 w-full xl:w-auto flex-wrap">
                 <div className="flex items-center gap-2">
-                  <span className="text-[9px] font-black uppercase text-slate-400 shrink-0">Arrival From</span>
+                  <span className="text-[9px] font-black uppercase text-slate-400 shrink-0">Filter From</span>
                   <input type="date" className={filterInputClasses + " w-32"} value={startDate} onChange={e => setStartDate(e.target.value)} />
                   <span className="text-[9px] font-black uppercase text-slate-400 shrink-0">To</span>
                   <input type="date" className={filterInputClasses + " w-32"} value={endDate} onChange={e => setEndDate(e.target.value)} />
                 </div>
-                
-                {listCategory === 'PENDING' && (
-                  <div className="flex items-center gap-2 border-l border-slate-200 pl-4 ml-2 animate-in slide-in-from-left-2">
-                    <span className="text-[9px] font-black uppercase text-emerald-500 shrink-0 flex items-center gap-1"><RefreshCcw className="w-3 h-3" /> Moved On From</span>
-                    <input type="date" className={filterInputClasses + " w-32 border-emerald-100 focus:ring-emerald-500"} value={movedStartDate} onChange={e => setMovedStartDate(e.target.value)} />
-                    <span className="text-[9px] font-black uppercase text-slate-400 shrink-0">To</span>
-                    <input type="date" className={filterInputClasses + " w-32 border-emerald-100 focus:ring-emerald-500"} value={movedEndDate} onChange={e => setMovedEndDate(e.target.value)} />
-                  </div>
-                )}
               </div>
 
               <div className="flex items-center gap-3 w-full xl:w-auto justify-end">
@@ -431,10 +418,11 @@ export const PackageTeamDashboard: React.FC = () => {
                     {allPatients.map((p, index) => {
                       const followUpDateVal = p.followup_date || p.packageProposal?.followUpDate;
                       const hasOutcome = !!p.packageProposal?.outcome;
+                      
+                      // Updated isOverdue logic: Highlight past dates in FOLLOWUP section or PENDING section without outcome
                       const isOverdue = followUpDateVal && 
                                       followUpDateVal < todayStr && 
-                                      !hasOutcome && 
-                                      p.packageProposal?.outcome !== 'Lost';
+                                      (listCategory === 'FOLLOWUP' || (!hasOutcome && p.packageProposal?.outcome !== 'Lost'));
 
                       // Section Splitter logic for Pending Tab
                       const prevP = allPatients[index - 1];
