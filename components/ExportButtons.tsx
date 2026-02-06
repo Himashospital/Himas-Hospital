@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Download, Printer, Calendar as CalendarIcon, X, FileSpreadsheet } from 'lucide-react';
-import { Patient, PackageProposal } from '../types';
+import { Patient, PackageProposal, SurgeonCode } from '../types';
 
 const formatDate = (dateString: string | undefined | null): string => {
   if (!dateString) return '';
@@ -16,6 +16,25 @@ const formatDate = (dateString: string | undefined | null): string => {
   }
   
   return dateString;
+};
+
+// Helper to get descriptive status for reports
+const getStatusLabel = (p: Patient): string => {
+  if (p.packageProposal?.outcome) {
+    switch (p.packageProposal.outcome) {
+      case 'Scheduled': return 'Surgery Scheduled';
+      case 'Follow-Up': return 'Follow-Up Surgery';
+      case 'Lost': return 'Surgery Lost';
+      case 'Completed': return 'Surgery Completed';
+    }
+  }
+  if (p.doctorAssessment) {
+    if (p.doctorAssessment.quickCode === SurgeonCode.S1) return 'Package Proposal';
+    if (p.doctorAssessment.quickCode === SurgeonCode.M1) return 'Medication Done';
+    return 'Doctor Done';
+  }
+  if (p.status === 'Arrived') return 'Arrived';
+  return p.visitType === 'Follow Up' ? 'Follow Up' : 'Scheduled';
 };
 
 interface ExportButtonsProps {
@@ -202,12 +221,13 @@ export const ExportButtons: React.FC<ExportButtonsProps> = ({ patients, role, se
       'Source',
       'Condition',
       'Registration Date',
+      'Status',
       'Doctor Assessed', 
       'Surgeon Code', 
       'Proposed Procedure',
       'Pain Severity',
       'Affordability',
-      'Readiness',
+      'Readyiness',
       'Surgery Date',
       'Digital Signature',
       'Clinical Findings & Notes',
@@ -231,7 +251,7 @@ export const ExportButtons: React.FC<ExportButtonsProps> = ({ patients, role, se
       p.source === 'Doctor Recommended' ? `Dr. ${p.sourceDoctorName || 'Recommended'}` : p.source,
       p.condition,
       formatDate(p.entry_date || p.registeredAt),
-      
+      getStatusLabel(p),
       p.doctorAssessment ? 'Yes' : 'No',
       p.doctorAssessment?.quickCode || '',
       p.doctorAssessment?.surgeryProcedure === 'Other' 
