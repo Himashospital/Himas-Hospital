@@ -1,11 +1,13 @@
+
 -- =================================================================
 -- HIMAS HOSPITAL MANAGEMENT DATABASE SCHEMA
--- Version: 3.1 (Transition Tracking Support)
+-- Version: 3.2 (Visit Type Category Support)
 -- =================================================================
 
 -- 1. MIGRATION SCRIPT FOR EXISTING TABLES
 ALTER TABLE public.himas_appointments 
 ADD COLUMN IF NOT EXISTS status_updated_at TIMESTAMPTZ,
+ADD COLUMN IF NOT EXISTS visit_type TEXT, -- Added for New/Revisit persistence
 ADD COLUMN IF NOT EXISTS followup_date DATE,
 ADD COLUMN IF NOT EXISTS surgery_date DATE,
 ADD COLUMN IF NOT EXISTS surgery_lost_date DATE,
@@ -34,7 +36,7 @@ CREATE TABLE IF NOT EXISTS public.himas_appointments (
     hospital_id TEXT DEFAULT 'himas_facility_01',
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW(),
-    status_updated_at TIMESTAMPTZ, -- Tracks when the status moved from Pending
+    status_updated_at TIMESTAMPTZ, 
     name TEXT NOT NULL,
     mobile TEXT NOT NULL,
     age INTEGER,
@@ -50,6 +52,7 @@ CREATE TABLE IF NOT EXISTS public.himas_appointments (
     booking_time TIME,
     arrival_time TIME,
     booking_status TEXT DEFAULT 'Scheduled', 
+    visit_type TEXT, -- Persisted 'New' or 'Revisit'
     is_follow_up BOOLEAN DEFAULT FALSE,
     
     remarks TEXT,

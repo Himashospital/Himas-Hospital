@@ -1,3 +1,4 @@
+
 export type Role = 'FRONT_OFFICE' | 'DOCTOR' | 'PACKAGE_TEAM' | null;
 
 export enum Gender {
@@ -96,6 +97,7 @@ export interface Patient {
   sourceDoctorName?: string;
   condition: Condition;
   visitType: 'OPD' | 'Follow Up';
+  visit_type?: string; // Persisted 'New' or 'Revisit'
   registeredAt: string;
   updated_at?: string;
   status_updated_at?: string;
@@ -129,6 +131,7 @@ export interface Appointment {
   time: string; 
   status: 'Scheduled' | 'Arrived' | 'Cancelled' | 'Follow Up';
   bookingType: 'Follow Up' | 'Scheduled';
+  visit_type?: string; // Persisted 'New' or 'Revisit'
   createdAt: string;
 }
 

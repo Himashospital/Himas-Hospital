@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Download, Printer, Calendar as CalendarIcon, X, FileSpreadsheet } from 'lucide-react';
 import { Patient, PackageProposal, SurgeonCode } from '../types';
@@ -16,6 +17,16 @@ const formatDate = (dateString: string | undefined | null): string => {
   }
   
   return dateString;
+};
+
+// Helper to determine visit type (New/Revisit)
+const getVisitTypeLabel = (p: Patient, allPatients: Patient[]): string => {
+  if (p.visit_type) return p.visit_type;
+  const visits = allPatients
+    .filter(v => v.mobile === p.mobile)
+    .sort((a, b) => new Date(a.registeredAt).getTime() - new Date(b.registeredAt).getTime());
+  if (visits.length > 0 && visits[0].id === p.id) return 'New';
+  return 'Revisit';
 };
 
 // Helper to get descriptive status for reports
@@ -220,6 +231,7 @@ export const ExportButtons: React.FC<ExportButtonsProps> = ({ patients, role, se
       'Insurance Provider',
       'Source',
       'Condition',
+      'Visit Type',
       'Registration Date',
       'Status',
       'Doctor Assessed', 
@@ -250,6 +262,7 @@ export const ExportButtons: React.FC<ExportButtonsProps> = ({ patients, role, se
       p.insuranceName || 'N/A',
       p.source === 'Doctor Recommended' ? `Dr. ${p.sourceDoctorName || 'Recommended'}` : p.source,
       p.condition,
+      getVisitTypeLabel(p, patients),
       formatDate(p.entry_date || p.registeredAt),
       getStatusLabel(p),
       p.doctorAssessment ? 'Yes' : 'No',

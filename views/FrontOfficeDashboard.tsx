@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useHospital } from '../context/HospitalContext';
 import { ExportButtons } from '../components/ExportButtons';
@@ -8,7 +9,7 @@ import {
   Phone, X, CalendarCheck, Tag, Chrome, MessageCircle, Instagram, 
   Facebook, Youtube, Globe, Clock, Users as UsersIcon,
   Share2, History, BadgeInfo, FileText, CreditCard, Clock3, Stethoscope,
-  Filter, FileSpreadsheet, Briefcase, AlertTriangle
+  Filter, FileSpreadsheet, Briefcase, AlertTriangle, RefreshCcw
 } from 'lucide-react';
 
 const formatDate = (dateString: string | undefined | null): string => {
@@ -25,6 +26,9 @@ const formatDate = (dateString: string | undefined | null): string => {
 };
 
 const getHistoryStatus = (p: Patient): string => {
+  if (p.visit_type === 'Revisit' && p.status === 'Arrived' && !p.doctorAssessment) {
+    return 'Revisit';
+  }
   if (p.packageProposal?.outcome) {
     switch (p.packageProposal.outcome) {
       case 'Scheduled': return 'Surgery Scheduled';
@@ -54,11 +58,8 @@ export const FrontOfficeDashboard: React.FC = () => {
   const [step, setStep] = useState(1);
   const [searchTerm, setSearchTerm] = useState('');
   
-  // Date Range Filters for OPD
   const [opdStartDate, setOpdStartDate] = useState(new Date().toISOString().split('T')[0]);
   const [opdEndDate, setOpdEndDate] = useState(new Date().toISOString().split('T')[0]);
-  
-  // Date Range Filters for Appointments
   const [apptStartDate, setApptStartDate] = useState(new Date().toISOString().split('T')[0]);
   const [apptEndDate, setApptEndDate] = useState(new Date().toISOString().split('T')[0]);
 
@@ -70,10 +71,16 @@ export const FrontOfficeDashboard: React.FC = () => {
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [originatingAppointmentId, setOriginatingAppointmentId] = useState<string | null>(null);
 
+  // Revisit Modals State
+  const [revisitPatient, setRevisitPatient] = useState<any>(null);
+  const [showRevisitModal, setShowRevisitModal] = useState(false);
+  const [showRevisitScheduleModal, setShowRevisitScheduleModal] = useState(false);
+  const [revisitScheduleData, setRevisitScheduleData] = useState({ date: new Date().toISOString().split('T')[0], time: '10:00' });
+
   const [formData, setFormData] = useState<Partial<Patient> & { sourceDoctorNotes?: string; sourceOtherDetails?: string }>({
     id: '', name: '', dob: '', gender: undefined, age: undefined,
     mobile: '', occupation: '', hasInsurance: 'No', insuranceName: '',
-    source: '', condition: undefined, visitType: 'OPD',
+    source: '', condition: undefined, visitType: 'OPD', visit_type: '',
     sourceDoctorName: '', sourceDoctorNotes: '', sourceOtherDetails: '',
     entry_date: new Date().toISOString().split('T')[0],
     arrivalTime: new Date().toTimeString().split(' ')[0].substring(0, 5)
@@ -98,11 +105,12 @@ export const FrontOfficeDashboard: React.FC = () => {
     { name: "Other", icon: <PlusCircle className="w-4 h-4 text-slate-400" /> }
   ];
 
-  const statusOptions = ['Arrived', 'Doctor Done', 'Medication Done', 'Package Proposal', 'Surgery Scheduled', 'Follow-Up Surgery', 'Surgery Lost', 'Surgery Completed', 'Scheduled', 'Follow Up'];
+  const statusOptions = ['Arrived', 'Doctor Done', 'Medication Done', 'Package Proposal', 'Surgery Scheduled', 'Follow-Up Surgery', 'Surgery Lost', 'Surgery Completed', 'Scheduled', 'Follow Up', 'Revisit'];
 
   const getStatusClass = (status?: string): string => {
     if (!status) return 'bg-slate-50 text-slate-400';
     const s = status.toLowerCase();
+    if (s === 'revisit') return 'bg-indigo-50 text-indigo-600 border-indigo-100';
     if (s.includes('completed')) return 'bg-teal-50 text-teal-600';
     if (s.includes('scheduled')) return 'bg-emerald-50 text-emerald-600';
     if (s.includes('follow-up')) return 'bg-blue-50 text-blue-600';
@@ -115,8 +123,9 @@ export const FrontOfficeDashboard: React.FC = () => {
     return 'bg-slate-50 text-slate-400';
   };
 
-  const calculateVisitType = (item: any, allPatients: Patient[]): 'New' | 'Revisit' => {
-    if (item.recordType === 'Appointment') return 'New';
+  const calculateVisitType = (item: any, allPatients: Patient[]): string => {
+    if (item.recordType === 'Appointment') return 'Scheduled';
+    if (item.visit_type) return item.visit_type;
     const patientMobile = item.mobile;
     if (!patientMobile) return 'New';
     const visits = allPatients.filter(p => p.mobile === patientMobile).sort((a, b) => new Date(a.registeredAt).getTime() - new Date(b.registeredAt).getTime());
@@ -126,7 +135,7 @@ export const FrontOfficeDashboard: React.FC = () => {
 
   const resetForm = () => { 
     setFormData({ 
-      id: '', name: '', dob: '', gender: undefined, age: undefined, mobile: '', occupation: '', hasInsurance: 'No', insuranceName: '', source: '', condition: undefined, visitType: 'OPD', sourceDoctorName: '', sourceDoctorNotes: '', sourceOtherDetails: '',
+      id: '', name: '', dob: '', gender: undefined, age: undefined, mobile: '', occupation: '', hasInsurance: 'No', insuranceName: '', source: '', condition: undefined, visitType: 'OPD', visit_type: '', sourceDoctorName: '', sourceDoctorNotes: '', sourceOtherDetails: '',
       entry_date: new Date().toISOString().split('T')[0],
       arrivalTime: new Date().toTimeString().split(' ')[0].substring(0, 5)
     }); 
@@ -153,7 +162,7 @@ export const FrontOfficeDashboard: React.FC = () => {
       let sourceOtherDetails = '';
       if (source.startsWith('Other: ')) { sourceOtherDetails = source.substring(7); source = 'Other'; }
       setFormData({ 
-        ...item, source, sourceOtherDetails, visitType: item.visitType || 'OPD', hasInsurance: item.hasInsurance || 'No', insuranceName: item.insuranceName || '', sourceDoctorName, sourceDoctorNotes,
+        ...item, source, sourceOtherDetails, visitType: item.visitType || 'OPD', visit_type: item.visit_type || '', hasInsurance: item.hasInsurance || 'No', insuranceName: item.insuranceName || '', sourceDoctorName, sourceDoctorNotes,
         entry_date: item.entry_date || new Date().toISOString().split('T')[0],
         arrivalTime: item.arrivalTime || new Date().toTimeString().split(' ')[0].substring(0, 5)
       });
@@ -165,7 +174,7 @@ export const FrontOfficeDashboard: React.FC = () => {
 
   const handleArrived = (appt: Appointment) => { 
     setFormData({ 
-      id: '', name: appt.name || '', dob: '', gender: undefined, age: undefined, mobile: appt.mobile || '', occupation: '', hasInsurance: 'No', insuranceName: '', source: appt.source || '', sourceDoctorName: appt.sourceDoctorName || '', condition: appt.condition, visitType: appt.bookingType === 'Follow Up' ? 'Follow Up' : 'OPD',
+      id: '', name: appt.name || '', dob: '', gender: undefined, age: undefined, mobile: appt.mobile || '', occupation: '', hasInsurance: 'No', insuranceName: '', source: appt.source || '', sourceDoctorName: appt.sourceDoctorName || '', condition: appt.condition, visitType: appt.bookingType === 'Follow Up' ? 'Follow Up' : 'OPD', visit_type: appt.visit_type || 'New',
       entry_date: new Date().toISOString().split('T')[0],
       arrivalTime: new Date().toTimeString().split(' ')[0].substring(0, 5)
     }); 
@@ -175,18 +184,83 @@ export const FrontOfficeDashboard: React.FC = () => {
     setShowForm(true); 
   };
 
-  const handleRevisit = async (item: any) => {
+  const handleRevisitClick = (item: any) => {
+    setRevisitPatient(item);
+    setShowRevisitModal(true);
+  };
+
+  const handleRevisitArrived = async () => {
+    if (!revisitPatient) return;
+    const item = revisitPatient;
     const baseId = item.id.split('_V')[0];
     const newVisitId = `${baseId}_V${Date.now()}`;
-    const revisitData: Omit<Patient, 'registeredAt' | 'hospital_id'> = { id: newVisitId, name: item.name, dob: item.dob || null, gender: item.gender || Gender.Other, age: item.age || 0, mobile: item.mobile, occupation: item.occupation || '', condition: item.condition, source: item.source || 'Other', hasInsurance: item.hasInsurance || 'No', insuranceName: item.insuranceName || '', sourceDoctorName: item.sourceDoctorName || '', visitType: 'Follow Up' };
-    try { await addPatient(revisitData); setSearchTerm(item.mobile); setOpdStartDate(new Date().toISOString().split('T')[0]); setOpdEndDate(new Date().toISOString().split('T')[0]); setActiveTab('REGISTRATION'); } catch (error) { alert("Failed to create revisit record."); }
+    const revisitData: Omit<Patient, 'registeredAt' | 'hospital_id'> = { 
+      id: newVisitId, 
+      name: item.name, 
+      dob: item.dob || null, 
+      gender: item.gender || Gender.Other, 
+      age: item.age || 0, 
+      mobile: item.mobile, 
+      occupation: item.occupation || '', 
+      condition: item.condition, 
+      source: item.source || 'Other', 
+      hasInsurance: item.hasInsurance || 'No', 
+      insuranceName: item.insuranceName || '', 
+      sourceDoctorName: item.sourceDoctorName || '', 
+      visitType: 'Follow Up', 
+      visit_type: 'Revisit',
+      entry_date: new Date().toISOString().split('T')[0],
+      arrivalTime: new Date().toTimeString().split(' ')[0].substring(0, 5)
+    };
+    try { 
+      await addPatient(revisitData); 
+      setShowRevisitModal(false);
+      setRevisitPatient(null);
+      setSearchTerm(item.mobile); 
+      setOpdStartDate(new Date().toISOString().split('T')[0]); 
+      setOpdEndDate(new Date().toISOString().split('T')[0]); 
+      setActiveTab('REGISTRATION'); 
+    } catch (error) { 
+      alert("Failed to create revisit record."); 
+    }
+  };
+
+  const handleRevisitScheduleSubmit = async () => {
+    if (!revisitPatient || !revisitScheduleData.date || !revisitScheduleData.time) {
+      alert("Please select date and time.");
+      return;
+    }
+    const item = revisitPatient;
+    const apptData: any = {
+      name: item.name,
+      mobile: item.mobile,
+      source: item.source || 'Other',
+      sourceDoctorName: item.sourceDoctorName || '',
+      condition: item.condition,
+      date: revisitScheduleData.date,
+      time: revisitScheduleData.time,
+      bookingType: 'Scheduled',
+      visit_type: 'Revisit'
+    };
+    
+    try {
+      await addAppointment(apptData);
+      setShowRevisitScheduleModal(false);
+      setRevisitPatient(null);
+      setSearchTerm(item.mobile);
+      setApptStartDate(revisitScheduleData.date);
+      setApptEndDate(revisitScheduleData.date);
+      setActiveTab('APPOINTMENTS');
+    } catch (error) {
+      alert("Failed to schedule revisit.");
+    }
   };
 
   const handleBookingSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const isBasicValid = bookingData.name && bookingData.mobile && bookingData.date && bookingData.time && bookingData.bookingType && bookingData.source && bookingData.condition;
+    const isBasicValid = bookingData.name && bookingData.mobile && bookingData.date && bookingData.time && bookingData.source && bookingData.condition;
     if (!isBasicValid) return alert("Please provide all details.");
-    const payload = { ...bookingData };
+    const payload = { ...bookingData, bookingType: 'Scheduled' }; // Force Scheduled by default as requested
     if (payload.source === 'Other' && payload.sourceOtherDetails) payload.source = `Other: ${payload.sourceOtherDetails}`;
     if (editingId && activeTab === 'APPOINTMENTS') await updateAppointment({ ...payload, id: editingId } as Appointment);
     else await addAppointment(payload as any);
@@ -203,6 +277,11 @@ export const FrontOfficeDashboard: React.FC = () => {
       if (formData.source === 'Doctor Recommended' && !formData.sourceDoctorName) return alert("Please provide the Doctor Name.");
       if (formData.source === 'Other' && !formData.sourceOtherDetails) return alert("Please provide details for 'Other' source.");
       if (formData.hasInsurance === 'Yes' && !formData.insuranceName) return alert("Please provide the Insurance Name.");
+      
+      // Calculate visit type category (New/Revisit) before moving to ID step
+      const isRevisit = patients.some(p => p.mobile === formData.mobile);
+      setFormData(prev => ({ ...prev, visit_type: isRevisit ? 'Revisit' : 'New' }));
+      
       setStep(2); return;
     }
     if (!formData.id) return alert("Case Number is required.");
@@ -244,9 +323,10 @@ export const FrontOfficeDashboard: React.FC = () => {
       recordType: 'Appointment' as const, 
       displayDate: a.date + 'T' + (a.time || '00:00') + ':00', 
       displayEntryDate: a.date, 
-      displayStatus: a.bookingType || 'Scheduled',
+      displayStatus: a.visit_type === 'Revisit' ? 'Revisit' : 'Scheduled',
       age: undefined as any,
-      gender: undefined as any
+      gender: undefined as any,
+      visit_type: a.visit_type || ''
     }))
   ].filter(item => {
     const sTerm = searchTerm.toLowerCase();
@@ -353,6 +433,7 @@ export const FrontOfficeDashboard: React.FC = () => {
                 <option value="ALL">All Visits</option>
                 <option value="New">New</option>
                 <option value="Revisit">Revisit</option>
+                <option value="Scheduled">Scheduled</option>
               </select>
             </div>
             <div className="flex flex-col gap-1.5 w-full xl:col-span-2">
@@ -420,7 +501,9 @@ export const FrontOfficeDashboard: React.FC = () => {
                           <span className={`text-[9px] font-black uppercase px-2 py-1 rounded-lg border shadow-sm ${
                             visitType === 'New' 
                               ? 'bg-teal-50 text-teal-700 border-teal-100' 
-                              : 'bg-orange-50 text-orange-700 border-orange-100'
+                              : visitType === 'Scheduled' 
+                                ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
+                                : 'bg-orange-50 text-orange-700 border-orange-100'
                           }`}>
                             {visitType}
                           </span>
@@ -432,27 +515,20 @@ export const FrontOfficeDashboard: React.FC = () => {
                     <span className="text-[10px] font-black uppercase bg-slate-100 text-slate-600 px-3 py-1.5 rounded-full">{item.condition}</span>
                   </td>
                   <td className="p-5 whitespace-nowrap">
-                    {activeTab === 'APPOINTMENTS' ? (
-                      <select className={`text-[10px] font-black uppercase px-2 py-1 rounded-lg border transition-all ${item.bookingType === 'Follow Up' ? 'bg-blue-50 text-blue-700 border-blue-100' : 'bg-emerald-50 text-emerald-700 border-emerald-100'}`} value={item.bookingType || 'Scheduled'} onChange={(e) => handleBookingTypeChange(item, e.target.value as any)}>
-                        <option value="Scheduled">Scheduled</option>
-                        <option value="Follow Up">Follow Up</option>
-                      </select>
-                    ) : (
-                      <span className={`text-[8px] font-black uppercase px-2.5 py-1.5 rounded-md shadow-sm border border-transparent whitespace-nowrap ${getStatusClass(item.displayStatus || getHistoryStatus(item))}`}>
-                        {item.displayStatus || getHistoryStatus(item)}
-                      </span>
-                    )}
+                    <span className={`text-[8px] font-black uppercase px-2.5 py-1.5 rounded-md shadow-sm border border-transparent whitespace-nowrap ${getStatusClass(item.displayStatus || getHistoryStatus(item))}`}>
+                      {item.displayStatus || getHistoryStatus(item)}
+                    </span>
                   </td>
                   <td className="p-5 text-right whitespace-nowrap">
                     <div className="flex justify-end gap-2 items-center">
                       {(activeTab === 'REGISTRATION' || activeTab === 'GLOBAL_SEARCH') && item.recordType === 'Registration' && (
-                        <button onClick={() => handleRevisit(item)} className="px-3 py-2 bg-indigo-50 text-indigo-700 rounded-xl text-[9px] font-black uppercase hover:bg-indigo-100 transition-all flex items-center gap-1.5 shadow-sm border border-indigo-100"><History className="w-3.5 h-3.5" /> Revisit</button>
+                        <button onClick={() => handleRevisitClick(item)} className="px-3 py-2 bg-indigo-50 text-indigo-700 rounded-xl text-[9px] font-black uppercase hover:bg-indigo-100 transition-all flex items-center gap-1.5 shadow-sm border border-indigo-100"><History className="w-3.5 h-3.5" /> Revisit</button>
                       )}
                       {activeTab === 'APPOINTMENTS' && (
                         <button onClick={() => handleArrived(item)} className="px-5 py-2.5 bg-emerald-500 text-white rounded-xl text-[10px] font-black uppercase hover:bg-emerald-600 shadow-md transition-all flex items-center gap-1.5"><CheckCircle className="w-3.5 h-3.5" /> Arrived</button>
                       )}
                       <button onClick={() => handleEdit(item)} className="p-2 text-slate-300 hover:text-blue-600 transition-colors"><Pencil className="w-4 h-4" /></button>
-                      {item.id !== '---' && (
+                      {item.id !== '---' && activeTab === 'APPOINTMENTS' && (
                         <button onClick={() => setDeleteConfirmId(item.id)} className="p-2 text-slate-200 hover:text-red-500 transition-colors"><Trash2 className="w-4 h-4" /></button>
                       )}
                     </div>
@@ -484,7 +560,6 @@ export const FrontOfficeDashboard: React.FC = () => {
                     <div><label className="block text-[10px] font-black uppercase text-slate-400 mb-2 tracking-widest">Appt Date</label><input required type="date" className="w-full border-b-2 border-slate-100 p-2 text-sm font-bold" value={bookingData.date || ''} onChange={e => setBookingData({...bookingData, date: e.target.value})} /></div>
                     <div><label className="block text-[10px] font-black uppercase text-slate-400 mb-2 tracking-widest">Appt Time</label><input required type="time" className="w-full border-b-2 border-slate-100 p-2 text-sm font-bold" value={bookingData.time || ''} onChange={e => setBookingData({...bookingData, time: e.target.value})} /></div>
                     <div><label className="block text-[10px] font-black uppercase text-slate-400 mb-2 tracking-widest">Lead Source</label><select required className="w-full border-b-2 border-slate-100 p-2 text-sm font-bold bg-white" value={bookingData.source || ''} onChange={e => setBookingData({...bookingData, source: e.target.value})}><option value="">Select Source</option>{sourceConfig.map(s => <option key={s.name} value={s.name}>{s.name}</option>)}</select></div>
-                    <div><label className="block text-[10px] font-black uppercase text-slate-400 mb-2 tracking-widest">Visit Category</label><div className="flex gap-2">{['Scheduled', 'Follow Up'].map(type => (<button key={type} type="button" onClick={() => setBookingData({...bookingData, bookingType: type as any})} className={`flex-1 py-2 rounded-lg border-2 text-[10px] font-black uppercase transition-all ${bookingData.bookingType === type ? 'bg-hospital-600 text-white border-hospital-600 shadow-sm' : 'bg-white text-slate-400 border-slate-100'}`}>{type}</button>))}</div></div>
                     {bookingData.source === 'Doctor Recommended' && (<div className="md:col-span-2 animate-in slide-in-from-top-2 duration-300"><label className="block text-[10px] font-black uppercase text-hospital-600 mb-2 tracking-widest">Doctor Name</label><input required className="w-full text-xl font-bold border-b-2 border-hospital-100 p-2 outline-none focus:border-hospital-500 placeholder-slate-200" value={bookingData.sourceDoctorName || ''} onChange={e => setBookingData({...bookingData, sourceDoctorName: e.target.value})} placeholder="Dr. Enter Name" /></div>)}
                     {bookingData.source === 'Other' && (<div className="md:col-span-2 animate-in slide-in-from-top-2 duration-300"><label className="block text-[10px] font-black uppercase text-hospital-600 mb-2 tracking-widest">Other Details</label><input required className="w-full text-xl font-bold border-b-2 border-hospital-100 p-2 outline-none focus:border-hospital-500 placeholder-slate-200" value={bookingData.sourceOtherDetails || ''} onChange={e => setBookingData({...bookingData, sourceOtherDetails: e.target.value})} placeholder="Enter Details..." /></div>)}
                  </div>
@@ -536,11 +611,56 @@ export const FrontOfficeDashboard: React.FC = () => {
 
       {deleteConfirmId && (
         <div className="fixed inset-0 z-[200] bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200">
-          <div className="bg-white w-full max-w-sm rounded-[2rem] shadow-2xl p-8 border border-slate-100 animate-in zoom-in-95 duration-200">
+          <div className="bg-white w-full max-sm rounded-[2rem] shadow-2xl p-8 border border-slate-100 animate-in zoom-in-95 duration-200">
             <div className="w-16 h-16 bg-rose-50 rounded-2xl flex items-center justify-center mx-auto mb-6"><AlertTriangle className="w-8 h-8 text-rose-600" /></div>
             <h3 className="text-xl font-black text-slate-900 mb-2 uppercase tracking-tight text-center">Confirm Deletion</h3>
             <p className="text-sm text-slate-500 font-medium mb-8 text-center leading-relaxed">Are you sure? This patient data will be <span className="text-rose-600 font-bold">permanently deleted</span>.</p>
             <div className="flex gap-3"><button onClick={() => setDeleteConfirmId(null)} className="flex-1 py-3 text-[10px] font-black uppercase text-slate-500 bg-slate-50 rounded-xl border">No / Cancel</button><button onClick={async () => { if (deleteConfirmId) { await deletePatient(deleteConfirmId); setDeleteConfirmId(null); } }} className="flex-1 py-3 text-[10px] font-black uppercase text-white bg-rose-600 rounded-xl shadow-lg hover:bg-rose-700">Confirm / Yes</button></div>
+          </div>
+        </div>
+      )}
+
+      {/* Revisit Choice Modal */}
+      {showRevisitModal && revisitPatient && (
+        <div className="fixed inset-0 z-[200] bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-white w-full max-w-md rounded-[2rem] shadow-2xl p-8 border border-slate-100 animate-in zoom-in-95 duration-200">
+            <div className="w-16 h-16 bg-indigo-50 rounded-2xl flex items-center justify-center mx-auto mb-6"><History className="w-8 h-8 text-indigo-600" /></div>
+            <h3 className="text-xl font-black text-slate-900 mb-2 uppercase tracking-tight text-center">Revisit Action</h3>
+            <p className="text-sm text-slate-500 font-medium mb-8 text-center leading-relaxed">Choose an action for <span className="text-indigo-600 font-bold">{revisitPatient.name}</span></p>
+            <div className="flex flex-col gap-3">
+              <button onClick={handleRevisitArrived} className="w-full py-4 text-[10px] font-black uppercase text-white bg-emerald-600 rounded-xl shadow-lg hover:bg-emerald-700 transition-all flex items-center justify-center gap-2">
+                <CheckCircle className="w-4 h-4" /> Patient Arrived Now
+              </button>
+              <button onClick={() => { setShowRevisitModal(false); setShowRevisitScheduleModal(true); }} className="w-full py-4 text-[10px] font-black uppercase text-white bg-indigo-600 rounded-xl shadow-lg hover:bg-indigo-700 transition-all flex items-center justify-center gap-2">
+                <Calendar className="w-4 h-4" /> Schedule Appointment
+              </button>
+              <button onClick={() => { setShowRevisitModal(false); setRevisitPatient(null); }} className="w-full py-3 text-[10px] font-black uppercase text-slate-400 hover:text-slate-600 transition-colors">Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Revisit Schedule Modal */}
+      {showRevisitScheduleModal && revisitPatient && (
+        <div className="fixed inset-0 z-[200] bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-white w-full max-w-md rounded-[2rem] shadow-2xl p-8 border border-slate-100 animate-in zoom-in-95 duration-200">
+            <div className="w-16 h-16 bg-blue-50 rounded-2xl flex items-center justify-center mx-auto mb-6"><CalendarCheck className="w-8 h-8 text-blue-600" /></div>
+            <h3 className="text-xl font-black text-slate-900 mb-2 uppercase tracking-tight text-center">Schedule Appointment</h3>
+            <p className="text-sm text-slate-500 font-medium mb-8 text-center leading-relaxed">For <span className="text-blue-600 font-bold">{revisitPatient.name}</span></p>
+            <div className="space-y-4 mb-8">
+              <div>
+                <label className="block text-[10px] font-black uppercase text-slate-400 mb-2 tracking-widest">Date</label>
+                <input type="date" className="w-full bg-slate-50 border-2 border-slate-100 rounded-xl p-3 text-sm font-bold outline-none focus:border-blue-500 transition-all" value={revisitScheduleData.date} onChange={e => setRevisitScheduleData({...revisitScheduleData, date: e.target.value})} />
+              </div>
+              <div>
+                <label className="block text-[10px] font-black uppercase text-slate-400 mb-2 tracking-widest">Time</label>
+                <input type="time" className="w-full bg-slate-50 border-2 border-slate-100 rounded-xl p-3 text-sm font-bold outline-none focus:border-blue-500 transition-all" value={revisitScheduleData.time} onChange={e => setRevisitScheduleData({...revisitScheduleData, time: e.target.value})} />
+              </div>
+            </div>
+            <div className="flex gap-3">
+              <button onClick={() => { setShowRevisitScheduleModal(false); setShowRevisitModal(true); }} className="flex-1 py-4 text-[10px] font-black uppercase text-slate-500 bg-slate-50 rounded-xl border">Back</button>
+              <button onClick={handleRevisitScheduleSubmit} className="flex-[2] py-4 px-8 text-[10px] font-black uppercase text-white bg-blue-600 rounded-xl shadow-lg hover:bg-blue-700 transition-all">Confirm Schedule</button>
+            </div>
           </div>
         </div>
       )}

@@ -110,6 +110,7 @@ const mapRowToPatient = (row: any): Patient => {
     sourceDoctorName: row.source_doctor_name || '',
     condition: (row.condition || Condition.Other) as Condition,
     visitType: row.is_follow_up ? 'Follow Up' : 'OPD',
+    visit_type: row.visit_type || '',
     registeredAt: row.created_at || new Date().toISOString(),
     updated_at: row.updated_at || row.created_at || new Date().toISOString(),
     status_updated_at: row.status_updated_at || null,
@@ -152,7 +153,6 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
     const url = process.env.VITE_APPSCRIPT_URL;
     if (!url) return;
     try {
-      // Fire and forget, using no-cors to avoid GAS redirect issues on POST
       fetch(url, {
         method: 'POST',
         body: JSON.stringify(patient),
@@ -197,13 +197,14 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
           hospital_id: r.hospital_id || '',
           name: r.name || '',
           source: r.source || '',
-          sourceDoctorName: r.source_doctor_name || '',
+          source_doctor_name: r.source_doctor_name || '',
           condition: (r.condition || Condition.Other) as Condition,
           mobile: r.mobile || '',
           date: r.entry_date || '',
           time: r.booking_time || '',
           status: r.booking_status || 'Scheduled',
           bookingType: r.booking_status === 'Follow Up' ? 'Follow Up' : 'Scheduled',
+          visit_type: r.visit_type || '',
           createdAt: r.created_at || new Date().toISOString()
         }));
       setAppointments(appointmentLeads as Appointment[]);
@@ -236,6 +237,7 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
         source_doctor_name: patientData.sourceDoctorName,
         condition: patientData.condition,
         is_follow_up: patientData.visitType === 'Follow Up',
+        visit_type: patientData.visit_type || '',
         has_insurance: patientData.hasInsurance,
         insurance_name: patientData.insuranceName,
         booking_status: 'Arrived',
@@ -248,9 +250,7 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
       const { error } = await supabase.from('himas_appointments').insert(dbRecord);
       if (error) throw error;
       
-      // Sync to Sheets
       syncToSheets({ ...patientData, registeredAt: dbRecord.updated_at, status: 'Arrived' });
-      
       await refreshData();
       setSaveStatus('saved');
     } catch (err) {
@@ -270,7 +270,6 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
       let completedSurgeryVal = null;
       let remarksVal = null;
       
-      // Determine status transition timestamp
       const oldOutcome = existingPatient?.packageProposal?.outcome;
       const newOutcome = patient.packageProposal?.outcome;
       let statusUpdatedAtVal = existingPatient?.status_updated_at;
@@ -324,16 +323,15 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
         source: patient.source,
         condition: patient.condition,
         is_follow_up: patient.visitType === 'Follow Up',
+        visit_type: patient.visit_type || existingPatient?.visit_type || '',
         has_insurance: patient.hasInsurance,
         insurance_name: patient.insuranceName,
-        // Fixed: Property patient.source_doctor_name was replaced with camelCase version patient.sourceDoctorName as defined in the Patient interface
         source_doctor_name: patient.sourceDoctorName,
         entry_date: nullify(patient.entry_date) || new Date().toISOString().split('T')[0],
         arrival_time: nullify(patient.arrivalTime) || new Date().toTimeString().split(' ')[0],
         booking_status: patient.status || 'Arrived',
         package_proposal: dbPackageProposal,
         doctor_assessment: patient.doctorAssessment || null,
-        
         remarks: remarksVal,
         follow_up_date: followUpDateVal,
         followup_date: followUpDateVal,
@@ -347,9 +345,7 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
       const { error } = await supabase.from('himas_appointments').update(updateData).eq('id', targetId);
       if (error) throw error;
       
-      // Sync to Sheets
       syncToSheets(patient);
-      
       await refreshData();
       setSaveStatus('saved');
     } catch (err) {
@@ -385,6 +381,7 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
             source_doctor_name: patientData.sourceDoctorName,
             condition: patientData.condition,
             is_follow_up: patientData.visitType === 'Follow Up',
+            visit_type: patientData.visit_type || '',
             has_insurance: patientData.hasInsurance,
             insurance_name: patientData.insuranceName,
             booking_status: 'Arrived',
@@ -398,9 +395,7 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
         if (insertError) throw insertError;
         const { error: deleteError } = await supabase.from('himas_appointments').delete().eq('id', appointmentId);
         
-        // Sync to Sheets
         syncToSheets({ ...patientData, registeredAt: dbRecord.updated_at, status: 'Arrived' });
-
         await refreshData();
         setSaveStatus('saved');
     } catch (err) {
@@ -428,9 +423,7 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
             .eq('id', patientId);
         if (error) throw error;
 
-        // Sync to Sheets
         syncToSheets({ ...patient, doctorAssessment: updatedAssessment });
-
         await refreshData();
         setSaveStatus('saved');
     } catch (err) {
@@ -460,6 +453,7 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
         booking_time: nullify(appointmentData.time),
         is_follow_up: appointmentData.bookingType === 'Follow Up',
         booking_status: appointmentData.bookingType || 'Scheduled',
+        visit_type: (appointmentData as any).visit_type || '',
         hospital_id: 'himas_facility_01',
         updated_at: new Date().toISOString()
       };
@@ -485,6 +479,7 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
         booking_time: nullify(appointment.time),
         booking_status: appointment.bookingType, 
         is_follow_up: appointment.bookingType === 'Follow Up',
+        visit_type: appointment.visit_type || '',
         updated_at: new Date().toISOString()
       };
       const { error } = await supabase.from('himas_appointments').update(updateData).eq('id', appointment.id);
