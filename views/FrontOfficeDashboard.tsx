@@ -260,7 +260,7 @@ export const FrontOfficeDashboard: React.FC = () => {
     e.preventDefault();
     const isBasicValid = bookingData.name && bookingData.mobile && bookingData.date && bookingData.time && bookingData.source && bookingData.condition;
     if (!isBasicValid) return alert("Please provide all details.");
-    const payload = { ...bookingData, bookingType: 'Scheduled' }; // Force Scheduled by default as requested
+    const payload = { ...bookingData, bookingType: 'Scheduled' }; 
     if (payload.source === 'Other' && payload.sourceOtherDetails) payload.source = `Other: ${payload.sourceOtherDetails}`;
     if (editingId && activeTab === 'APPOINTMENTS') await updateAppointment({ ...payload, id: editingId } as Appointment);
     else await addAppointment(payload as any);
@@ -278,18 +278,27 @@ export const FrontOfficeDashboard: React.FC = () => {
       if (formData.source === 'Other' && !formData.sourceOtherDetails) return alert("Please provide details for 'Other' source.");
       if (formData.hasInsurance === 'Yes' && !formData.insuranceName) return alert("Please provide the Insurance Name.");
       
-      // Calculate visit type category (New/Revisit) before moving to ID step
       const isRevisit = patients.some(p => p.mobile === formData.mobile);
       setFormData(prev => ({ ...prev, visit_type: isRevisit ? 'Revisit' : 'New' }));
       
       setStep(2); return;
     }
+    
+    // Step 2 logic or step 1 edit logic
     if (!formData.id) return alert("Case Number is required.");
     const dataToSave = { ...formData };
     if (dataToSave.source === 'Doctor Recommended' && dataToSave.sourceDoctorName) dataToSave.sourceDoctorName = dataToSave.sourceDoctorNotes ? `${dataToSave.sourceDoctorName} (Notes: ${dataToSave.sourceDoctorNotes})` : dataToSave.sourceDoctorName;
     if (dataToSave.source === 'Other' && dataToSave.sourceOtherDetails) dataToSave.source = `Other: ${dataToSave.sourceOtherDetails}`;
-    if (editingId) { const originalPatient = patients.find(p => p.id === editingId); if (originalPatient) await updatePatient(editingId, { ...originalPatient, ...dataToSave as Patient }); }
-    else { if (patients.some(p => p.id === formData.id)) return alert("File Number already exists."); if (originatingAppointmentId) await convertAppointment(originatingAppointmentId, dataToSave as any); else await addPatient(dataToSave as any); }
+    
+    if (editingId) { 
+      const originalPatient = patients.find(p => p.id === editingId); 
+      if (originalPatient) await updatePatient(editingId, { ...originalPatient, ...dataToSave as Patient }); 
+    }
+    else { 
+      if (patients.some(p => p.id === formData.id)) return alert("File Number already exists."); 
+      if (originatingAppointmentId) await convertAppointment(originatingAppointmentId, dataToSave as any); 
+      else await addPatient(dataToSave as any); 
+    }
     setShowForm(false); resetForm();
   };
 
@@ -479,7 +488,12 @@ export const FrontOfficeDashboard: React.FC = () => {
                       <div className="font-mono font-black text-slate-500 flex items-center gap-2"><Clock className="w-4 h-4 text-hospital-400" /> {item.time}</div>
                     ) : (
                       <div className="flex flex-col">
-                        <span className="font-mono font-black text-slate-500">{item.id.split('_V')[0]}</span>
+                        <button 
+                          onClick={() => handleEdit(item)}
+                          className="font-mono font-black text-slate-500 hover:text-hospital-600 transition-colors text-left"
+                        >
+                          {item.id.split('_V')[0]}
+                        </button>
                         <span className="text-[10px] text-slate-400 font-bold uppercase mt-1">{formatDate(item.entry_date || item.displayEntryDate)}</span>
                       </div>
                     )}
@@ -586,6 +600,23 @@ export const FrontOfficeDashboard: React.FC = () => {
                 <form onSubmit={handleSubmit} className="max-w-3xl mx-auto space-y-12">
                   {step === 1 ? (
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-12 gap-y-8">
+                       {editingId && (
+                        <div className="sm:col-span-2 bg-hospital-50/50 p-6 rounded-[2rem] border border-hospital-100 mb-4 animate-in slide-in-from-top-2">
+                            <label className="block text-[10px] font-black uppercase text-hospital-600 mb-3 tracking-widest">Edit File ID / Case Number</label>
+                            <div className="flex items-center gap-4">
+                                <div className="bg-hospital-100 p-3 rounded-xl">
+                                    <Tag className="w-5 h-5 text-hospital-600" />
+                                </div>
+                                <input 
+                                    className="flex-1 bg-transparent text-2xl font-black text-slate-900 outline-none uppercase placeholder-slate-200"
+                                    value={formData.id || ''}
+                                    onChange={e => setFormData({...formData, id: e.target.value.toUpperCase().trim()})}
+                                    placeholder="HMS-000"
+                                />
+                            </div>
+                            <p className="text-[9px] font-bold text-slate-400 mt-3 uppercase tracking-tighter">Warning: This updates the unique patient identifier across the system.</p>
+                        </div>
+                       )}
                        <div className="sm:col-span-2"><label className="block text-[10px] font-black uppercase text-slate-500 mb-2">Full Name</label><input required className="w-full text-2xl sm:text-3xl font-black border-b-4 border-slate-100 bg-slate-50/30 p-2 outline-none focus:border-hospital-500" value={formData.name || ''} onChange={e => setFormData({...formData, name: e.target.value})} placeholder="Patient Name" /></div>
                        <div><label className="block text-[10px] font-black uppercase text-slate-500 mb-2">Age</label><input type="number" required className="w-full text-xl font-bold border-b-2 border-slate-100 bg-slate-50/30 p-2 outline-none" value={formData.age ?? ''} onChange={e => setFormData({...formData, age: parseInt(e.target.value, 10) || undefined})} /></div>
                        <div><label className="block text-[10px] font-black uppercase text-slate-500 mb-2">Gender</label><div className="flex gap-2 p-1 bg-slate-100 rounded-xl">{Object.values(Gender).map(g => (<button key={g} type="button" onClick={() => setFormData({...formData, gender: g as Gender})} className={`flex-1 py-2 rounded-lg text-[10px] font-black uppercase ${formData.gender === g ? 'bg-hospital-600 text-white shadow' : 'text-slate-500'}`}>{g}</button>))}</div></div>
@@ -603,7 +634,7 @@ export const FrontOfficeDashboard: React.FC = () => {
                   )}
                 </form>
               </div>
-              <footer className="p-6 sm:p-8 border-t flex justify-between items-center bg-slate-50/30"><button onClick={() => step === 2 ? setStep(1) : setShowForm(false)} className="px-6 py-4 text-xs font-black uppercase text-slate-400">{step === 2 ? 'Back' : 'Cancel'}</button><button onClick={handleSubmit} className="px-8 sm:px-14 py-5 bg-hospital-600 text-white rounded-2xl font-black text-xs uppercase shadow-xl transition-all">{step === 1 ? 'Next' : 'Save'}</button></footer>
+              <footer className="p-6 sm:p-8 border-t flex justify-between items-center bg-slate-50/30"><button onClick={() => step === 2 ? setStep(1) : setShowForm(false)} className="px-6 py-4 text-xs font-black uppercase text-slate-400">{step === 2 ? 'Back' : 'Cancel'}</button><button onClick={handleSubmit} className="px-8 sm:px-14 py-5 bg-hospital-600 text-white rounded-2xl font-black text-xs uppercase shadow-xl transition-all">{step === 1 && !editingId ? 'Next' : 'Save'}</button></footer>
             </div>
           </div>
         </div>

@@ -313,7 +313,14 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
         };
       }
 
+      // Sync internal patient_id with potential new primary ID
+      const updatedAssessment = patient.doctorAssessment ? {
+        ...patient.doctorAssessment,
+        patient_id: patient.id
+      } : null;
+
       const updateData = {
+        id: patient.id, // Explicitly include id to support primary key updates
         name: patient.name,
         dob: nullify(patient.dob),
         age: patient.age,
@@ -328,10 +335,10 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
         insurance_name: patient.insuranceName,
         source_doctor_name: patient.sourceDoctorName,
         entry_date: nullify(patient.entry_date) || new Date().toISOString().split('T')[0],
-        arrival_time: nullify(patient.arrivalTime) || new Date().toTimeString().split(' ')[0],
+        arrival_time: nullify(patient.arrivalTime) || new Date().toTimeString().split(' ')[0].substring(0, 5),
         booking_status: patient.status || 'Arrived',
         package_proposal: dbPackageProposal,
-        doctor_assessment: patient.doctorAssessment || null,
+        doctor_assessment: updatedAssessment,
         remarks: remarksVal,
         follow_up_date: followUpDateVal,
         followup_date: followUpDateVal,
@@ -386,7 +393,7 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
             insurance_name: patientData.insuranceName,
             booking_status: 'Arrived',
             entry_date: patientData.entry_date || new Date().toISOString().split('T')[0],
-            arrival_time: patientData.arrivalTime || new Date().toTimeString().split(' ')[0],
+            arrival_time: patientData.arrivalTime || new Date().toTimeString().split(' ')[0].substring(0, 5),
             hospital_id: 'himas_facility_01',
             updated_at: new Date().toISOString()
         };

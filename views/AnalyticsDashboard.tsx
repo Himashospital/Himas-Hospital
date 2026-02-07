@@ -52,37 +52,50 @@ export const AnalyticsDashboard: React.FC = () => {
   // Memoized stats with corrected logic for accurate counts
   const stats = useMemo(() => {
     /**
-     * Logic for OPD Flow, New, and Revisit:
-     * 1. Status must NOT be 'Scheduled' (those are leads, not arrivals).
-     * 2. visit_type should be cleaned of whitespace.
+     * LOGIC REFINEMENT (Strict Requirements):
+     * 1. New Patients: Strictly Visit Type = 'New' (Arrived only)
+     * 2. Revisit Count: Strictly Visit Type = 'Revisit' (Arrived only)
+     * 3. OPD Flow: Sum of New + Revisit
+     * 4. Not Arrived: Strictly Status = 'Scheduled' (Includes all VT)
      */
-    const validOpdPatients = filteredPatientsBase.filter(p => {
-      const status = (p.status || '').trim();
-      if (status === 'Scheduled') return false;
-      
+    
+    // Arrival pool: Anyone who isn't 'Scheduled'
+    const arrivedPatients = filteredPatientsBase.filter(p => {
+      const status = (p.status || '').trim().toLowerCase();
+      return status !== 'scheduled';
+    });
+
+    const newPatients = arrivedPatients.filter(p => 
+      (p.visit_type || '').trim().toLowerCase() === 'new'
+    );
+
+    const revisitPatients = arrivedPatients.filter(p => 
+      (p.visit_type || '').trim().toLowerCase() === 'revisit'
+    );
+    
+    // OPD Flow is strictly New + Revisit arrivals
+    const opdFlowTotal = newPatients.length + revisitPatients.length;
+
+    // Filter valid dataset for source analytics to match the header logic (New + Revisit arrivals)
+    const validDataset = arrivedPatients.filter(p => {
       const vt = (p.visit_type || '').trim().toLowerCase();
-      // Only include valid arrival categories
       return vt === 'new' || vt === 'revisit';
     });
 
-    const newPatients = validOpdPatients.filter(p => p.visit_type?.trim().toLowerCase() === 'new');
-    const revisitPatients = validOpdPatients.filter(p => p.visit_type?.trim().toLowerCase() === 'revisit');
-    
-    // OPD Flow = Sum of actual New + Revisit arrivals
-    const opdFlowTotal = newPatients.length + revisitPatients.length;
-
     // Derived counts for funnel and snapshot
-    const completedPatients = validOpdPatients.filter(p => p.packageProposal?.outcome === 'Completed');
+    const completedPatients = validDataset.filter(p => p.packageProposal?.outcome === 'Completed');
     const totalRevenue = completedPatients.reduce((sum, p) => {
       const amt = parseInt(p.packageProposal?.packageAmount?.replace(/,/g, '') || '0', 10);
       return sum + amt;
     }, 0);
 
     const surgeryCompletedCount = completedPatients.length;
-    const leads = validOpdPatients.filter(p => p.doctorAssessment?.quickCode === SurgeonCode.S1).length;
+    const leads = validDataset.filter(p => p.doctorAssessment?.quickCode === SurgeonCode.S1).length;
     
-    // Not Arrived = Only records in appointments collection with Status = Scheduled
-    const notArrivedCount = filteredAppts.filter(a => a.status === 'Scheduled').length;
+    // Not Arrived = ONLY Status = Scheduled (Includes all VT)
+    const notArrivedCount = filteredAppts.filter(a => 
+      (a.status || '').trim().toLowerCase() === 'scheduled'
+    ).length;
 
     return {
       totalPatients: opdFlowTotal, 
@@ -93,11 +106,11 @@ export const AnalyticsDashboard: React.FC = () => {
       newPatients: newPatients.length,
       notArrived: notArrivedCount,
       conversionRate: leads > 0 ? ((surgeryCompletedCount / leads) * 100).toFixed(1) : '0',
-      doctorPending: validOpdPatients.filter(p => !p.doctorAssessment).length,
-      assessed: validOpdPatients.filter(p => !!p.doctorAssessment).length,
-      inCounseling: validOpdPatients.filter(p => p.doctorAssessment?.quickCode === SurgeonCode.S1 && !p.packageProposal?.outcome).length,
-      followUps: validOpdPatients.filter(p => p.packageProposal?.outcome === 'Follow-Up').length,
-      validDataset: validOpdPatients
+      doctorPending: validDataset.filter(p => !p.doctorAssessment).length,
+      assessed: validDataset.filter(p => !!p.doctorAssessment).length,
+      inCounseling: validDataset.filter(p => p.doctorAssessment?.quickCode === SurgeonCode.S1 && !p.packageProposal?.outcome).length,
+      followUps: validDataset.filter(p => p.packageProposal?.outcome === 'Follow-Up').length,
+      validDataset: validDataset
     };
   }, [filteredPatientsBase, filteredAppts]);
 
@@ -128,8 +141,10 @@ export const AnalyticsDashboard: React.FC = () => {
       
       const vt = (p.visit_type || '').trim().toLowerCase();
       sourcesMap[s].totalPatients++;
-      if (vt === 'new') sourcesMap[s].newPatients++;
-      else sourcesMap[s].revisitPatients++;
+      
+      // Matching header logic for New/Revisit categorization
+      if (vt === 'revisit') sourcesMap[s].revisitPatients++;
+      else sourcesMap[s].newPatients++;
 
       if (p.packageProposal?.outcome === 'Completed') {
         const rev = parseInt(p.packageProposal.packageAmount?.replace(/,/g, '') || '0', 10);
@@ -245,11 +260,11 @@ export const AnalyticsDashboard: React.FC = () => {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6">
         {[
           { label: 'OPD Flow', val: stats.totalPatients, icon: Users, color: 'indigo', detail: `${stats.newPatients} New • ${stats.revisits} Revisit` },
-          { label: 'New Patients', val: stats.newPatients, icon: UserPlus, color: 'sky', detail: 'Visit Type = New (Strictly Arrived)' },
-          { label: 'Revisit Count', val: stats.revisits, icon: RefreshCw, color: 'blue', detail: 'Visit Type = Revisit (Strictly Arrived)' },
-          { label: 'Not Arrived', val: stats.notArrived, icon: UserX, color: 'slate', detail: 'Status = Scheduled Leads' },
-          { label: 'Surgery Completed', val: stats.conversions, icon: Target, color: 'emerald', detail: `${stats.conversionRate}% Completion rate` },
-          { label: 'Total Surgery Revenue', val: `₹${stats.revenue.toLocaleString()}`, icon: Banknote, color: 'amber', detail: 'Realized revenue (All Sources)' }
+          { label: 'New Patients', val: stats.newPatients, icon: UserPlus, color: 'sky', detail: 'Strictly Visit Type = New' },
+          { label: 'Revisit Count', val: stats.revisits, icon: RefreshCw, color: 'blue', detail: 'Strictly Visit Type = Revisit' },
+          { label: 'Not Arrived', val: stats.notArrived, icon: UserX, color: 'slate', detail: 'Status = Scheduled' },
+          { label: 'Surgery Completed', val: stats.conversions, icon: Target, color: 'emerald', detail: `${stats.conversionRate}% Conversion Rate` },
+          { label: 'Total Revenue', val: `₹${stats.revenue.toLocaleString()}`, icon: Banknote, color: 'amber', detail: 'From Completed Surgeries' }
         ].map((card, idx) => (
           <div key={idx} className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all group">
             <div className="flex justify-between items-start mb-4">
@@ -328,7 +343,7 @@ export const AnalyticsDashboard: React.FC = () => {
               <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-4">Appointment Breakdown (All Sources)</div>
               <div className="space-y-3">
                  {[
-                   { label: 'Scheduled', count: filteredAppts.filter(a => a.status === 'Scheduled').length, color: 'bg-emerald-500' },
+                   { label: 'Scheduled', count: filteredAppts.filter(a => (a.status || '').toLowerCase() === 'scheduled').length, color: 'bg-emerald-500' },
                    { label: 'Follow Ups', count: filteredAppts.filter(a => a.bookingType === 'Follow Up').length, color: 'bg-blue-500' }
                  ].map((stat, idx) => (
                    <div key={idx} className="flex justify-between items-center text-[10px] font-bold uppercase">
