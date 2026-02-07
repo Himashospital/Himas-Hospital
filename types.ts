@@ -1,5 +1,5 @@
 
-export type Role = 'FRONT_OFFICE' | 'DOCTOR' | 'PACKAGE_TEAM' | null;
+export type Role = 'FRONT_OFFICE' | 'DOCTOR' | 'PACKAGE_TEAM' | 'ANALYTICS' | null;
 
 export enum Gender {
   Male = 'Male',

@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { HospitalProvider, useHospital } from './context/HospitalContext';
 import { Layout } from './components/Layout';
@@ -5,6 +6,7 @@ import { Login } from './components/Login';
 import { FrontOfficeDashboard } from './views/FrontOfficeDashboard';
 import { DoctorDashboard } from './views/DoctorDashboard';
 import { PackageTeamDashboard } from './views/PackageTeamDashboard';
+import { AnalyticsDashboard } from './views/AnalyticsDashboard';
 
 const MainApp: React.FC = () => {
   const { currentUserRole } = useHospital();
@@ -21,6 +23,8 @@ const MainApp: React.FC = () => {
         return <DoctorDashboard />;
       case 'PACKAGE_TEAM':
         return <PackageTeamDashboard />;
+      case 'ANALYTICS':
+        return <AnalyticsDashboard />;
       default:
         return <div>Unknown Role</div>;
     }

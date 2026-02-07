@@ -1,6 +1,7 @@
+
 import React from 'react';
 import { useHospital } from '../context/HospitalContext';
-import { LogOut, Activity, User, Briefcase, FileText, Menu, X, Cloud, Check, Loader2, AlertCircle, RefreshCw } from 'lucide-react';
+import { LogOut, Activity, User, Briefcase, FileText, Menu, X, Cloud, Check, Loader2, AlertCircle, RefreshCw, BarChart3 } from 'lucide-react';
 
 export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { currentUserRole, setCurrentUserRole, saveStatus, refreshData, isLoading } = useHospital();
@@ -17,6 +18,7 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
       case 'FRONT_OFFICE': return 'Front Office';
       case 'DOCTOR': return 'Doctor Panel';
       case 'PACKAGE_TEAM': return 'Counseling Packages';
+      case 'ANALYTICS': return 'Analytics Hub';
       default: return '';
     }
   };
@@ -26,6 +28,7 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
       case 'FRONT_OFFICE': return <User className="w-6 h-6" />;
       case 'DOCTOR': return <Activity className="w-6 h-6" />;
       case 'PACKAGE_TEAM': return <Briefcase className="w-6 h-6" />;
+      case 'ANALYTICS': return <BarChart3 className="w-6 h-6" />;
       default: return <FileText className="w-6 h-6" />;
     }
   };
