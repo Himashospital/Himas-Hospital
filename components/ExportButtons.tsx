@@ -244,6 +244,7 @@ export const ExportButtons: React.FC<ExportButtonsProps> = ({ patients, role, se
       'Digital Signature',
       'Clinical Findings & Notes',
       'Proposal Created', 
+      'Proposal Stage',
       'Decision Pattern',
       'Objection',
       'Strategy',
@@ -278,6 +279,7 @@ export const ExportButtons: React.FC<ExportButtonsProps> = ({ patients, role, se
       p.doctorAssessment?.notes || '',
 
       p.packageProposal ? 'Yes' : 'No',
+      p.packageProposal?.proposalStage || '',
       p.packageProposal?.decisionPattern || '',
       p.packageProposal?.objectionIdentified || '',
       p.packageProposal?.counselingStrategy || '',

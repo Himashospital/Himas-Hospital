@@ -84,6 +84,7 @@ const mapRowToPatient = (row: any): Patient => {
       counselingStrategy: dbProposal?.counselingStrategy || '',
       followUpDate: row.followup_date || row.follow_up_date || dbProposal?.followUpDate || '',
       proposalCreatedAt: dbProposal?.proposalCreatedAt || new Date().toISOString(),
+      proposalStage: dbProposal?.proposalStage || undefined,
     };
   }
   
@@ -310,6 +311,7 @@ export const HospitalProvider: React.FC<{ children: ReactNode }> = ({ children }
           postOpFollowUpCount: nullify(uiProposal.postFollowUpCount),
           packageAmount: uiProposal.packageAmount ? parseInt(uiProposal.packageAmount.replace(/,/g, ''), 10) : null,
           equipment: uiProposal.equipment,
+          proposalStage: nullify(uiProposal.proposalStage),
         };
       }
 

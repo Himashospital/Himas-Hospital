@@ -80,6 +80,7 @@ export interface PackageProposal {
   outcome?: ProposalOutcome;
   outcomeDate?: string;
   lostReason?: string;
+  proposalStage?: string;
 }
 
 export interface Patient {

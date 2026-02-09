@@ -1,9 +1,10 @@
+
 import React, { useState, useEffect } from 'react';
 import { useHospital } from '../context/HospitalContext';
 import { ExportButtons } from '../components/ExportButtons';
 import { Patient, PackageProposal, Role, SurgeonCode, ProposalOutcome } from '../types';
 // Added Database to lucide-react imports
-import { Briefcase, Calendar, Users, BadgeCheck, User, Activity, ShieldCheck, Banknote, Trash2, Clock, X, Share2, Stethoscope, LayoutList, Columns, Search, Phone, Filter, Tag, CalendarClock, Ban, ChevronLeft, ChevronRight, LayoutPanelLeft, MessageSquareQuote, FileText, ChevronDown, AlertCircle, RefreshCcw, Database } from 'lucide-react';
+import { Briefcase, Calendar, Users, BadgeCheck, User, Activity, ShieldCheck, Banknote, Trash2, Clock, X, Share2, Stethoscope, LayoutList, Columns, Search, Phone, Filter, Tag, CalendarClock, Ban, ChevronLeft, ChevronRight, LayoutPanelLeft, MessageSquareQuote, FileText, ChevronDown, AlertCircle, RefreshCcw, Database, Gauge } from 'lucide-react';
 
 const lostReasons = [
   "Cost / Financial Constraints",
@@ -14,6 +15,15 @@ const lostReasons = [
   "Fear of Surgery",
   "Personal / Non-Medical Reasons"
 ];
+
+const PROPOSAL_STAGES: Record<string, number> = {
+  "Surgery Recommended": 10,
+  "Surgery Acceptance": 30,
+  "Doctor Acceptance": 50,
+  "Hospital Acceptance": 70,
+  "Package Acceptance": 90,
+  "Pre-Ops Fixed": 100
+};
 
 const formatToDDMMYYYY = (dateString: string | undefined | null): string => {
   if (!dateString) return '';
@@ -89,7 +99,8 @@ export const PackageTeamDashboard: React.FC = () => {
     remarks: '',
     outcome: undefined,
     outcomeDate: '',
-    lostReason: ''
+    lostReason: '',
+    proposalStage: ''
   };
 
   const [proposal, setProposal] = useState<Partial<PackageProposal>>(initialProposalState);
@@ -438,8 +449,8 @@ export const PackageTeamDashboard: React.FC = () => {
                       
                       const currentStatusUpdate = p.status_updated_at || p.updated_at || '';
                       const currentUpdateDate = currentStatusUpdate.split('T')[0];
-                      const prevStatusUpdate = prevP?.status_updated_at || prevP?.updated_at || '';
-                      const prevUpdateDate = prevStatusUpdate.split('T')[0];
+                      const prevPStatusUpdate = prevP?.status_updated_at || prevP?.updated_at || '';
+                      const prevUpdateDate = prevPStatusUpdate.split('T')[0];
                       const isNewDayInMoved = listCategory === 'PENDING' && hasOutcome && !!prevP?.packageProposal?.outcome && currentUpdateDate !== prevUpdateDate;
 
                       return (
@@ -475,13 +486,20 @@ export const PackageTeamDashboard: React.FC = () => {
                           >
                             <div className="flex justify-between mb-2">
                               <span className="font-bold text-slate-800 text-sm">{p.name}</span>
-                              <div className="flex gap-2 items-center">
-                                {isOverdue && (
-                                  <span className="text-[8px] font-black uppercase px-2 py-0.5 rounded-full bg-rose-600 text-white flex items-center gap-1 animate-pulse">
-                                    <AlertCircle className="w-2 h-2" /> OVERDUE
+                              <div className="flex flex-col items-end gap-2">
+                                <div className="flex gap-2 items-center">
+                                  {isOverdue && (
+                                    <span className="text-[8px] font-black uppercase px-2 py-0.5 rounded-full bg-rose-600 text-white flex items-center gap-1 animate-pulse">
+                                      <AlertCircle className="w-2 h-2" /> OVERDUE
+                                    </span>
+                                  )}
+                                  <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded-full shadow-sm border border-transparent ${p.packageProposal?.outcome === 'Scheduled' ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : p.packageProposal?.outcome === 'Completed' ? 'bg-teal-100 text-teal-700 border-teal-200' : p.packageProposal?.outcome === 'Follow-Up' ? 'bg-blue-100 text-blue-700 border-blue-200' : p.packageProposal?.outcome === 'Lost' ? 'bg-rose-100 text-rose-700 border-rose-200' : 'bg-amber-50 text-amber-600'}`}>{p.packageProposal?.outcome || 'Pending Lead'}</span>
+                                </div>
+                                {p.packageProposal?.proposalStage && (
+                                  <span className="text-[8px] font-black uppercase px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-600 border border-indigo-100 flex items-center gap-1">
+                                    <Gauge className="w-2.5 h-2.5" /> {PROPOSAL_STAGES[p.packageProposal.proposalStage]}%
                                   </span>
                                 )}
-                                <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded-full shadow-sm border border-transparent ${p.packageProposal?.outcome === 'Scheduled' ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : p.packageProposal?.outcome === 'Completed' ? 'bg-teal-100 text-teal-700 border-teal-200' : p.packageProposal?.outcome === 'Follow-Up' ? 'bg-blue-100 text-blue-700 border-blue-200' : p.packageProposal?.outcome === 'Lost' ? 'bg-rose-100 text-rose-700 border-rose-200' : 'bg-amber-50 text-amber-600'}`}>{p.packageProposal?.outcome || 'Pending Lead'}</span>
                               </div>
                             </div>
                             
@@ -752,6 +770,35 @@ export const PackageTeamDashboard: React.FC = () => {
                       <div className="pt-8 border-t border-slate-100 space-y-8">
                          <div className="flex items-center gap-2 text-[10px] font-black uppercase text-indigo-600 tracking-[0.2em]"><MessageSquareQuote className="w-4 h-4" /> Counseling Insights</div>
                          <div className="grid grid-cols-1 gap-6">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-end">
+                                <div>
+                                   <label className="block text-[10px] font-black uppercase text-slate-400 mb-3 tracking-widest">Proposal Stage</label>
+                                   <div className="relative">
+                                      <select 
+                                        className={selectClasses} 
+                                        value={proposal.proposalStage || ''} 
+                                        onChange={v => setProposal({...proposal, proposalStage: v.target.value})}
+                                      >
+                                        <option value="" disabled>Select Stage</option>
+                                        {Object.keys(PROPOSAL_STAGES).map(stage => (
+                                          <option key={stage} value={stage}>{stage} – {PROPOSAL_STAGES[stage]}%</option>
+                                        ))}
+                                      </select>
+                                      <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                                   </div>
+                                </div>
+                                {proposal.proposalStage && (
+                                  <div className="bg-hospital-50 border border-hospital-100 px-6 py-3 rounded-2xl flex items-center justify-between animate-in zoom-in-95">
+                                    <div className="flex items-center gap-3">
+                                      <div className="p-2 bg-hospital-100 rounded-lg text-hospital-600">
+                                        <Gauge className="w-4 h-4" />
+                                      </div>
+                                      <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Probability</span>
+                                    </div>
+                                    <span className="text-2xl font-black text-hospital-700">{PROPOSAL_STAGES[proposal.proposalStage]}%</span>
+                                  </div>
+                                )}
+                            </div>
                             <div>
                                <label className="block text-[10px] font-black uppercase text-slate-400 mb-3 tracking-widest">Decision Pattern</label>
                                <div className="relative">
