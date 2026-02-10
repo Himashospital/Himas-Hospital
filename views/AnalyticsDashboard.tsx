@@ -407,8 +407,158 @@ export const AnalyticsDashboard: React.FC = () => {
         </div>
       )}
 
-      {/* Digital vs Traditional Section (Enhanced with Comparison) */}
+      {/* Performance Data Table Section (Moved from Source Insights) */}
       <div className="space-y-8 animate-in slide-in-from-bottom-6 duration-700">
+        <div className="bg-white rounded-[2.5rem] border border-slate-100 overflow-hidden shadow-sm flex flex-col">
+            <div className="p-8 border-b flex justify-between items-center bg-slate-50/30">
+              <h4 className="text-sm font-black text-slate-900 uppercase">Period Activity Report</h4>
+              <button onClick={handleExportDaily} className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all" title="Export CSV">
+                <Download className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="overflow-x-auto flex-1">
+              <table className="w-full text-left">
+                <thead className="text-[9px] font-black uppercase tracking-widest text-slate-400 border-b">
+                  <tr>
+                    <th className="px-6 py-4">Date</th>
+                    <th className="px-6 py-4">Arrivals</th>
+                    <th className="px-6 py-4 text-teal-600">New</th>
+                    <th className="px-6 py-4 text-orange-600">Rev.</th>
+                    <th className="px-6 py-4">Leads</th>
+                    <th className="px-6 py-4 text-indigo-600">Schd.</th>
+                    <th className="px-6 py-4">Conv.</th>
+                    <th className="px-6 py-4 text-right">Opp.</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50">
+                  {Array.from(new Set(stats.dataset.map(p => (p.entry_date || p.registeredAt.split('T')[0]) as string)))
+                    .sort((a: string, b: string) => b.localeCompare(a))
+                    .slice(0, 10)
+                    .map((date: string, i: number) => {
+                      const dayPatients = stats.dataset.filter(p => (p.entry_date || p.registeredAt.split('T')[0]) === date);
+                      const rev = dayPatients.reduce((sum, p) => sum + parseInt(p.packageProposal?.packageAmount?.replace(/,/g, '') || '0', 10), 0);
+                      return (
+                        <tr key={i} className="hover:bg-slate-50 transition-colors group">
+                          <td className="px-6 py-4 text-[11px] font-black text-slate-900">{formatDate(date)}</td>
+                          <td className="px-6 py-4 text-xs font-bold text-slate-600">{dayPatients.length}</td>
+                          <td className="px-6 py-4 text-xs font-bold text-teal-600">{dayPatients.filter(p => (p.visit_type || '').toLowerCase() === 'new').length}</td>
+                          <td className="px-6 py-4 text-xs font-bold text-orange-600">{dayPatients.filter(p => (p.visit_type || '').toLowerCase() === 'revisit').length}</td>
+                          <td className="px-6 py-4 text-xs font-bold text-indigo-500">{dayPatients.filter(p => p.doctorAssessment?.quickCode === SurgeonCode.S1).length}</td>
+                          <td className="px-6 py-4 text-xs font-bold text-indigo-600">{dayPatients.filter(p => p.packageProposal?.outcome === 'Scheduled').length}</td>
+                          <td className="px-6 py-4 text-xs font-bold text-emerald-600">{dayPatients.filter(p => p.packageProposal?.outcome === 'Completed').length}</td>
+                          <td className="px-6 py-4 text-right text-xs font-black text-slate-900">₹{rev.toLocaleString()}</td>
+                        </tr>
+                      );
+                    })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+      </div>
+
+      {/* Source Analytics Section */}
+      <div className="space-y-8 animate-in slide-in-from-bottom-6 duration-700">
+        <div className="flex items-center justify-between border-b border-slate-200 pb-4">
+          <div>
+            <h3 className="text-2xl font-black text-slate-900 uppercase">Source Insights</h3>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] mt-1">Lead Attribution & Performance breakdown</p>
+          </div>
+          <div className="p-3 bg-hospital-50 rounded-2xl">
+            <Globe className="w-6 h-6 text-hospital-600" />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          {/* Source Charts */}
+          <div className="bg-white rounded-[2.5rem] border border-slate-100 p-8 shadow-sm space-y-10">
+            <div>
+              <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-6 flex justify-between">
+                <span>Patient Flow (New vs Revisit)</span>
+                <span className="flex gap-4">
+                  <span className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-hospital-500"></div> New</span>
+                  <span className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-indigo-300"></div> Revisit</span>
+                </span>
+              </h4>
+              <div className="space-y-4">
+                {sourceStats.slice(0, 10).map((s, idx) => {
+                  const max = Math.max(...sourceStats.map(x => x.total), 1);
+                  const pNew = (s.new / max * 100).toFixed(0);
+                  const pRevisit = (s.revisit / max * 100).toFixed(0);
+                  return (
+                    <div key={idx} className="group">
+                      <div className="flex justify-between text-[10px] font-black uppercase mb-1.5">
+                        <span className="text-slate-600 group-hover:text-hospital-600 transition-colors">{s.name}</span>
+                        <span className="text-slate-900">{s.total} <span className="text-slate-300 font-bold">({s.new}N/{s.revisit}R)</span></span>
+                      </div>
+                      <div className="h-2.5 bg-slate-50 rounded-full overflow-hidden border border-slate-100 flex">
+                        <div className="h-full bg-hospital-500 transition-all duration-700" style={{ width: `${pNew}%` }}></div>
+                        <div className="h-full bg-indigo-300 transition-all duration-700" style={{ width: `${pRevisit}%` }}></div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div>
+              <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-6">Surgery Completed & Revenue Contribution</h4>
+              <div className="space-y-5">
+                {sourceStats.sort((a,b) => b.revenue - a.revenue).slice(0, 5).map((s, idx) => {
+                  const maxRev = Math.max(...sourceStats.map(x => x.revenue), 1);
+                  const pRev = (s.revenue / maxRev * 100).toFixed(0);
+                  return (
+                    <div key={idx} className="bg-slate-50/50 p-4 rounded-2xl border border-slate-50">
+                      <div className="flex justify-between items-end mb-2">
+                        <div>
+                          <div className="text-[10px] font-black uppercase text-slate-900">{s.name}</div>
+                          <div className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{s.completed} Surgeries Done</div>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-sm font-black text-emerald-600">₹{s.revenue.toLocaleString()}</div>
+                        </div>
+                      </div>
+                      <div className="h-1.5 bg-slate-200 rounded-full overflow-hidden">
+                        <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${pRev}%` }}></div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+
+          {/* Condition Distribution Section (Moved from bottom) */}
+          <div className="bg-white rounded-[2.5rem] shadow-sm border border-slate-100 overflow-hidden flex flex-col">
+            <div className="p-8 border-b bg-slate-50/30">
+               <div className="flex items-center justify-between">
+                 <div>
+                   <h3 className="text-lg font-black text-slate-900 uppercase">Condition Distribution</h3>
+                   <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest mt-1">Patient Volume by complaint</p>
+                 </div>
+                 <BarChart3 className="w-6 h-6 text-slate-200" />
+               </div>
+            </div>
+            <div className="p-8 space-y-4 flex-1">
+              {Array.from(new Set(stats.dataset.map(p => p.condition))).map((cond, idx) => {
+                const count = stats.dataset.filter(p => p.condition === cond).length;
+                const pct = ((count / (stats.total || 1)) * 100).toFixed(0);
+                return (
+                  <div key={idx} className="flex items-center gap-4">
+                    <span className="w-24 text-[10px] font-black text-slate-500 uppercase truncate">{cond}</span>
+                    <div className="flex-1 h-2.5 bg-slate-50 rounded-full overflow-hidden border border-slate-100">
+                      <div className="h-full bg-indigo-500 rounded-full transition-all duration-700" style={{ width: `${pct}%` }}></div>
+                    </div>
+                    <span className="w-8 text-right text-xs font-black text-slate-900">{count}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Digital vs Traditional Section (Moved to bottom) */}
+      <div className="pb-20 space-y-8 animate-in slide-in-from-bottom-6 duration-700">
         <div className="flex flex-col md:flex-row md:items-center justify-between border-b border-slate-200 pb-4 gap-4">
            <div>
              <h3 className="text-2xl font-black text-slate-900 uppercase">Digital vs Traditional Flow</h3>
@@ -598,179 +748,6 @@ export const AnalyticsDashboard: React.FC = () => {
               </div>
            </div>
         </div>
-      </div>
-
-      {/* Source Analytics Section */}
-      <div className="space-y-8 animate-in slide-in-from-bottom-6 duration-700">
-        <div className="flex items-center justify-between border-b border-slate-200 pb-4">
-          <div>
-            <h3 className="text-2xl font-black text-slate-900 uppercase">Source Insights</h3>
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] mt-1">Lead Attribution & Performance breakdown</p>
-          </div>
-          <div className="p-3 bg-hospital-50 rounded-2xl">
-            <Globe className="w-6 h-6 text-hospital-600" />
-          </div>
-        </div>
-
-        {/* Source Summary Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-           {[
-             { label: 'Top Lead Source', val: sourceStats[0]?.name || 'N/A', icon: MousePointer2, color: 'indigo', detail: `${sourceStats[0]?.new || 0} New • ${sourceStats[0]?.revisit || 0} Revisit` },
-             { label: 'Total Source Flow', val: stats.total, icon: Users, color: 'blue', detail: `${stats.newPatients} New • ${stats.revisits} Revisit` },
-             { label: 'Avg Conv. Rate', val: `${stats.conversionRate}%`, icon: Target, color: 'emerald', detail: 'Source-to-Surgery' },
-             { label: 'Top Revenue Source', val: sourceStats.sort((a,b) => b.revenue - a.revenue)[0]?.name || 'N/A', icon: PieChart, color: 'amber', detail: `₹${(sourceStats.sort((a,b) => b.revenue - a.revenue)[0]?.revenue || 0).toLocaleString()}` }
-           ].map((card, idx) => (
-             <div key={idx} className="bg-slate-50 p-6 rounded-[2rem] border border-slate-100 shadow-sm">
-                <div className="flex justify-between items-start mb-3">
-                  <div className={`p-2.5 rounded-xl bg-${card.color}-100 text-${card.color}-700`}>
-                    <card.icon className="w-5 h-5" />
-                  </div>
-                </div>
-                <div className="text-xl font-black text-slate-900 mb-1 truncate">{card.val}</div>
-                <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{card.label}</div>
-                <div className={`mt-3 pt-3 border-t border-slate-100 text-[8px] font-bold text-${card.color}-600 uppercase`}>
-                  {card.detail}
-                </div>
-             </div>
-           ))}
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Source Charts */}
-          <div className="bg-white rounded-[2.5rem] border border-slate-100 p-8 shadow-sm space-y-10">
-            <div>
-              <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-6 flex justify-between">
-                <span>Patient Flow (New vs Revisit)</span>
-                <span className="flex gap-4">
-                  <span className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-hospital-500"></div> New</span>
-                  <span className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-indigo-300"></div> Revisit</span>
-                </span>
-              </h4>
-              <div className="space-y-4">
-                {sourceStats.slice(0, 10).map((s, idx) => {
-                  const max = Math.max(...sourceStats.map(x => x.total), 1);
-                  const pNew = (s.new / max * 100).toFixed(0);
-                  const pRevisit = (s.revisit / max * 100).toFixed(0);
-                  return (
-                    <div key={idx} className="group">
-                      <div className="flex justify-between text-[10px] font-black uppercase mb-1.5">
-                        <span className="text-slate-600 group-hover:text-hospital-600 transition-colors">{s.name}</span>
-                        <span className="text-slate-900">{s.total} <span className="text-slate-300 font-bold">({s.new}N/{s.revisit}R)</span></span>
-                      </div>
-                      <div className="h-2.5 bg-slate-50 rounded-full overflow-hidden border border-slate-100 flex">
-                        <div className="h-full bg-hospital-500 transition-all duration-700" style={{ width: `${pNew}%` }}></div>
-                        <div className="h-full bg-indigo-300 transition-all duration-700" style={{ width: `${pRevisit}%` }}></div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            <div>
-              <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-6">Surgery Completed & Revenue Contribution</h4>
-              <div className="space-y-5">
-                {sourceStats.sort((a,b) => b.revenue - a.revenue).slice(0, 5).map((s, idx) => {
-                  const maxRev = Math.max(...sourceStats.map(x => x.revenue), 1);
-                  const pRev = (s.revenue / maxRev * 100).toFixed(0);
-                  return (
-                    <div key={idx} className="bg-slate-50/50 p-4 rounded-2xl border border-slate-50">
-                      <div className="flex justify-between items-end mb-2">
-                        <div>
-                          <div className="text-[10px] font-black uppercase text-slate-900">{s.name}</div>
-                          <div className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{s.completed} Surgeries Done</div>
-                        </div>
-                        <div className="text-right">
-                          <div className="text-sm font-black text-emerald-600">₹{s.revenue.toLocaleString()}</div>
-                        </div>
-                      </div>
-                      <div className="h-1.5 bg-slate-200 rounded-full overflow-hidden">
-                        <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${pRev}%` }}></div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-
-          {/* Performance Data Table */}
-          <div className="bg-white rounded-[2.5rem] border border-slate-100 overflow-hidden shadow-sm flex flex-col">
-            <div className="p-8 border-b flex justify-between items-center bg-slate-50/30">
-              <h4 className="text-sm font-black text-slate-900 uppercase">Period Activity Report</h4>
-              <button onClick={handleExportDaily} className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all" title="Export CSV">
-                <Download className="w-5 h-5" />
-              </button>
-            </div>
-            <div className="overflow-x-auto flex-1">
-              <table className="w-full text-left">
-                <thead className="text-[9px] font-black uppercase tracking-widest text-slate-400 border-b">
-                  <tr>
-                    <th className="px-6 py-4">Date</th>
-                    <th className="px-6 py-4">Arrivals</th>
-                    <th className="px-6 py-4 text-teal-600">New</th>
-                    <th className="px-6 py-4 text-orange-600">Rev.</th>
-                    <th className="px-6 py-4">Leads</th>
-                    <th className="px-6 py-4 text-indigo-600">Schd.</th>
-                    <th className="px-6 py-4">Conv.</th>
-                    <th className="px-6 py-4 text-right">Opp.</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-50">
-                  {Array.from(new Set(stats.dataset.map(p => (p.entry_date || p.registeredAt.split('T')[0]) as string)))
-                    .sort((a: string, b: string) => b.localeCompare(a))
-                    .slice(0, 10)
-                    .map((date: string, i: number) => {
-                      const dayPatients = stats.dataset.filter(p => (p.entry_date || p.registeredAt.split('T')[0]) === date);
-                      const rev = dayPatients.reduce((sum, p) => sum + parseInt(p.packageProposal?.packageAmount?.replace(/,/g, '') || '0', 10), 0);
-                      return (
-                        <tr key={i} className="hover:bg-slate-50 transition-colors group">
-                          <td className="px-6 py-4 text-[11px] font-black text-slate-900">{formatDate(date)}</td>
-                          <td className="px-6 py-4 text-xs font-bold text-slate-600">{dayPatients.length}</td>
-                          <td className="px-6 py-4 text-xs font-bold text-teal-600">{dayPatients.filter(p => (p.visit_type || '').toLowerCase() === 'new').length}</td>
-                          <td className="px-6 py-4 text-xs font-bold text-orange-600">{dayPatients.filter(p => (p.visit_type || '').toLowerCase() === 'revisit').length}</td>
-                          <td className="px-6 py-4 text-xs font-bold text-indigo-500">{dayPatients.filter(p => p.doctorAssessment?.quickCode === SurgeonCode.S1).length}</td>
-                          <td className="px-6 py-4 text-xs font-bold text-indigo-600">{dayPatients.filter(p => p.packageProposal?.outcome === 'Scheduled').length}</td>
-                          <td className="px-6 py-4 text-xs font-bold text-emerald-600">{dayPatients.filter(p => p.packageProposal?.outcome === 'Completed').length}</td>
-                          <td className="px-6 py-4 text-right text-xs font-black text-slate-900">₹{rev.toLocaleString()}</td>
-                        </tr>
-                      );
-                    })}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Breakdown Section */}
-      <div className="pb-20">
-         <div className="bg-white rounded-[2.5rem] shadow-sm border border-slate-100 overflow-hidden">
-            <div className="p-8 border-b bg-slate-50/30">
-               <div className="flex items-center justify-between">
-                 <div>
-                   <h3 className="text-lg font-black text-slate-900 uppercase">Condition Distribution</h3>
-                   <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest mt-1">Patient Volume by complaint</p>
-                 </div>
-                 <BarChart3 className="w-6 h-6 text-slate-200" />
-               </div>
-            </div>
-            <div className="p-8 space-y-4">
-              {Array.from(new Set(stats.dataset.map(p => p.condition))).map((cond, idx) => {
-                const count = stats.dataset.filter(p => p.condition === cond).length;
-                const pct = ((count / (stats.total || 1)) * 100).toFixed(0);
-                return (
-                  <div key={idx} className="flex items-center gap-4">
-                    <span className="w-24 text-[10px] font-black text-slate-500 uppercase truncate">{cond}</span>
-                    <div className="flex-1 h-2.5 bg-slate-50 rounded-full overflow-hidden border border-slate-100">
-                      <div className="h-full bg-indigo-500 rounded-full transition-all duration-700" style={{ width: `${pct}%` }}></div>
-                    </div>
-                    <span className="w-8 text-right text-xs font-black text-slate-900">{count}</span>
-                  </div>
-                );
-              })}
-            </div>
-         </div>
       </div>
     </div>
   );
