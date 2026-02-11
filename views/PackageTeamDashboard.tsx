@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useHospital } from '../context/HospitalContext';
 import { ExportButtons } from '../components/ExportButtons';
@@ -512,6 +511,11 @@ export const PackageTeamDashboard: React.FC = () => {
                                   <div className="flex items-center gap-1 bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-md border border-emerald-100">
                                     <span className="opacity-70">Moved On:</span>
                                     <span className="font-bold">{formatToDDMMYYYY(p.status_updated_at || p.updated_at)}</span>
+                                  </div>
+                                ) : listCategory === 'COMPLETED' ? (
+                                  <div className="flex items-center gap-1 bg-teal-50 text-teal-700 px-2 py-0.5 rounded-md border border-teal-100">
+                                    <span className="opacity-70">Completed:</span>
+                                    <span className="font-bold">{formatToDDMMYYYY(p.completed_surgery || p.packageProposal?.outcomeDate)}</span>
                                   </div>
                                 ) : (
                                   <div className="flex items-center gap-1">
