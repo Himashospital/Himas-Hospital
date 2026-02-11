@@ -187,8 +187,29 @@ export const FrontOfficeDashboard: React.FC = () => {
   };
 
   const handleArrived = (appt: Appointment) => { 
+    // Lookup historical data if it's a revisit to pre-fill the form
+    let existingPatient: Patient | undefined = undefined;
+    if (appt.visit_type === 'Revisit') {
+      existingPatient = patients
+        .filter(p => p.mobile === appt.mobile)
+        .sort((a, b) => new Date(b.registeredAt).getTime() - new Date(a.registeredAt).getTime())[0];
+    }
+
     setFormData({ 
-      id: '', name: appt.name || '', dob: '', gender: undefined, age: undefined, mobile: appt.mobile || '', occupation: '', hasInsurance: 'No', insuranceName: '', source: appt.source, sourceDoctorName: appt.sourceDoctorName || '', condition: appt.condition, visitType: appt.bookingType === 'Follow Up' ? 'Follow Up' : 'OPD', visit_type: appt.visit_type || 'New',
+      id: '', // New registration requires a new case number or re-assignment
+      name: appt.name || existingPatient?.name || '', 
+      dob: existingPatient?.dob || '', 
+      gender: existingPatient?.gender || undefined, 
+      age: existingPatient?.age || undefined, 
+      mobile: appt.mobile || existingPatient?.mobile || '', 
+      occupation: existingPatient?.occupation || '', 
+      hasInsurance: existingPatient?.hasInsurance || 'No', 
+      insuranceName: existingPatient?.insuranceName || '', 
+      source: appt.source || existingPatient?.source || '', 
+      sourceDoctorName: appt.sourceDoctorName || existingPatient?.sourceDoctorName || '', 
+      condition: appt.condition || existingPatient?.condition, 
+      visitType: appt.bookingType === 'Follow Up' ? 'Follow Up' : 'OPD', 
+      visit_type: appt.visit_type || 'New',
       entry_date: new Date().toISOString().split('T')[0],
       arrivalTime: new Date().toTimeString().split(' ')[0].substring(0, 5)
     }); 

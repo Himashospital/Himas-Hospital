@@ -399,12 +399,18 @@ export const AnalyticsDashboard: React.FC = () => {
     setDrillDown({ label, data: filteredData });
   };
 
+  /**
+   * Calculates growth percentage between two values.
+   * FIX: Added explicit number casting and safety checks for arithmetic operations to resolve compiler errors.
+   */
   const calculateGrowth = (current: any, previous: any): string => {
-      // Fix: Explicitly cast to any and then Number to resolve arithmetic operation errors
+      // Explicitly convert inputs to numbers to satisfy strict arithmetic operation rules
       const curr = Number(current) || 0;
       const prev = Number(previous) || 0;
       if (prev === 0) return curr > 0 ? '100' : '0';
-      return ((curr - prev) / prev * 100).toFixed(0);
+      // Perform arithmetic on guaranteed number types
+      const growth: number = ((curr - prev) / prev) * 100;
+      return growth.toFixed(0);
   };
 
   return (
@@ -665,8 +671,8 @@ export const AnalyticsDashboard: React.FC = () => {
                   return (
                     <div key={idx} className="bg-slate-50/50 p-4 rounded-2xl border border-slate-50">
                       <div className="flex justify-between items-end mb-2">
-                        <div>
-                          <div className="text-[10px] font-black uppercase text-slate-900">{s.name}</div>
+                        <div className="max-w-[150px]">
+                          <div className="text-[10px] font-black uppercase text-slate-900 truncate">{s.name}</div>
                           <div className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{s.completed} Surgeries Done</div>
                         </div>
                         <div className="text-right">
@@ -832,8 +838,8 @@ export const AnalyticsDashboard: React.FC = () => {
                 <div className="flex items-end justify-between gap-4 mb-1">
                   <div className="text-4xl font-black text-slate-900">{stats.onlineTotal}</div>
                   {showComparison && stats.comparison && (
-                    <div className={`flex items-center gap-1 text-xs font-black ${parseInt(calculateGrowth(stats.onlineTotal, stats.comparison.onlineTotal)) >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
-                      {parseInt(calculateGrowth(stats.onlineTotal, stats.comparison.onlineTotal)) >= 0 ? <TrendingUp className="w-4 h-4"/> : <TrendingDown className="w-4 h-4"/>}
+                    <div className={`flex items-center gap-1 text-xs font-black ${Number(calculateGrowth(stats.onlineTotal, stats.comparison.onlineTotal)) >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                      {Number(calculateGrowth(stats.onlineTotal, stats.comparison.onlineTotal)) >= 0 ? <TrendingUp className="w-4 h-4"/> : <TrendingDown className="w-4 h-4"/>}
                       {calculateGrowth(stats.onlineTotal, stats.comparison.onlineTotal)}%
                     </div>
                   )}
@@ -864,8 +870,8 @@ export const AnalyticsDashboard: React.FC = () => {
                 <div className="flex items-end justify-between gap-4 mb-1">
                   <div className="text-4xl font-black text-slate-900">{stats.offlineTotal}</div>
                   {showComparison && stats.comparison && (
-                    <div className={`flex items-center gap-1 text-xs font-black ${parseInt(calculateGrowth(stats.offlineTotal, stats.comparison.offlineTotal)) >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
-                      {parseInt(calculateGrowth(stats.offlineTotal, stats.comparison.offlineTotal)) >= 0 ? <TrendingUp className="w-4 h-4"/> : <TrendingDown className="w-4 h-4"/>}
+                    <div className={`flex items-center gap-1 text-xs font-black ${Number(calculateGrowth(stats.offlineTotal, stats.comparison.offlineTotal)) >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                      {Number(calculateGrowth(stats.offlineTotal, stats.comparison.offlineTotal)) >= 0 ? <TrendingUp className="w-4 h-4"/> : <TrendingDown className="w-4 h-4"/>}
                       {calculateGrowth(stats.offlineTotal, stats.comparison.offlineTotal)}%
                     </div>
                   )}
