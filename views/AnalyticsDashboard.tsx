@@ -3,9 +3,9 @@ import { useHospital } from '../context/HospitalContext';
 import { Patient, SurgeonCode, Condition } from '../types';
 import { 
   Users, Banknote, Download, Target, RefreshCw, Layers, Search, 
-  Globe, MousePointer2, PieChart, UserPlus, ArrowUpRight, CheckCircle,
+  Globe, PieChart, ArrowUpRight, CheckCircle,
   X, Phone, Calendar, Tag, Briefcase, Zap, Landmark, BarChart3, TrendingUp, TrendingDown, CalendarDays,
-  PieChart as PieChartIcon, LayoutDashboard, Target as TargetIcon, Activity
+  PieChart as PieChartIcon, LayoutDashboard, Target as TargetIcon, Activity, Ban, FileSpreadsheet
 } from 'lucide-react';
 
 const formatDate = (dateString: string | undefined | null): string => {
@@ -66,12 +66,21 @@ const parseAmount = (amt: any): number => {
   return isNaN(parsed) ? 0 : parsed;
 };
 
+// Fixed calculateGrowth to return a number for better compatibility with arithmetic operations and type safety in TSX
+const calculateGrowth = (current: any, previous: any): number => {
+  const curr = Number(current) || 0;
+  const prev = Number(previous) || 0;
+  if (prev === 0) return curr > 0 ? 100 : 0;
+  return ((curr - prev) / prev) * 100;
+};
+
 // SVG-based Pie/Donut Chart component for clinical and counseling breakdown
 const AnalyticsPieChart: React.FC<{ 
   data: Record<string, number>, 
   title: string, 
-  icon: React.ReactNode 
-}> = ({ data, title, icon }) => {
+  icon: React.ReactNode,
+  onSegmentClick?: (label: string) => void
+}> = ({ data, title, icon, onSegmentClick }) => {
   const entries = (Object.entries(data) as [string, number][]).sort((a, b) => b[1] - a[1]);
   const total = entries.reduce((sum, [_, val]) => sum + val, 0);
 
@@ -125,6 +134,7 @@ const AnalyticsPieChart: React.FC<{
                 key={i} 
                 d={slice.path} 
                 fill={slice.color} 
+                onClick={() => onSegmentClick?.(slice.name)}
                 className="hover:opacity-80 transition-opacity cursor-pointer"
               >
                 <title>{slice.name}: {slice.val} ({slice.percent}%)</title>
@@ -140,7 +150,11 @@ const AnalyticsPieChart: React.FC<{
 
         <div className="flex-1 space-y-3 w-full">
           {slices.map((slice, i) => (
-            <div key={i} className="flex items-center justify-between group">
+            <div 
+              key={i} 
+              onClick={() => onSegmentClick?.(slice.name)}
+              className={`flex items-center justify-between group ${onSegmentClick ? 'cursor-pointer hover:bg-slate-50 p-1 -m-1 rounded-lg transition-colors' : ''}`}
+            >
               <div className="flex items-center gap-2 overflow-hidden">
                 <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: slice.color }}></div>
                 <span className="text-[9px] font-black text-slate-600 uppercase truncate group-hover:text-slate-900 transition-colors">
@@ -149,7 +163,7 @@ const AnalyticsPieChart: React.FC<{
               </div>
               <div className="flex items-center gap-2 shrink-0">
                 <span className="text-[10px] font-black text-slate-900">{slice.val}</span>
-                <span className="text-[8px] font-bold text-slate-400 bg-slate-50 px-1.5 py-0.5 rounded-md">{slice.percent}%</span>
+                <span className="text-[8px] font-bold text-slate-400 bg-slate-50 px-1.5 py-0.5 rounded-md group-hover:bg-white transition-colors">{slice.percent}%</span>
               </div>
             </div>
           ))}
@@ -179,7 +193,7 @@ export const AnalyticsDashboard: React.FC = () => {
   const [appliedCompRange, setAppliedCompRange] = useState<{ from: string, to: string } | null>(null);
 
   // Drill down state
-  const [drillDown, setDrillDown] = useState<{ label: string, data: Patient[] } | null>(null);
+  const [drillDown, setDrillDown] = useState<{ label: string, data: Patient[], viewMode?: 'cards' | 'table' } | null>(null);
 
   const filterByRange = (dateStr: string | undefined, range: { from: string, to: string }) => {
     if (!dateStr) return false;
@@ -252,20 +266,23 @@ export const AnalyticsDashboard: React.FC = () => {
           return !(ONLINE_SOURCES.includes(p.source) || ONLINE_SOURCES.includes(ds)) && (p.visit_type || '').trim().toLowerCase() === 'new';
         }).length;
 
-        // Aggregate Counseling Distributions
-        const decisionPatterns: Record<string, number> = {};
-        const proposalStages: Record<string, number> = {};
+        // Counseling status mix aggregation for new pie charts
+        const decisionPatternMix: Record<string, number> = {};
+        const proposalStageMix: Record<string, number> = {};
         
-        // Merge datasets to find all active counseling activity in this period (arrived S1s or completions)
-        const counselingActiveSet = Array.from(new Map([...arrivedPatients, ...completedInPeriod].map(p => [p.id, p])).values());
-        
-        counselingActiveSet.forEach(p => {
-          if (p.packageProposal) {
-            const dp = p.packageProposal.decisionPattern || 'Not Defined';
-            decisionPatterns[dp] = (decisionPatterns[dp] || 0) + 1;
+        // Merge arrived S1s and completions to get the full Counseling pool relevant for this period
+        const activeCounselingPatients = Array.from(new Map([
+          ...arrivedPatients.filter(p => p.doctorAssessment?.quickCode === SurgeonCode.S1),
+          ...completedInPeriod
+        ].map(p => [p.id, p])).values());
 
-            const ps = p.packageProposal.proposalStage || 'Not Defined';
-            proposalStages[ps] = (proposalStages[ps] || 0) + 1;
+        activeCounselingPatients.forEach(p => {
+          if (p.packageProposal) {
+            const dp = p.packageProposal.decisionPattern || 'Not Specified';
+            decisionPatternMix[dp] = (decisionPatternMix[dp] || 0) + 1;
+            
+            const ps = p.packageProposal.proposalStage || 'Not Specified';
+            proposalStageMix[ps] = (proposalStageMix[ps] || 0) + 1;
           }
         });
 
@@ -281,15 +298,16 @@ export const AnalyticsDashboard: React.FC = () => {
             sources: sourcesMap,
             arrivedDataset: arrivedPatients,
             completedDataset: completedInPeriod,
-            conversionRate: leads > 0 ? ((conversions / leads) * 100).toFixed(1) : '0',
-            decisionPatterns,
-            proposalStages
+            decisionPatternMix,
+            proposalStageMix,
+            conversionRate: leads > 0 ? ((conversions / leads) * 100).toFixed(1) : '0'
         };
     };
 
     const primaryStats = processSet(patients, appliedRange);
     
-    let compStats = null;
+    // Explicitly type compStats as 'any' to avoid inference as 'null' and allow later assignment
+    let compStats: any = null;
     if (showComparison && appliedCompRange) {
         compStats = processSet(patients, appliedCompRange);
     }
@@ -315,7 +333,6 @@ export const AnalyticsDashboard: React.FC = () => {
   }, [stats.sources]);
 
   const handleExportDaily = () => {
-    // Generate dates based on both arrival and completion events
     const allDates = new Set([
       ...stats.arrivedDataset.map(p => (p.entry_date || p.registeredAt.split('T')[0]) as string),
       ...stats.completedDataset.map(p => (p.completed_surgery || p.packageProposal?.outcomeDate?.split('T')[0]) as string)
@@ -349,6 +366,62 @@ export const AnalyticsDashboard: React.FC = () => {
     document.body.removeChild(link);
   };
 
+  const handleExportDrillDown = () => {
+    if (!drillDown) return;
+    const isTable = drillDown.viewMode === 'table';
+    
+    let headers: string[] = [];
+    let rows: string[][] = [];
+
+    if (isTable) {
+      headers = [
+        'Patient ID', 'Name', 'Source', 'Status', 'Decision Pattern', 
+        'Proposal Stage', 'Arrived Date', 'Surgery Scheduled', 
+        'Surgery Follow-Up', 'Surgery Lost', 'Surgery Completed'
+      ];
+      rows = drillDown.data.map(p => [
+        p.id,
+        p.name,
+        p.source,
+        p.packageProposal?.outcome || 'Pending',
+        p.packageProposal?.decisionPattern || '',
+        p.packageProposal?.proposalStage || '',
+        formatDate(p.entry_date || p.registeredAt),
+        formatDate(p.surgery_date || p.packageProposal?.surgeryDate),
+        formatDate(p.followup_date || p.packageProposal?.followUpDate),
+        formatDate(p.surgery_lost_date || (p.packageProposal?.outcome === 'Lost' ? p.packageProposal.outcomeDate : null)),
+        formatDate(p.completed_surgery || (p.packageProposal?.outcome === 'Completed' ? p.packageProposal.outcomeDate : null))
+      ]);
+    } else {
+      headers = ['ID', 'Name', 'Condition', 'Mobile', 'Type', 'Source', 'Arrived', 'Affordability', 'Amount'];
+      rows = drillDown.data.map(p => [
+        p.id,
+        p.name,
+        p.condition,
+        p.mobile,
+        p.visit_type || 'OPD',
+        p.source,
+        formatDate(p.entry_date),
+        p.doctorAssessment?.affordability || '---',
+        p.packageProposal?.packageAmount || '0'
+      ]);
+    }
+
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row => row.map(cell => `"${(cell || '').toString().replace(/"/g, '""')}"`).join(','))
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `${drillDown.label.replace(/[: /]/g, '_')}_export.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   const handleKpiClick = (label: string) => {
     let filteredData: Patient[] = [];
     switch (label) {
@@ -375,10 +448,10 @@ export const AnalyticsDashboard: React.FC = () => {
             entry_date: a.date,
             source: a.source,
             visit_type: a.visit_type || 'New',
-            gender: 'Other',
+            gender: 'Other' as any,
             age: 0,
             registeredAt: a.createdAt,
-            hasInsurance: 'No',
+            hasInsurance: 'No' as any,
             occupation: '',
             visitType: 'OPD'
           } as Patient));
@@ -396,21 +469,28 @@ export const AnalyticsDashboard: React.FC = () => {
       default:
         filteredData = stats.arrivedDataset;
     }
-    setDrillDown({ label, data: filteredData });
+    setDrillDown({ label, data: filteredData, viewMode: 'cards' });
   };
 
-  /**
-   * Calculates growth percentage between two values.
-   * FIX: Added explicit number casting and safety checks for arithmetic operations to resolve compiler errors.
-   */
-  const calculateGrowth = (current: any, previous: any): string => {
-      // Explicitly convert inputs to numbers to satisfy strict arithmetic operation rules
-      const curr = Number(current) || 0;
-      const prev = Number(previous) || 0;
-      if (prev === 0) return curr > 0 ? '100' : '0';
-      // Perform arithmetic on guaranteed number types
-      const growth: number = ((curr - prev) / prev) * 100;
-      return growth.toFixed(0);
+  const handleCounselingClick = (category: 'DP' | 'PS', label: string) => {
+    // Re-aggregate the relevant counseling pool for precise drill-down
+    const counselingPool = Array.from(new Map([
+      ...stats.arrivedDataset.filter(p => p.doctorAssessment?.quickCode === SurgeonCode.S1),
+      ...stats.completedDataset
+    ].map(p => [p.id, p])).values());
+
+    const filtered = counselingPool.filter(p => {
+      const val = category === 'DP' 
+        ? (p.packageProposal?.decisionPattern || 'Not Specified')
+        : (p.packageProposal?.proposalStage || 'Not Specified');
+      return val === label;
+    });
+
+    setDrillDown({ 
+      label: `${category === 'DP' ? 'Decision Pattern' : 'Proposal Stage'}: ${label}`, 
+      data: filtered,
+      viewMode: 'table'
+    });
   };
 
   return (
@@ -487,11 +567,20 @@ export const AnalyticsDashboard: React.FC = () => {
       {/* Drill Down Modal */}
       {drillDown && (
         <div className="fixed inset-0 z-[150] bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-300">
-          <div className="bg-white w-full max-w-6xl rounded-[3rem] shadow-2xl overflow-hidden border border-white/20 flex flex-col max-h-[90vh]">
+          <div className="bg-white w-full max-w-7xl rounded-[3rem] shadow-2xl overflow-hidden border border-white/20 flex flex-col max-h-[90vh]">
             <header className="p-8 border-b flex justify-between items-center bg-slate-50/50 shrink-0">
                <div>
-                 <h3 className="text-2xl font-black text-slate-900 uppercase tracking-tight">{drillDown.label}</h3>
-                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Detailed Patient breakdown ({drillDown.data.length} Records)</p>
+                 <div className="flex items-center gap-4">
+                    <h3 className="text-2xl font-black text-slate-900 uppercase tracking-tight">{drillDown.label}</h3>
+                    <button 
+                      onClick={handleExportDrillDown}
+                      className="p-2 bg-emerald-50 text-emerald-600 rounded-xl hover:bg-emerald-100 transition-all flex items-center gap-2 border border-emerald-100 text-[10px] font-black uppercase tracking-widest"
+                      title="Download Table as CSV"
+                    >
+                      <Download className="w-4 h-4" /> Export CSV
+                    </button>
+                 </div>
+                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Detailed breakdown ({drillDown.data.length} Records)</p>
                </div>
                <button 
                  onClick={() => setDrillDown(null)}
@@ -502,57 +591,108 @@ export const AnalyticsDashboard: React.FC = () => {
             </header>
             
             <div className="flex-1 overflow-auto p-4 sm:p-8">
-               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                 {drillDown.data.map((p, idx) => (
-                   <div key={p.id + idx} className="bg-slate-50/50 border border-slate-100 p-6 rounded-[2rem] hover:bg-white hover:shadow-xl transition-all group">
-                     <div className="flex justify-between items-start mb-4">
-                       <div>
-                         <div className="text-sm font-black text-slate-900">{p.name}</div>
-                         <div className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter mt-0.5">{p.id.split('_V')[0]}</div>
-                       </div>
-                       <span className={`text-[8px] font-black uppercase px-2 py-1 rounded-md ${
-                         (p.visit_type || '').toLowerCase() === 'new' ? 'bg-teal-100 text-teal-700' : 'bg-orange-100 text-orange-700'
-                       }`}>
-                         {p.visit_type || 'OPD'}
-                       </span>
-                     </div>
-                     
-                     <div className="space-y-3">
-                       <div className="flex items-center gap-3">
-                         <div className="p-2 bg-white rounded-xl text-slate-400"><Tag className="w-3.5 h-3.5" /></div>
-                         <span className="text-[10px] font-black uppercase text-slate-600">{p.condition}</span>
-                       </div>
-                       <div className="flex items-center gap-3">
-                         <div className="p-2 bg-white rounded-xl text-slate-400"><Phone className="w-3.5 h-3.5" /></div>
-                         <span className="text-[10px] font-black text-slate-600 font-mono">{p.mobile}</span>
-                       </div>
-                       <div className="flex items-center gap-3">
-                         <div className="p-2 bg-white rounded-xl text-slate-400"><Calendar className="w-3.5 h-3.5" /></div>
-                         <span className="text-[10px] font-black uppercase text-slate-600">
-                           {p.packageProposal?.outcome === 'Completed' ? formatDate(p.completed_surgery || p.packageProposal?.outcomeDate) : formatDate(p.entry_date)}
+               {drillDown.viewMode === 'table' ? (
+                 <div className="bg-white rounded-[2rem] border border-slate-100 overflow-hidden shadow-sm">
+                   <div className="overflow-x-auto">
+                     <table className="w-full text-left border-collapse min-w-[1200px]">
+                       <thead className="bg-slate-50 text-slate-500 text-[9px] font-black uppercase tracking-widest border-b">
+                         <tr>
+                           <th className="p-4">Patient ID</th>
+                           <th className="p-4">Name</th>
+                           <th className="p-4">Source</th>
+                           <th className="p-4">Status</th>
+                           <th className="p-4">Decision Pattern</th>
+                           <th className="p-4">Proposal Stage</th>
+                           <th className="p-4">Arrived Date</th>
+                           <th className="p-4">Surgery Scheduled</th>
+                           <th className="p-4">Surgery Follow-Up</th>
+                           <th className="p-4">Surgery Lost</th>
+                           <th className="p-4">Surgery Completed</th>
+                         </tr>
+                       </thead>
+                       <tbody className="divide-y divide-slate-100">
+                         {drillDown.data.map((p, idx) => (
+                           <tr key={p.id + idx} className="hover:bg-slate-50 transition-colors">
+                             <td className="p-4 text-[10px] font-mono font-bold text-slate-400">{p.id.split('_V')[0]}</td>
+                             <td className="p-4 text-[11px] font-black text-slate-900 whitespace-nowrap">{p.name}</td>
+                             <td className="p-4 text-[10px] font-bold text-slate-500 uppercase whitespace-nowrap">{p.source}</td>
+                             <td className="p-4">
+                               <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-md ${
+                                 p.packageProposal?.outcome === 'Completed' ? 'bg-teal-50 text-teal-700' :
+                                 p.packageProposal?.outcome === 'Scheduled' ? 'bg-emerald-50 text-emerald-700' :
+                                 p.packageProposal?.outcome === 'Lost' ? 'bg-rose-50 text-rose-700' :
+                                 p.packageProposal?.outcome === 'Follow-Up' ? 'bg-blue-50 text-blue-700' :
+                                 'bg-amber-50 text-amber-700'
+                               }`}>
+                                 {p.packageProposal?.outcome || 'Pending'}
+                               </span>
+                             </td>
+                             <td className="p-4 text-[10px] font-bold text-slate-600">{p.packageProposal?.decisionPattern || '---'}</td>
+                             <td className="p-4 text-[10px] font-bold text-slate-600">{p.packageProposal?.proposalStage || '---'}</td>
+                             <td className="p-4 text-[10px] font-bold text-slate-500">{formatDate(p.entry_date || p.registeredAt)}</td>
+                             <td className="p-4 text-[10px] font-bold text-emerald-600">{formatDate(p.surgery_date || p.packageProposal?.surgeryDate)}</td>
+                             <td className="p-4 text-[10px] font-bold text-blue-600">{formatDate(p.followup_date || p.packageProposal?.followUpDate)}</td>
+                             <td className="p-4 text-[10px] font-bold text-rose-600">{formatDate(p.surgery_lost_date || (p.packageProposal?.outcome === 'Lost' ? p.packageProposal.outcomeDate : null))}</td>
+                             <td className="p-4 text-[10px] font-bold text-teal-600">{formatDate(p.completed_surgery || (p.packageProposal?.outcome === 'Completed' ? p.packageProposal.outcomeDate : null))}</td>
+                           </tr>
+                         ))}
+                       </tbody>
+                     </table>
+                   </div>
+                 </div>
+               ) : (
+                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                   {drillDown.data.map((p, idx) => (
+                     <div key={p.id + idx} className="bg-slate-50/50 border border-slate-100 p-6 rounded-[2rem] hover:bg-white hover:shadow-xl transition-all group">
+                       <div className="flex justify-between items-start mb-4">
+                         <div>
+                           <div className="text-sm font-black text-slate-900">{p.name}</div>
+                           <div className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter mt-0.5">{p.id.split('_V')[0]}</div>
+                         </div>
+                         <span className={`text-[8px] font-black uppercase px-2 py-1 rounded-md ${
+                           (p.visit_type || '').toLowerCase() === 'new' ? 'bg-teal-100 text-teal-700' : 'bg-orange-100 text-orange-700'
+                         }`}>
+                           {p.visit_type || 'OPD'}
                          </span>
                        </div>
-                       <div className="flex items-center gap-3">
-                         <div className="p-2 bg-white rounded-xl text-slate-400"><Globe className="w-3.5 h-3.5" /></div>
-                         <span className="text-[10px] font-black uppercase text-slate-600 truncate max-w-[150px]">{p.source}</span>
+                       
+                       <div className="space-y-3">
+                         <div className="flex items-center gap-3">
+                           <div className="p-2 bg-white rounded-xl text-slate-400"><Tag className="w-3.5 h-3.5" /></div>
+                           <span className="text-[10px] font-black uppercase text-slate-600">{p.condition}</span>
+                         </div>
+                         <div className="flex items-center gap-3">
+                           <div className="p-2 bg-white rounded-xl text-slate-400"><Phone className="w-3.5 h-3.5" /></div>
+                           <span className="text-[10px] font-black text-slate-600 font-mono">{p.mobile}</span>
+                         </div>
+                         <div className="flex items-center gap-3">
+                           <div className="p-2 bg-white rounded-xl text-slate-400"><Calendar className="w-3.5 h-3.5" /></div>
+                           <span className="text-[10px] font-black uppercase text-slate-600">
+                             {p.packageProposal?.outcome === 'Completed' ? formatDate(p.completed_surgery || p.packageProposal?.outcomeDate) : formatDate(p.entry_date)}
+                         </span>
+                         </div>
+                         <div className="flex items-center gap-3">
+                           <div className="p-2 bg-white rounded-xl text-slate-400"><Globe className="w-3.5 h-3.5" /></div>
+                           <span className="text-[10px] font-black uppercase text-slate-600 truncate max-w-[150px]">{p.source}</span>
+                         </div>
+                       </div>
+
+                       <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between">
+                          <div className="flex flex-col">
+                            <span className="text-[7px] font-black text-slate-300 uppercase tracking-[0.2em]">Affordability</span>
+                            <span className="text-[9px] font-black text-slate-500 uppercase">{p.doctorAssessment?.affordability || '---'}</span>
+                          </div>
+                          {p.packageProposal?.packageAmount && (
+                            <div className="text-right">
+                               <span className="text-[7px] font-black text-emerald-300 uppercase tracking-[0.2em]">Amount</span>
+                               <div className="text-xs font-black text-emerald-600">₹{p.packageProposal.packageAmount}</div>
+                            </div>
+                          )}
                        </div>
                      </div>
-
-                     <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between">
-                        <div className="flex flex-col">
-                          <span className="text-[7px] font-black text-slate-300 uppercase tracking-[0.2em]">Affordability</span>
-                          <span className="text-[9px] font-black text-slate-500 uppercase">{p.doctorAssessment?.affordability || '---'}</span>
-                        </div>
-                        {p.packageProposal?.packageAmount && (
-                          <div className="text-right">
-                             <span className="text-[7px] font-black text-emerald-300 uppercase tracking-[0.2em]">Amount</span>
-                             <div className="text-xs font-black text-emerald-600">₹{p.packageProposal.packageAmount}</div>
-                          </div>
-                        )}
-                     </div>
-                   </div>
-                 ))}
-               </div>
+                   ))}
+                 </div>
+               )}
             </div>
             <footer className="p-6 border-t bg-slate-50/30 flex justify-end shrink-0">
                <button 
@@ -702,14 +842,10 @@ export const AnalyticsDashboard: React.FC = () => {
             </div>
             <div className="p-8 space-y-4 flex-1">
               {(() => {
-                // Filter patients who have a clinical procedure assigned by a doctor in the filtered period
                 const assessedDataset = stats.arrivedDataset.filter(p => p.doctorAssessment?.surgeryProcedure);
                 const totalAssessed = assessedDataset.length;
-                
-                // Aggregate counts for each procedure
                 const procedureCounts = assessedDataset.reduce((acc, p) => {
                   let proc = p.doctorAssessment?.surgeryProcedure || 'Not Specified';
-                  // Resolve "Other" procedures to their specific name
                   if (proc === 'Other' && p.doctorAssessment?.otherSurgeryName) {
                     proc = p.doctorAssessment.otherSurgeryName;
                   }
@@ -743,31 +879,33 @@ export const AnalyticsDashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* Counseling Analytics Section */}
+      {/* Counseling Analysis Section */}
       <div className="space-y-8 animate-in slide-in-from-bottom-6 duration-700">
         <div className="flex items-center justify-between border-b border-slate-200 pb-4">
           <div>
             <h3 className="text-2xl font-black text-slate-900 uppercase tracking-tight flex items-center gap-3">
               <PieChartIcon className="w-7 h-7 text-hospital-600" />
-              Counseling Pie Charts
+              Counseling Analysis
             </h3>
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] mt-1">Decision Patterns & Proposal Stages breakdown</p>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] mt-1">Decision Patterns & Proposal Stages</p>
           </div>
           <div className="p-3 bg-hospital-50 rounded-2xl">
             <TargetIcon className="w-6 h-6 text-hospital-600" />
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
            <AnalyticsPieChart 
-             data={stats.decisionPatterns} 
+             data={stats.decisionPatternMix} 
              title="Decision Pattern" 
-             icon={<LayoutDashboard className="w-5 h-5" />} 
+             icon={<Activity className="w-5 h-5" />} 
+             onSegmentClick={(label) => handleCounselingClick('DP', label)}
            />
            <AnalyticsPieChart 
-             data={stats.proposalStages} 
+             data={stats.proposalStageMix} 
              title="Proposal Stage" 
-             icon={<Layers className="w-5 h-5" />} 
+             icon={<LayoutDashboard className="w-5 h-5" />} 
+             onSegmentClick={(label) => handleCounselingClick('PS', label)}
            />
         </div>
       </div>
@@ -784,7 +922,7 @@ export const AnalyticsDashboard: React.FC = () => {
               <div className="bg-slate-100 p-1 rounded-xl flex items-center">
                  <button 
                    onClick={() => setGraphGranularity('daily')}
-                   className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all ${graphGranularity === 'daily' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500'}`}
+                   className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all ${graphGranularity === 'daily' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-50'}`}
                  >Daily</button>
                  <button 
                    onClick={() => setGraphGranularity('monthly')}
@@ -831,15 +969,16 @@ export const AnalyticsDashboard: React.FC = () => {
                   <div className="text-right">
                      <span className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">Digital Share (New)</span>
                      <div className="text-2xl font-black text-indigo-600">
-                       {stats.newPatients > 0 ? ((stats.onlineTotal / stats.newPatients) * 100).toFixed(0) : 0}%
+                        {/* Fixed arithmetic error by ensuring numeric types */}
+                       {Number(stats.newPatients) > 0 ? ((Number(stats.onlineTotal) / Number(stats.newPatients)) * 100).toFixed(0) : 0}%
                      </div>
                   </div>
                 </div>
                 <div className="flex items-end justify-between gap-4 mb-1">
                   <div className="text-4xl font-black text-slate-900">{stats.onlineTotal}</div>
                   {showComparison && stats.comparison && (
-                    <div className={`flex items-center gap-1 text-xs font-black ${Number(calculateGrowth(stats.onlineTotal, stats.comparison.onlineTotal)) >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
-                      {Number(calculateGrowth(stats.onlineTotal, stats.comparison.onlineTotal)) >= 0 ? <TrendingUp className="w-4 h-4"/> : <TrendingDown className="w-4 h-4"/>}
+                    <div className={`flex items-center gap-1 text-xs font-black ${calculateGrowth(stats.onlineTotal, stats.comparison.onlineTotal) >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                      {calculateGrowth(stats.onlineTotal, stats.comparison.onlineTotal) >= 0 ? <TrendingUp className="w-4 h-4"/> : <TrendingDown className="w-4 h-4"/>}
                       {calculateGrowth(stats.onlineTotal, stats.comparison.onlineTotal)}%
                     </div>
                   )}
@@ -861,17 +1000,18 @@ export const AnalyticsDashboard: React.FC = () => {
                     <Landmark className="w-8 h-8" />
                   </div>
                   <div className="text-right">
-                     <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Traditional Share (New)</span>
+                     <span className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">Traditional Share (New)</span>
                      <div className="text-2xl font-black text-indigo-600">
-                       {stats.newPatients > 0 ? ((stats.offlineTotal / stats.newPatients) * 100).toFixed(0) : 0}%
+                        {/* Fixed arithmetic error by ensuring numeric types */}
+                       {Number(stats.newPatients) > 0 ? ((Number(stats.offlineTotal) / Number(stats.newPatients)) * 100).toFixed(0) : 0}%
                      </div>
                   </div>
                 </div>
                 <div className="flex items-end justify-between gap-4 mb-1">
                   <div className="text-4xl font-black text-slate-900">{stats.offlineTotal}</div>
                   {showComparison && stats.comparison && (
-                    <div className={`flex items-center gap-1 text-xs font-black ${Number(calculateGrowth(stats.offlineTotal, stats.comparison.offlineTotal)) >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
-                      {Number(calculateGrowth(stats.offlineTotal, stats.comparison.offlineTotal)) >= 0 ? <TrendingUp className="w-4 h-4"/> : <TrendingDown className="w-4 h-4"/>}
+                    <div className={`flex items-center gap-1 text-xs font-black ${calculateGrowth(stats.offlineTotal, stats.comparison.offlineTotal) >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                      {calculateGrowth(stats.offlineTotal, stats.comparison.offlineTotal) >= 0 ? <TrendingUp className="w-4 h-4"/> : <TrendingDown className="w-4 h-4"/>}
                       {calculateGrowth(stats.offlineTotal, stats.comparison.offlineTotal)}%
                     </div>
                   )}
