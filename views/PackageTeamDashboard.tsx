@@ -194,6 +194,13 @@ export const PackageTeamDashboard: React.FC = () => {
       const dateB = b.followup_date || b.packageProposal?.followUpDate ? new Date(b.followup_date || b.packageProposal!.followUpDate).getTime() : Infinity;
       return dateA - dateB; 
     }
+
+    // FIX: Special sorting for COMPLETED category based on completion date
+    if (listCategory === 'COMPLETED') {
+      const dateA = a.completed_surgery || a.packageProposal?.outcomeDate ? new Date(a.completed_surgery || a.packageProposal!.outcomeDate).getTime() : 0;
+      const dateB = b.completed_surgery || b.packageProposal?.outcomeDate ? new Date(b.completed_surgery || b.packageProposal!.outcomeDate).getTime() : 0;
+      return dateB - dateA; // Most recently completed first
+    }
     
     if (listCategory === 'PENDING') {
       const aHasOutcome = !!a.packageProposal?.outcome;
@@ -442,15 +449,24 @@ export const PackageTeamDashboard: React.FC = () => {
                                       followUpDateVal < todayStr && 
                                       (listCategory === 'FOLLOWUP' || (!hasOutcome && p.packageProposal?.outcome !== 'Lost'));
 
-                      // Section Splitter logic for Pending Tab
+                      // Section Splitter logic for Pending and COMPLETED tabs
                       const prevP = allPatients[index - 1];
                       const isFirstMoved = listCategory === 'PENDING' && hasOutcome && (!prevP || !prevP.packageProposal?.outcome);
                       
-                      const currentStatusUpdate = p.status_updated_at || p.updated_at || '';
-                      const currentUpdateDate = currentStatusUpdate.split('T')[0];
-                      const prevPStatusUpdate = prevP?.status_updated_at || prevP?.updated_at || '';
-                      const prevUpdateDate = prevPStatusUpdate.split('T')[0];
-                      const isNewDayInMoved = listCategory === 'PENDING' && hasOutcome && !!prevP?.packageProposal?.outcome && currentUpdateDate !== prevUpdateDate;
+                      let currentGroupDate = '';
+                      let prevGroupDate = '';
+
+                      if (listCategory === 'PENDING' && hasOutcome) {
+                          currentGroupDate = (p.status_updated_at || p.updated_at || '').split('T')[0];
+                          prevGroupDate = (prevP?.status_updated_at || prevP?.updated_at || '').split('T')[0];
+                      } else if (listCategory === 'COMPLETED') {
+                          // FIX: Sync grouping based on Surgery Completion Date for COMPLETED section
+                          currentGroupDate = (p.completed_surgery || p.packageProposal?.outcomeDate || '').split('T')[0];
+                          prevGroupDate = (prevP?.completed_surgery || prevP?.packageProposal?.outcomeDate || '').split('T')[0];
+                      }
+
+                      const isNewGroupDay = currentGroupDate && currentGroupDate !== prevGroupDate;
+                      const isFirstInGroup = isFirstMoved || (listCategory === 'COMPLETED' && index === 0);
 
                       return (
                         <React.Fragment key={p.id}>
@@ -463,10 +479,10 @@ export const PackageTeamDashboard: React.FC = () => {
                               </div>
                             </div>
                           )}
-                          {(isFirstMoved || isNewDayInMoved) && hasOutcome && (
-                             <div className="px-3 mb-2">
-                               <span className="text-[9px] font-black text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-100 shadow-sm flex items-center gap-2 w-fit">
-                                 <Calendar className="w-3 h-3" /> {formatToDDMMYYYY(currentUpdateDate)}
+                          {(isFirstInGroup || isNewGroupDay) && currentGroupDate && (
+                             <div className="px-3 mb-2 mt-2">
+                               <span className={`text-[9px] font-black px-3 py-1 rounded-full border shadow-sm flex items-center gap-2 w-fit ${listCategory === 'COMPLETED' ? 'text-teal-600 bg-teal-50 border-teal-100' : 'text-emerald-600 bg-emerald-50 border-emerald-100'}`}>
+                                 <Calendar className="w-3 h-3" /> {formatToDDMMYYYY(currentGroupDate)}
                                </span>
                              </div>
                           )}
@@ -607,10 +623,19 @@ export const PackageTeamDashboard: React.FC = () => {
                           <div className="flex items-center gap-1.5 mb-1"><Tag className="w-3 h-3 text-purple-500" /><span className="text-[8px] font-black text-purple-400 uppercase tracking-widest">Condition</span></div>
                           <div className="text-sm font-black text-purple-900 truncate leading-tight">{selectedPatient.condition}</div>
                         </div>
-                        <div className="bg-emerald-50 border border-emerald-100 p-3 rounded-2xl shadow-sm">
-                          <div className="flex items-center gap-1.5 mb-1"><Clock className="w-3 h-3 text-emerald-500" /><span className="text-[8px] font-black text-emerald-400 uppercase tracking-widest">Status Date</span></div>
-                          <div className="text-sm font-black text-emerald-900 truncate leading-tight">
-                            {selectedPatient.status_updated_at ? formatToDDMMYYYY(selectedPatient.status_updated_at) : '---'}
+                        <div className={`${selectedPatient.packageProposal?.outcome === 'Completed' ? 'bg-teal-50 border-teal-100' : 'bg-emerald-50 border-emerald-100'} border p-3 rounded-2xl shadow-sm`}>
+                          <div className="flex items-center gap-1.5 mb-1">
+                             <Clock className={`w-3 h-3 ${selectedPatient.packageProposal?.outcome === 'Completed' ? 'text-teal-500' : 'text-emerald-500'}`} />
+                             <span className={`text-[8px] font-black ${selectedPatient.packageProposal?.outcome === 'Completed' ? 'text-teal-400' : 'text-emerald-400'} uppercase tracking-widest`}>
+                               {selectedPatient.packageProposal?.outcome === 'Completed' ? 'Completion Date' : 'Status Date'}
+                             </span>
+                          </div>
+                          <div className={`text-sm font-black ${selectedPatient.packageProposal?.outcome === 'Completed' ? 'text-teal-900' : 'text-emerald-900'} truncate leading-tight`}>
+                            {/* FIX: Detail header prioritization for completion date */}
+                            {selectedPatient.packageProposal?.outcome === 'Completed' 
+                              ? formatToDDMMYYYY(selectedPatient.completed_surgery || selectedPatient.packageProposal?.outcomeDate)
+                              : selectedPatient.status_updated_at ? formatToDDMMYYYY(selectedPatient.status_updated_at) : '---'
+                            }
                           </div>
                         </div>
                       </div>

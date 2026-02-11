@@ -4,7 +4,8 @@ import { Patient, SurgeonCode, Condition } from '../types';
 import { 
   Users, Banknote, Download, Target, RefreshCw, Layers, Search, 
   Globe, MousePointer2, PieChart, UserPlus, ArrowUpRight, CheckCircle,
-  X, Phone, Calendar, Tag, Briefcase, Zap, Landmark, BarChart3, TrendingUp, TrendingDown, CalendarDays
+  X, Phone, Calendar, Tag, Briefcase, Zap, Landmark, BarChart3, TrendingUp, TrendingDown, CalendarDays,
+  PieChart as PieChartIcon, LayoutDashboard, Target as TargetIcon, Activity
 } from 'lucide-react';
 
 const formatDate = (dateString: string | undefined | null): string => {
@@ -23,10 +24,6 @@ const ONLINE_SOURCES = [
   'Google', 'Facebook', 'Instagram', 'WhatsApp', 'YouTube', 'Website', 'Friends / Online',
   'Google / YouTube / Website', 'FB / Insta / WhatsApp', 'Friend + Online'
 ];
-const OFFLINE_SOURCES = [
-  'Hospital Billboards', 'Doctor Recommended', 'Old Patient / Relatives', 'Other',
-  'Self / Old Patient / Relative', 'Others'
-];
 
 const SOURCE_DISPLAY_MAP: Record<string, string> = {
   'Google': 'Google / YouTube / Website',
@@ -43,10 +40,123 @@ const SOURCE_DISPLAY_MAP: Record<string, string> = {
   'Others': 'Others'
 };
 
+const CHART_COLORS = [
+  '#6366f1', // Indigo
+  '#10b981', // Emerald
+  '#f59e0b', // Amber
+  '#ef4444', // Rose
+  '#06b6d4', // Cyan
+  '#8b5cf6', // Violet
+  '#ec4899', // Pink
+  '#64748b', // Slate
+];
+
 const getSourceDisplay = (source: string | undefined): string => {
   if (!source) return 'Others';
   if (source.startsWith('Other: ')) return 'Others';
   return SOURCE_DISPLAY_MAP[source] || source;
+};
+
+// Robust helper to parse package amounts for accurate summation
+const parseAmount = (amt: any): number => {
+  if (amt == null) return 0;
+  if (typeof amt === 'number') return amt;
+  const cleaned = String(amt).replace(/[^0-9.-]+/g, '');
+  const parsed = parseInt(cleaned, 10);
+  return isNaN(parsed) ? 0 : parsed;
+};
+
+// SVG-based Pie/Donut Chart component for clinical and counseling breakdown
+const AnalyticsPieChart: React.FC<{ 
+  data: Record<string, number>, 
+  title: string, 
+  icon: React.ReactNode 
+}> = ({ data, title, icon }) => {
+  const entries = (Object.entries(data) as [string, number][]).sort((a, b) => b[1] - a[1]);
+  const total = entries.reduce((sum, [_, val]) => sum + val, 0);
+
+  if (total === 0) {
+    return (
+      <div className="bg-white rounded-[2.5rem] border border-slate-100 p-8 shadow-sm h-full flex flex-col items-center justify-center space-y-4">
+        <div className="p-4 bg-slate-50 rounded-2xl text-slate-300">{icon}</div>
+        <p className="text-[10px] font-black uppercase text-slate-300 tracking-widest text-center">No Data for {title}<br/>in selected range</p>
+      </div>
+    );
+  }
+
+  let cumulativePercent = 0;
+  const slices = entries.map(([name, val], i) => {
+    const percent = (val / total) * 100;
+    const startPercent = cumulativePercent;
+    cumulativePercent += percent;
+    
+    const x1 = Math.cos(2 * Math.PI * (startPercent / 100));
+    const y1 = Math.sin(2 * Math.PI * (startPercent / 100));
+    const x2 = Math.cos(2 * Math.PI * (cumulativePercent / 100));
+    const y2 = Math.sin(2 * Math.PI * (cumulativePercent / 100));
+    const largeArcFlag = percent > 50 ? 1 : 0;
+    
+    return {
+      name,
+      val,
+      percent: percent.toFixed(1),
+      path: `M 0 0 L ${x1} ${y1} A 1 1 0 ${largeArcFlag} 1 ${x2} ${y2} Z`,
+      color: CHART_COLORS[i % CHART_COLORS.length]
+    };
+  });
+
+  return (
+    <div className="bg-white rounded-[2.5rem] border border-slate-100 p-8 shadow-sm flex flex-col h-full animate-in fade-in duration-700">
+      <div className="flex items-center justify-between mb-8">
+        <div className="flex items-center gap-3">
+          <div className="p-2.5 bg-slate-50 rounded-xl text-slate-500">{icon}</div>
+          <div>
+            <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{title}</h4>
+            <div className="text-xl font-black text-slate-900">{total} <span className="text-[10px] text-slate-400">Cases</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex flex-col xl:flex-row items-center gap-8 flex-1">
+        <div className="relative w-36 h-36 lg:w-44 lg:h-44 shrink-0">
+          <svg viewBox="-1 -1 2 2" className="w-full h-full -rotate-90">
+            {slices.map((slice, i) => (
+              <path 
+                key={i} 
+                d={slice.path} 
+                fill={slice.color} 
+                className="hover:opacity-80 transition-opacity cursor-pointer"
+              >
+                <title>{slice.name}: {slice.val} ({slice.percent}%)</title>
+              </path>
+            ))}
+            <circle cx="0" cy="0" r="0.65" fill="white" />
+          </svg>
+          <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+            <span className="text-xl font-black text-slate-900 leading-none">{total}</span>
+            <span className="text-[8px] font-bold text-slate-400 uppercase tracking-tighter">Total</span>
+          </div>
+        </div>
+
+        <div className="flex-1 space-y-3 w-full">
+          {slices.map((slice, i) => (
+            <div key={i} className="flex items-center justify-between group">
+              <div className="flex items-center gap-2 overflow-hidden">
+                <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: slice.color }}></div>
+                <span className="text-[9px] font-black text-slate-600 uppercase truncate group-hover:text-slate-900 transition-colors">
+                  {slice.name}
+                </span>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <span className="text-[10px] font-black text-slate-900">{slice.val}</span>
+                <span className="text-[8px] font-bold text-slate-400 bg-slate-50 px-1.5 py-0.5 rounded-md">{slice.percent}%</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
 };
 
 export const AnalyticsDashboard: React.FC = () => {
@@ -89,81 +199,99 @@ export const AnalyticsDashboard: React.FC = () => {
 
   // Calculate stats for the selected range
   const stats = useMemo(() => {
-    const processSet = (dataset: Patient[]) => {
-        const arrivedPatients = dataset.filter(p => {
-          const status = (p.status || '').trim().toLowerCase();
-          return status !== 'scheduled';
-        });
+    const processSet = (dataset: Patient[], range: { from: string, to: string }) => {
+        // FLOW METRICS: Patients who arrived in the period (OPD Flow based on entry_date)
+        const arrivedPatients = dataset.filter(p => 
+          filterByRange(p.entry_date || p.registeredAt, range) && 
+          (p.status || '').trim().toLowerCase() !== 'scheduled'
+        );
 
-        const validDataset = arrivedPatients.filter(p => {
-          const vt = (p.visit_type || '').trim().toLowerCase();
-          return vt === 'new' || vt === 'revisit';
-        });
+        // REVENUE & COMPLETED METRICS: Patients who COMPLETED surgery in the period (using completed_surgery date)
+        const completedInPeriod = dataset.filter(p => 
+          p.packageProposal?.outcome === 'Completed' && 
+          filterByRange(p.completed_surgery || p.packageProposal?.outcomeDate, range)
+        );
 
-        const completedPatients = validDataset.filter(p => p.packageProposal?.outcome === 'Completed');
-        const revenue = completedPatients.reduce((sum, p) => {
-          const amt = parseInt(p.packageProposal?.packageAmount?.replace(/,/g, '') || '0', 10);
-          return sum + amt;
+        // SUM REVENUE: Only from the completedInPeriod set
+        const revenue = completedInPeriod.reduce((sum, p) => {
+          return sum + parseAmount(p.packageProposal?.packageAmount);
         }, 0);
 
-        const conversions = completedPatients.length;
-        const leads = validDataset.filter(p => p.doctorAssessment?.quickCode === SurgeonCode.S1).length;
+        const conversions = completedInPeriod.length;
+        const totalArrived = arrivedPatients.length;
+        const leads = arrivedPatients.filter(p => p.doctorAssessment?.quickCode === SurgeonCode.S1).length;
         const newPatients = arrivedPatients.filter(p => (p.visit_type || '').trim().toLowerCase() === 'new').length;
         const revisits = arrivedPatients.filter(p => (p.visit_type || '').trim().toLowerCase() === 'revisit').length;
-        const assessed = validDataset.filter(p => !!p.doctorAssessment).length;
 
+        // Grouping sources for both arrived flow and completed revenue
         const sourcesMap: Record<string, { total: number, completed: number, revenue: number, new: number, revisit: number }> = {};
-        let onlineTotal = 0;
-        let offlineTotal = 0;
-
-        validDataset.forEach(p => {
-          const rawS = p.source || 'Other';
-          const ds = getSourceDisplay(rawS);
-          
-          const isNew = (p.visit_type || '').trim().toLowerCase() === 'new';
-          
-          if (ONLINE_SOURCES.includes(rawS) || ONLINE_SOURCES.includes(ds)) {
-            if (isNew) onlineTotal++; // Count only new patients for digital flow totals
-          } else {
-            if (isNew) offlineTotal++; // Count only new patients for traditional flow totals
-          }
-
+        
+        arrivedPatients.forEach(p => {
+          const ds = getSourceDisplay(p.source);
           if (!sourcesMap[ds]) sourcesMap[ds] = { total: 0, completed: 0, revenue: 0, new: 0, revisit: 0 };
-          
-          const vt = (p.visit_type || '').trim().toLowerCase();
           sourcesMap[ds].total++;
-          if (vt === 'revisit') sourcesMap[ds].revisit++;
+          if ((p.visit_type || '').trim().toLowerCase() === 'revisit') sourcesMap[ds].revisit++;
           else sourcesMap[ds].new++;
+        });
 
-          if (p.packageProposal?.outcome === 'Completed') {
-            sourcesMap[ds].completed++;
-            sourcesMap[ds].revenue += parseInt(p.packageProposal.packageAmount?.replace(/,/g, '') || '0', 10);
+        // Map revenue strictly to the sources of the completed surgeries
+        completedInPeriod.forEach(p => {
+          const ds = getSourceDisplay(p.source);
+          if (!sourcesMap[ds]) sourcesMap[ds] = { total: 0, completed: 0, revenue: 0, new: 0, revisit: 0 };
+          sourcesMap[ds].completed++;
+          sourcesMap[ds].revenue += parseAmount(p.packageProposal?.packageAmount);
+        });
+
+        let onlineTotal = arrivedPatients.filter(p => {
+          const ds = getSourceDisplay(p.source);
+          return (ONLINE_SOURCES.includes(p.source) || ONLINE_SOURCES.includes(ds)) && (p.visit_type || '').trim().toLowerCase() === 'new';
+        }).length;
+
+        let offlineTotal = arrivedPatients.filter(p => {
+          const ds = getSourceDisplay(p.source);
+          return !(ONLINE_SOURCES.includes(p.source) || ONLINE_SOURCES.includes(ds)) && (p.visit_type || '').trim().toLowerCase() === 'new';
+        }).length;
+
+        // Aggregate Counseling Distributions
+        const decisionPatterns: Record<string, number> = {};
+        const proposalStages: Record<string, number> = {};
+        
+        // Merge datasets to find all active counseling activity in this period (arrived S1s or completions)
+        const counselingActiveSet = Array.from(new Map([...arrivedPatients, ...completedInPeriod].map(p => [p.id, p])).values());
+        
+        counselingActiveSet.forEach(p => {
+          if (p.packageProposal) {
+            const dp = p.packageProposal.decisionPattern || 'Not Defined';
+            decisionPatterns[dp] = (decisionPatterns[dp] || 0) + 1;
+
+            const ps = p.packageProposal.proposalStage || 'Not Defined';
+            proposalStages[ps] = (proposalStages[ps] || 0) + 1;
           }
         });
 
         return {
-            total: validDataset.length,
+            total: totalArrived,
             revenue,
             conversions,
             leads,
             newPatients,
             revisits,
-            assessed,
             onlineTotal,
             offlineTotal,
             sources: sourcesMap,
-            dataset: validDataset,
-            conversionRate: leads > 0 ? ((conversions / leads) * 100).toFixed(1) : '0'
+            arrivedDataset: arrivedPatients,
+            completedDataset: completedInPeriod,
+            conversionRate: leads > 0 ? ((conversions / leads) * 100).toFixed(1) : '0',
+            decisionPatterns,
+            proposalStages
         };
     };
 
-    const primaryPatients = patients.filter(p => filterByRange(p.entry_date || p.registeredAt, appliedRange));
-    const primaryStats = processSet(primaryPatients);
+    const primaryStats = processSet(patients, appliedRange);
     
     let compStats = null;
     if (showComparison && appliedCompRange) {
-        const compPatients = patients.filter(p => filterByRange(p.entry_date || p.registeredAt, appliedCompRange));
-        compStats = processSet(compPatients);
+        compStats = processSet(patients, appliedCompRange);
     }
 
     const scheduledCount = appointments.filter(a => filterByRange(a.date, appliedRange)).length;
@@ -183,24 +311,30 @@ export const AnalyticsDashboard: React.FC = () => {
         ...sData,
         conversionRate: sData.total > 0 ? ((sData.completed / sData.total) * 100).toFixed(1) : '0'
       };
-    }).sort((a, b) => b.total - a.total);
+    }).sort((a, b) => b.new - a.new);
   }, [stats.sources]);
 
   const handleExportDaily = () => {
-    const dateSet = new Set(stats.dataset.map(p => (p.entry_date || p.registeredAt.split('T')[0]) as string));
-    const dates = Array.from(dateSet).sort((a: string, b: string) => b.localeCompare(a));
-    const headers = ['Date', 'Arrivals', 'New Patients', 'Revisit Patients', 'Leads', 'Scheduled Surgery', 'Conversions', 'Opportunity'];
+    // Generate dates based on both arrival and completion events
+    const allDates = new Set([
+      ...stats.arrivedDataset.map(p => (p.entry_date || p.registeredAt.split('T')[0]) as string),
+      ...stats.completedDataset.map(p => (p.completed_surgery || p.packageProposal?.outcomeDate?.split('T')[0]) as string)
+    ]);
+    const dates = Array.from(allDates).filter(Boolean).sort((a: string, b: string) => b.localeCompare(a));
+    
+    const headers = ['Date', 'Arrivals', 'New Patients', 'Revisit Patients', 'Leads', 'Conversions', 'Actual Revenue'];
     const rows = dates.map((date: string) => {
-      const dayPatients = stats.dataset.filter(p => (p.entry_date || p.registeredAt.split('T')[0]) === date);
-      const rev = dayPatients.reduce((sum, p) => sum + parseInt(p.packageProposal?.packageAmount?.replace(/,/g, '') || '0', 10), 0);
+      const arrivedDay = stats.arrivedDataset.filter(p => (p.entry_date || p.registeredAt.split('T')[0]) === date);
+      const completedDay = stats.completedDataset.filter(p => (p.completed_surgery || p.packageProposal?.outcomeDate?.split('T')[0]) === date);
+      const rev = completedDay.reduce((sum, p) => sum + parseAmount(p.packageProposal?.packageAmount), 0);
+      
       return [
         formatDate(date).replace(/,/g, ''),
-        dayPatients.length,
-        dayPatients.filter(p => (p.visit_type || '').toLowerCase() === 'new').length,
-        dayPatients.filter(p => (p.visit_type || '').toLowerCase() === 'revisit').length,
-        dayPatients.filter(p => p.doctorAssessment?.quickCode === SurgeonCode.S1).length,
-        dayPatients.filter(p => p.packageProposal?.outcome === 'Scheduled').length,
-        dayPatients.filter(p => p.packageProposal?.outcome === 'Completed').length,
+        arrivedDay.length,
+        arrivedDay.filter(p => (p.visit_type || '').toLowerCase() === 'new').length,
+        arrivedDay.filter(p => (p.visit_type || '').toLowerCase() === 'revisit').length,
+        arrivedDay.filter(p => p.doctorAssessment?.quickCode === SurgeonCode.S1).length,
+        completedDay.length,
         rev
       ].join(',');
     });
@@ -209,7 +343,7 @@ export const AnalyticsDashboard: React.FC = () => {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.setAttribute('href', url);
-    link.setAttribute('download', `daily_report_${new Date().toISOString().split('T')[0]}.csv`);
+    link.setAttribute('download', `himas_financial_report_${new Date().toISOString().split('T')[0]}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -219,16 +353,16 @@ export const AnalyticsDashboard: React.FC = () => {
     let filteredData: Patient[] = [];
     switch (label) {
       case 'Online Traffic':
-        filteredData = stats.dataset.filter(p => {
+        filteredData = stats.arrivedDataset.filter(p => {
             const ds = getSourceDisplay(p.source);
-            return ONLINE_SOURCES.includes(p.source) || ONLINE_SOURCES.includes(ds);
-        }).filter(p => (p.visit_type || '').toLowerCase() === 'new');
+            return (ONLINE_SOURCES.includes(p.source) || ONLINE_SOURCES.includes(ds)) && (p.visit_type || '').toLowerCase() === 'new';
+        });
         break;
       case 'Offline Traffic':
-        filteredData = stats.dataset.filter(p => {
+        filteredData = stats.arrivedDataset.filter(p => {
             const ds = getSourceDisplay(p.source);
-            return !ONLINE_SOURCES.includes(p.source) && !ONLINE_SOURCES.includes(ds);
-        }).filter(p => (p.visit_type || '').toLowerCase() === 'new');
+            return !(ONLINE_SOURCES.includes(p.source) || ONLINE_SOURCES.includes(ds)) && (p.visit_type || '').toLowerCase() === 'new';
+        });
         break;
       case 'Scheduled Appts':
         filteredData = appointments
@@ -250,31 +384,27 @@ export const AnalyticsDashboard: React.FC = () => {
           } as Patient));
         break;
       case 'OPD Flow':
-        filteredData = stats.dataset;
-        break;
-      case 'New Patients':
-        filteredData = stats.dataset.filter(p => (p.visit_type || '').trim().toLowerCase() === 'new');
-        break;
-      case 'Revisit Count':
-        filteredData = stats.dataset.filter(p => (p.visit_type || '').trim().toLowerCase() === 'revisit');
+        filteredData = stats.arrivedDataset;
         break;
       case 'Surg Recommended':
-        filteredData = stats.dataset.filter(p => p.doctorAssessment?.quickCode === SurgeonCode.S1);
+        filteredData = stats.arrivedDataset.filter(p => p.doctorAssessment?.quickCode === SurgeonCode.S1);
         break;
       case 'Surg Completed':
       case 'Total Revenue':
-        filteredData = stats.dataset.filter(p => p.packageProposal?.outcome === 'Completed');
+        filteredData = stats.completedDataset;
         break;
       default:
-        filteredData = stats.dataset;
+        filteredData = stats.arrivedDataset;
     }
     setDrillDown({ label, data: filteredData });
   };
 
-  // Fix: Ensure calculateGrowth always returns a string to satisfy parseInt and JSX expectations
-  const calculateGrowth = (current: number, previous: number): string => {
-      if (previous === 0) return current > 0 ? '100' : '0';
-      return ((current - previous) / previous * 100).toFixed(0);
+  const calculateGrowth = (current: any, previous: any): string => {
+      // Fix: Explicitly cast to any and then Number to resolve arithmetic operation errors
+      const curr = Number(current) || 0;
+      const prev = Number(previous) || 0;
+      if (prev === 0) return curr > 0 ? '100' : '0';
+      return ((curr - prev) / prev * 100).toFixed(0);
   };
 
   return (
@@ -326,7 +456,7 @@ export const AnalyticsDashboard: React.FC = () => {
           { label: 'OPD Flow', val: stats.total, icon: Users, color: 'indigo', detail: `${stats.newPatients} New • ${stats.revisits} Revisit` },
           { label: 'Surg Recommended', val: stats.leads, icon: Target, color: 'indigo', detail: 'S1 Assessments' },
           { label: 'Surg Completed', val: stats.conversions, icon: CheckCircle, color: 'emerald', detail: `${stats.conversionRate}% Conversion Rate` },
-          { label: 'Total Revenue', val: `₹${stats.revenue.toLocaleString()}`, icon: Banknote, color: 'amber', detail: 'From Completed Surgeries' }
+          { label: 'Total Revenue', val: `₹${stats.revenue.toLocaleString()}`, icon: Banknote, color: 'amber', detail: 'Actual Realized Completed Sales' }
         ].map((card, idx) => (
           <div 
             key={idx} 
@@ -392,11 +522,12 @@ export const AnalyticsDashboard: React.FC = () => {
                        </div>
                        <div className="flex items-center gap-3">
                          <div className="p-2 bg-white rounded-xl text-slate-400"><Calendar className="w-3.5 h-3.5" /></div>
-                         <span className="text-[10px] font-black uppercase text-slate-600">{formatDate(p.entry_date)}</span>
+                         <span className="text-[10px] font-black uppercase text-slate-600">
+                           {p.packageProposal?.outcome === 'Completed' ? formatDate(p.completed_surgery || p.packageProposal?.outcomeDate) : formatDate(p.entry_date)}
+                         </span>
                        </div>
                        <div className="flex items-center gap-3">
                          <div className="p-2 bg-white rounded-xl text-slate-400"><Globe className="w-3.5 h-3.5" /></div>
-                         {/* Changed from getSourceDisplay to raw p.source for individual attribution accuracy */}
                          <span className="text-[10px] font-black uppercase text-slate-600 truncate max-w-[150px]">{p.source}</span>
                        </div>
                      </div>
@@ -415,12 +546,6 @@ export const AnalyticsDashboard: React.FC = () => {
                      </div>
                    </div>
                  ))}
-                 {drillDown.data.length === 0 && (
-                   <div className="col-span-full py-20 text-center space-y-4">
-                     <Briefcase className="w-16 h-16 text-slate-100 mx-auto" />
-                     <p className="text-[10px] font-black uppercase tracking-widest text-slate-300">No records found for this metric</p>
-                   </div>
-                 )}
                </div>
             </div>
             <footer className="p-6 border-t bg-slate-50/30 flex justify-end shrink-0">
@@ -435,7 +560,7 @@ export const AnalyticsDashboard: React.FC = () => {
         </div>
       )}
 
-      {/* Performance Data Table Section (Moved from Source Insights) */}
+      {/* Performance Data Table Section */}
       <div className="space-y-8 animate-in slide-in-from-bottom-6 duration-700">
         <div className="bg-white rounded-[2.5rem] border border-slate-100 overflow-hidden shadow-sm flex flex-col">
             <div className="p-8 border-b flex justify-between items-center bg-slate-50/30">
@@ -453,31 +578,37 @@ export const AnalyticsDashboard: React.FC = () => {
                     <th className="px-6 py-4 text-teal-600">New</th>
                     <th className="px-6 py-4 text-orange-600">Rev.</th>
                     <th className="px-6 py-4">Leads</th>
-                    <th className="px-6 py-4 text-indigo-600">Schd.</th>
-                    <th className="px-6 py-4">Conv.</th>
-                    <th className="px-6 py-4 text-right">Opp.</th>
+                    <th className="px-6 py-4 text-emerald-600">Conv.</th>
+                    <th className="px-6 py-4 text-right">Opp. (Revenue)</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
-                  {Array.from(new Set(stats.dataset.map(p => (p.entry_date || p.registeredAt.split('T')[0]) as string)))
-                    .sort((a: string, b: string) => b.localeCompare(a))
-                    .slice(0, 10)
-                    .map((date: string, i: number) => {
-                      const dayPatients = stats.dataset.filter(p => (p.entry_date || p.registeredAt.split('T')[0]) === date);
-                      const rev = dayPatients.reduce((sum, p) => sum + parseInt(p.packageProposal?.packageAmount?.replace(/,/g, '') || '0', 10), 0);
-                      return (
-                        <tr key={i} className="hover:bg-slate-50 transition-colors group">
-                          <td className="px-6 py-4 text-[11px] font-black text-slate-900">{formatDate(date)}</td>
-                          <td className="px-6 py-4 text-xs font-bold text-slate-600">{dayPatients.length}</td>
-                          <td className="px-6 py-4 text-xs font-bold text-teal-600">{dayPatients.filter(p => (p.visit_type || '').toLowerCase() === 'new').length}</td>
-                          <td className="px-6 py-4 text-xs font-bold text-orange-600">{dayPatients.filter(p => (p.visit_type || '').toLowerCase() === 'revisit').length}</td>
-                          <td className="px-6 py-4 text-xs font-bold text-indigo-500">{dayPatients.filter(p => p.doctorAssessment?.quickCode === SurgeonCode.S1).length}</td>
-                          <td className="px-6 py-4 text-xs font-bold text-indigo-600">{dayPatients.filter(p => p.packageProposal?.outcome === 'Scheduled').length}</td>
-                          <td className="px-6 py-4 text-xs font-bold text-emerald-600">{dayPatients.filter(p => p.packageProposal?.outcome === 'Completed').length}</td>
-                          <td className="px-6 py-4 text-right text-xs font-black text-slate-900">₹{rev.toLocaleString()}</td>
-                        </tr>
-                      );
-                    })}
+                  {(() => {
+                    const allDates = new Set([
+                      ...stats.arrivedDataset.map(p => (p.entry_date || p.registeredAt.split('T')[0]) as string),
+                      ...stats.completedDataset.map(p => (p.completed_surgery || p.packageProposal?.outcomeDate?.split('T')[0]) as string)
+                    ]);
+                    return Array.from(allDates)
+                      .filter(Boolean)
+                      .sort((a: string, b: string) => b.localeCompare(a))
+                      .slice(0, 10)
+                      .map((date: string, i: number) => {
+                        const arrivedDay = stats.arrivedDataset.filter(p => (p.entry_date || p.registeredAt.split('T')[0]) === date);
+                        const completedDay = stats.completedDataset.filter(p => (p.completed_surgery || p.packageProposal?.outcomeDate?.split('T')[0]) === date);
+                        const rev = completedDay.reduce((sum, p) => sum + parseAmount(p.packageProposal?.packageAmount), 0);
+                        return (
+                          <tr key={i} className="hover:bg-slate-50 transition-colors group">
+                            <td className="px-6 py-4 text-[11px] font-black text-slate-900">{formatDate(date)}</td>
+                            <td className="px-6 py-4 text-xs font-bold text-slate-600">{arrivedDay.length}</td>
+                            <td className="px-6 py-4 text-xs font-bold text-teal-600">{arrivedDay.filter(p => (p.visit_type || '').toLowerCase() === 'new').length}</td>
+                            <td className="px-6 py-4 text-xs font-bold text-orange-600">{arrivedDay.filter(p => (p.visit_type || '').toLowerCase() === 'revisit').length}</td>
+                            <td className="px-6 py-4 text-xs font-bold text-indigo-500">{arrivedDay.filter(p => p.doctorAssessment?.quickCode === SurgeonCode.S1).length}</td>
+                            <td className="px-6 py-4 text-xs font-bold text-emerald-600">{completedDay.length}</td>
+                            <td className="px-6 py-4 text-right text-xs font-black text-slate-900">₹{rev.toLocaleString()}</td>
+                          </tr>
+                        );
+                      });
+                  })()}
                 </tbody>
               </table>
             </div>
@@ -501,26 +632,23 @@ export const AnalyticsDashboard: React.FC = () => {
           <div className="bg-white rounded-[2.5rem] border border-slate-100 p-8 shadow-sm space-y-10">
             <div>
               <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-6 flex justify-between">
-                <span>Patient Flow (New vs Revisit)</span>
+                <span>Patient Flow (New Patients Only)</span>
                 <span className="flex gap-4">
-                  <span className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-hospital-500"></div> New</span>
-                  <span className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-indigo-300"></div> Revisit</span>
+                  <span className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-hospital-500"></div> New Patients</span>
                 </span>
               </h4>
               <div className="space-y-4">
                 {sourceStats.slice(0, 10).map((s, idx) => {
-                  const max = Math.max(...sourceStats.map(x => x.total), 1);
+                  const max = Math.max(...sourceStats.map(x => x.new), 1);
                   const pNew = (s.new / max * 100).toFixed(0);
-                  const pRevisit = (s.revisit / max * 100).toFixed(0);
                   return (
                     <div key={idx} className="group">
                       <div className="flex justify-between text-[10px] font-black uppercase mb-1.5">
                         <span className="text-slate-600 group-hover:text-hospital-600 transition-colors">{s.name}</span>
-                        <span className="text-slate-900">{s.total} <span className="text-slate-300 font-bold">({s.new}N/{s.revisit}R)</span></span>
+                        <span className="text-slate-900">{s.new} <span className="text-slate-300 font-bold">New</span></span>
                       </div>
                       <div className="h-2.5 bg-slate-50 rounded-full overflow-hidden border border-slate-100 flex">
                         <div className="h-full bg-hospital-500 transition-all duration-700" style={{ width: `${pNew}%` }}></div>
-                        <div className="h-full bg-indigo-300 transition-all duration-700" style={{ width: `${pRevisit}%` }}></div>
                       </div>
                     </div>
                   );
@@ -555,37 +683,90 @@ export const AnalyticsDashboard: React.FC = () => {
             </div>
           </div>
 
-          {/* Condition Distribution Section (Moved from bottom) */}
+          {/* Procedure Distribution Section */}
           <div className="bg-white rounded-[2.5rem] shadow-sm border border-slate-100 overflow-hidden flex flex-col">
             <div className="p-8 border-b bg-slate-50/30">
                <div className="flex items-center justify-between">
                  <div>
-                   <h3 className="text-lg font-black text-slate-900 uppercase">Condition Distribution</h3>
-                   <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest mt-1">Patient Volume by complaint</p>
+                   <h3 className="text-lg font-black text-slate-900 uppercase">Procedure Distribution</h3>
+                   <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest mt-1">Breakdown by Recommended Doctor Procedure</p>
                  </div>
-                 <BarChart3 className="w-6 h-6 text-slate-200" />
+                 <Activity className="w-6 h-6 text-slate-200" />
                </div>
             </div>
             <div className="p-8 space-y-4 flex-1">
-              {Array.from(new Set(stats.dataset.map(p => p.condition))).map((cond, idx) => {
-                const count = stats.dataset.filter(p => p.condition === cond).length;
-                const pct = ((count / (stats.total || 1)) * 100).toFixed(0);
-                return (
-                  <div key={idx} className="flex items-center gap-4">
-                    <span className="w-24 text-[10px] font-black text-slate-500 uppercase truncate">{cond}</span>
-                    <div className="flex-1 h-2.5 bg-slate-50 rounded-full overflow-hidden border border-slate-100">
-                      <div className="h-full bg-indigo-500 rounded-full transition-all duration-700" style={{ width: `${pct}%` }}></div>
-                    </div>
-                    <span className="w-8 text-right text-xs font-black text-slate-900">{count}</span>
-                  </div>
-                );
-              })}
+              {(() => {
+                // Filter patients who have a clinical procedure assigned by a doctor in the filtered period
+                const assessedDataset = stats.arrivedDataset.filter(p => p.doctorAssessment?.surgeryProcedure);
+                const totalAssessed = assessedDataset.length;
+                
+                // Aggregate counts for each procedure
+                const procedureCounts = assessedDataset.reduce((acc, p) => {
+                  let proc = p.doctorAssessment?.surgeryProcedure || 'Not Specified';
+                  // Resolve "Other" procedures to their specific name
+                  if (proc === 'Other' && p.doctorAssessment?.otherSurgeryName) {
+                    proc = p.doctorAssessment.otherSurgeryName;
+                  }
+                  acc[proc] = (acc[proc] || 0) + 1;
+                  return acc;
+                }, {} as Record<string, number>);
+
+                return Object.entries(procedureCounts)
+                  .sort((a, b) => b[1] - a[1])
+                  .map(([proc, count], idx) => {
+                    const pct = ((count / (totalAssessed || 1)) * 100).toFixed(0);
+                    return (
+                      <div key={idx} className="flex items-center gap-4">
+                        <span className="w-32 text-[9px] font-black text-slate-500 uppercase truncate" title={proc}>{proc}</span>
+                        <div className="flex-1 h-2.5 bg-slate-50 rounded-full overflow-hidden border border-slate-100">
+                          <div className="h-full bg-indigo-500 rounded-full transition-all duration-700" style={{ width: `${pct}%` }}></div>
+                        </div>
+                        <span className="w-8 text-right text-xs font-black text-slate-900">{count}</span>
+                      </div>
+                    );
+                  });
+              })()}
+              {stats.arrivedDataset.filter(p => p.doctorAssessment?.surgeryProcedure).length === 0 && (
+                <div className="flex flex-col items-center justify-center h-full py-10 opacity-30">
+                  <BarChart3 className="w-12 h-12 mb-2" />
+                  <span className="text-[10px] font-black uppercase tracking-widest">No Procedures Found</span>
+                </div>
+              )}
             </div>
           </div>
         </div>
       </div>
 
-      {/* Digital vs Traditional Flow Section (Moved to bottom) */}
+      {/* Counseling Analytics Section */}
+      <div className="space-y-8 animate-in slide-in-from-bottom-6 duration-700">
+        <div className="flex items-center justify-between border-b border-slate-200 pb-4">
+          <div>
+            <h3 className="text-2xl font-black text-slate-900 uppercase tracking-tight flex items-center gap-3">
+              <PieChartIcon className="w-7 h-7 text-hospital-600" />
+              Counseling Pie Charts
+            </h3>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] mt-1">Decision Patterns & Proposal Stages breakdown</p>
+          </div>
+          <div className="p-3 bg-hospital-50 rounded-2xl">
+            <TargetIcon className="w-6 h-6 text-hospital-600" />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+           <AnalyticsPieChart 
+             data={stats.decisionPatterns} 
+             title="Decision Pattern" 
+             icon={<LayoutDashboard className="w-5 h-5" />} 
+           />
+           <AnalyticsPieChart 
+             data={stats.proposalStages} 
+             title="Proposal Stage" 
+             icon={<Layers className="w-5 h-5" />} 
+           />
+        </div>
+      </div>
+
+      {/* Digital vs Traditional Flow Section */}
       <div className="pb-20 space-y-8 animate-in slide-in-from-bottom-6 duration-700">
         <div className="flex flex-col md:flex-row md:items-center justify-between border-b border-slate-200 pb-4 gap-4">
            <div>
@@ -674,7 +855,7 @@ export const AnalyticsDashboard: React.FC = () => {
                     <Landmark className="w-8 h-8" />
                   </div>
                   <div className="text-right">
-                     <span className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">Traditional Share (New)</span>
+                     <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Traditional Share (New)</span>
                      <div className="text-2xl font-black text-indigo-600">
                        {stats.newPatients > 0 ? ((stats.offlineTotal / stats.newPatients) * 100).toFixed(0) : 0}%
                      </div>
@@ -721,7 +902,7 @@ export const AnalyticsDashboard: React.FC = () => {
                     const groupKey = graphGranularity === 'monthly' ? (p: Patient) => (p.entry_date || p.registeredAt).substring(0, 7) : (p: Patient) => (p.entry_date || p.registeredAt.split('T')[0]);
                     
                     // Filter dataset to only include new patients for graph calculations
-                    const newPatientsOnly = stats.dataset.filter(p => (p.visit_type || '').toLowerCase() === 'new');
+                    const newPatientsOnly = stats.arrivedDataset.filter(p => (p.visit_type || '').toLowerCase() === 'new');
                     const uniqueKeys = Array.from(new Set(newPatientsOnly.map(groupKey))).sort((a: any, b: any) => a.localeCompare(b)) as string[];
                     const visibleKeys = uniqueKeys.slice(graphGranularity === 'monthly' ? -12 : -15);
                     
@@ -762,7 +943,7 @@ export const AnalyticsDashboard: React.FC = () => {
                         </div>
                       );
                     });
-                 }, [stats.dataset, graphGranularity])}
+                 }, [stats.arrivedDataset, graphGranularity])}
               </div>
               <div className="mt-8 pt-6 border-t border-slate-50 flex items-center justify-center gap-10">
                   <div className="flex items-center gap-2">
