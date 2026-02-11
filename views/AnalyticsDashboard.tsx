@@ -376,8 +376,8 @@ export const AnalyticsDashboard: React.FC = () => {
     if (isTable) {
       headers = [
         'Patient ID', 'Name', 'Source', 'Status', 'Decision Pattern', 
-        'Proposal Stage', 'Arrived Date', 'Surgery Scheduled', 
-        'Surgery Follow-Up', 'Surgery Lost', 'Surgery Completed'
+        'Proposal Stage', 'Surgery Completed Date', 'Arrived Date', 
+        'Surgery Lost', 'Surgery Follow-Up', 'Surgery Scheduled'
       ];
       rows = drillDown.data.map(p => [
         p.id,
@@ -386,11 +386,11 @@ export const AnalyticsDashboard: React.FC = () => {
         p.packageProposal?.outcome || 'Pending',
         p.packageProposal?.decisionPattern || '',
         p.packageProposal?.proposalStage || '',
+        formatDate(p.completed_surgery || (p.packageProposal?.outcome === 'Completed' ? p.packageProposal.outcomeDate : null)),
         formatDate(p.entry_date || p.registeredAt),
-        formatDate(p.surgery_date || p.packageProposal?.surgeryDate),
-        formatDate(p.followup_date || p.packageProposal?.followUpDate),
         formatDate(p.surgery_lost_date || (p.packageProposal?.outcome === 'Lost' ? p.packageProposal.outcomeDate : null)),
-        formatDate(p.completed_surgery || (p.packageProposal?.outcome === 'Completed' ? p.packageProposal.outcomeDate : null))
+        formatDate(p.followup_date || p.packageProposal?.followUpDate),
+        formatDate(p.surgery_date || p.packageProposal?.surgeryDate)
       ]);
     } else {
       headers = ['ID', 'Name', 'Condition', 'Mobile', 'Type', 'Source', 'Arrived', 'Affordability', 'Amount'];
@@ -603,11 +603,11 @@ export const AnalyticsDashboard: React.FC = () => {
                            <th className="p-4">Status</th>
                            <th className="p-4">Decision Pattern</th>
                            <th className="p-4">Proposal Stage</th>
+                           <th className="p-4">Surgery Completed Date</th>
                            <th className="p-4">Arrived Date</th>
-                           <th className="p-4">Surgery Scheduled</th>
-                           <th className="p-4">Surgery Follow-Up</th>
                            <th className="p-4">Surgery Lost</th>
-                           <th className="p-4">Surgery Completed</th>
+                           <th className="p-4">Surgery Follow-Up</th>
+                           <th className="p-4">Surgery Scheduled</th>
                          </tr>
                        </thead>
                        <tbody className="divide-y divide-slate-100">
@@ -629,11 +629,11 @@ export const AnalyticsDashboard: React.FC = () => {
                              </td>
                              <td className="p-4 text-[10px] font-bold text-slate-600">{p.packageProposal?.decisionPattern || '---'}</td>
                              <td className="p-4 text-[10px] font-bold text-slate-600">{p.packageProposal?.proposalStage || '---'}</td>
-                             <td className="p-4 text-[10px] font-bold text-slate-500">{formatDate(p.entry_date || p.registeredAt)}</td>
-                             <td className="p-4 text-[10px] font-bold text-emerald-600">{formatDate(p.surgery_date || p.packageProposal?.surgeryDate)}</td>
-                             <td className="p-4 text-[10px] font-bold text-blue-600">{formatDate(p.followup_date || p.packageProposal?.followUpDate)}</td>
-                             <td className="p-4 text-[10px] font-bold text-rose-600">{formatDate(p.surgery_lost_date || (p.packageProposal?.outcome === 'Lost' ? p.packageProposal.outcomeDate : null))}</td>
                              <td className="p-4 text-[10px] font-bold text-teal-600">{formatDate(p.completed_surgery || (p.packageProposal?.outcome === 'Completed' ? p.packageProposal.outcomeDate : null))}</td>
+                             <td className="p-4 text-[10px] font-bold text-slate-500">{formatDate(p.entry_date || p.registeredAt)}</td>
+                             <td className="p-4 text-[10px] font-bold text-rose-600">{formatDate(p.surgery_lost_date || (p.packageProposal?.outcome === 'Lost' ? p.packageProposal.outcomeDate : null))}</td>
+                             <td className="p-4 text-[10px] font-bold text-blue-600">{formatDate(p.followup_date || p.packageProposal?.followUpDate)}</td>
+                             <td className="p-4 text-[10px] font-bold text-emerald-600">{formatDate(p.surgery_date || p.packageProposal?.surgeryDate)}</td>
                            </tr>
                          ))}
                        </tbody>

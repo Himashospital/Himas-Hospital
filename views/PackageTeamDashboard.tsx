@@ -190,15 +190,19 @@ export const PackageTeamDashboard: React.FC = () => {
     return true;
   }).sort((a, b) => {
     if (listCategory === 'FOLLOWUP') {
-      const dateA = a.followup_date || a.packageProposal?.followUpDate ? new Date(a.followup_date || a.packageProposal!.followUpDate).getTime() : Infinity;
-      const dateB = b.followup_date || b.packageProposal?.followUpDate ? new Date(b.followup_date || b.packageProposal!.followUpDate).getTime() : Infinity;
+      const valA = a.followup_date || a.packageProposal?.followUpDate;
+      const valB = b.followup_date || b.packageProposal?.followUpDate;
+      const dateA = valA ? new Date(valA).getTime() : Infinity;
+      const dateB = valB ? new Date(valB).getTime() : Infinity;
       return dateA - dateB; 
     }
 
     // FIX: Special sorting for COMPLETED category based on completion date
     if (listCategory === 'COMPLETED') {
-      const dateA = a.completed_surgery || a.packageProposal?.outcomeDate ? new Date(a.completed_surgery || a.packageProposal!.outcomeDate).getTime() : 0;
-      const dateB = b.completed_surgery || b.packageProposal?.outcomeDate ? new Date(b.completed_surgery || b.packageProposal!.outcomeDate).getTime() : 0;
+      const valA = a.completed_surgery || a.packageProposal?.outcomeDate;
+      const valB = b.completed_surgery || b.packageProposal?.outcomeDate;
+      const dateA = valA ? new Date(valA).getTime() : 0;
+      const dateB = valB ? new Date(valB).getTime() : 0;
       return dateB - dateA; // Most recently completed first
     }
     
@@ -508,7 +512,7 @@ export const PackageTeamDashboard: React.FC = () => {
                                       <AlertCircle className="w-2 h-2" /> OVERDUE
                                     </span>
                                   )}
-                                  <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded-full shadow-sm border border-transparent ${p.packageProposal?.outcome === 'Scheduled' ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : p.packageProposal?.outcome === 'Completed' ? 'bg-teal-100 text-teal-700 border-teal-200' : p.packageProposal?.outcome === 'Follow-Up' ? 'bg-blue-100 text-blue-700 border-blue-200' : p.packageProposal?.outcome === 'Lost' ? 'bg-rose-100 text-rose-700 border-rose-200' : 'bg-amber-50 text-amber-600'}`}>{p.packageProposal?.outcome || 'Pending Lead'}</span>
+                                  <span className={`text-[8px] font-black uppercase px-2.5 py-1.5 rounded-md shadow-sm border border-transparent whitespace-nowrap ${p.packageProposal?.outcome === 'Scheduled' ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : p.packageProposal?.outcome === 'Completed' ? 'bg-teal-100 text-teal-700 border-teal-200' : p.packageProposal?.outcome === 'Follow-Up' ? 'bg-blue-100 text-blue-700 border-blue-200' : p.packageProposal?.outcome === 'Lost' ? 'bg-rose-100 text-rose-700 border-rose-200' : 'bg-amber-50 text-amber-600'}`}>{p.packageProposal?.outcome || 'Pending Lead'}</span>
                                 </div>
                                 {p.packageProposal?.proposalStage && (
                                   <span className="text-[8px] font-black uppercase px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-600 border border-indigo-100 flex items-center gap-1">
