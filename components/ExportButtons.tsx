@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Download, Printer, Calendar as CalendarIcon, X, FileSpreadsheet } from 'lucide-react';
 import { Patient, PackageProposal, SurgeonCode } from '../types';
@@ -74,7 +73,8 @@ export const ExportButtons: React.FC<ExportButtonsProps> = ({ patients, role, se
       const today = formatDate(prop.outcomeDate || prop.proposalCreatedAt || new Date().toISOString());
       const stayText = prop.stayDays ? `${prop.stayDays} DAYS` : '---';
       const packageAmt = prop.packageAmount ? `₹ ${parseInt(prop.packageAmount.replace(/,/g, '')).toLocaleString()}` : '₹ 0';
-      const displaySource = p.source === 'Doctor Recommended' ? `DR. ${p.sourceDoctorName || 'RECOMMENDED'}` : p.source;
+      // Use raw source to display original stored value for old records
+      const displaySource = p.source === 'Doctor Recommended' ? `DR. ${p.sourceDoctorName || 'RECOMMENDED'}` : p.source.toUpperCase();
 
       const surgeryText = p.doctorAssessment?.surgeryProcedure === 'Other'
         ? (p.doctorAssessment?.otherSurgeryName || 'OTHER PROCEDURE')
@@ -261,6 +261,7 @@ export const ExportButtons: React.FC<ExportButtonsProps> = ({ patients, role, se
       p.mobile,
       p.occupation || '',
       p.insuranceName || 'N/A',
+      // Always use raw p.source to preserve original stored attribution
       p.source === 'Doctor Recommended' ? `Dr. ${p.sourceDoctorName || 'Recommended'}` : p.source,
       p.condition,
       getVisitTypeLabel(p, patients),

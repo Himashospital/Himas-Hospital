@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useHospital } from '../context/HospitalContext';
 import { ExportButtons } from '../components/ExportButtons';
@@ -23,6 +22,27 @@ const formatDate = (dateString: string | undefined | null): string => {
     return datePart;
   }
   return dateString;
+};
+
+const SOURCE_DISPLAY_MAP: Record<string, string> = {
+  'Google': 'Google / YouTube / Website',
+  'YouTube': 'Google / YouTube / Website',
+  'Website': 'Google / YouTube / Website',
+  'Facebook': 'FB / Insta / WhatsApp',
+  'Instagram': 'FB / Insta / WhatsApp',
+  'WhatsApp': 'FB / Insta / WhatsApp',
+  'Old Patient / Relatives': 'Self / Old Patient / Relative',
+  'Friends / Online': 'Friend + Online',
+  'Hospital Billboards': 'Hospital Billboards',
+  'Doctor Recommended': 'Doctor Recommended',
+  'Other': 'Others',
+  'Others': 'Others'
+};
+
+const getSourceDisplay = (source: string | undefined): string => {
+  if (!source) return 'Others';
+  if (source.startsWith('Other: ')) return 'Others';
+  return SOURCE_DISPLAY_MAP[source] || source;
 };
 
 const getHistoryStatus = (p: Patient): string => {
@@ -92,17 +112,13 @@ export const FrontOfficeDashboard: React.FC = () => {
   });
 
   const sourceConfig = [
-    { name: "Google", icon: <Chrome className="w-4 h-4 text-blue-500" /> },
-    { name: "Facebook", icon: <Facebook className="w-4 h-4 text-blue-600" /> },
-    { name: "Instagram", icon: <Instagram className="w-4 h-4 text-pink-500" /> },
-    { name: "WhatsApp", icon: <MessageCircle className="w-4 h-4 text-green-500" /> },
-    { name: "YouTube", icon: <Youtube className="w-4 h-4 text-red-600" /> },
-    { name: "Website", icon: <Globe className="w-4 h-4 text-slate-600" /> },
-    { name: "Old Patient / Relatives", icon: <UsersIcon className="w-4 h-4 text-amber-600" /> },
-    { name: "Friends / Online", icon: <Share2 className="w-4 h-4 text-indigo-500" /> },
+    { name: "Google / YouTube / Website", icon: <Chrome className="w-4 h-4 text-blue-500" /> },
+    { name: "FB / Insta / WhatsApp", icon: <Facebook className="w-4 h-4 text-blue-600" /> },
+    { name: "Self / Old Patient / Relative", icon: <UsersIcon className="w-4 h-4 text-amber-600" /> },
+    { name: "Friend + Online", icon: <Share2 className="w-4 h-4 text-indigo-500" /> },
     { name: "Hospital Billboards", icon: <Tag className="w-4 h-4 text-slate-500" /> },
     { name: "Doctor Recommended", icon: <Stethoscope className="w-4 h-4 text-teal-500" /> },
-    { name: "Other", icon: <PlusCircle className="w-4 h-4 text-slate-400" /> }
+    { name: "Others", icon: <PlusCircle className="w-4 h-4 text-slate-400" /> }
   ];
 
   const statusOptions = ['Arrived', 'Doctor Done', 'Medication Done', 'Package Proposal', 'Surgery Scheduled', 'Follow-Up Surgery', 'Surgery Lost', 'Surgery Completed', 'Scheduled', 'Follow Up', 'Revisit'];
@@ -147,10 +163,9 @@ export const FrontOfficeDashboard: React.FC = () => {
 
   const handleEdit = (item: any) => {
     if (activeTab === 'APPOINTMENTS') {
-      let source = item.source || '';
       let sourceOtherDetails = '';
-      if (source.startsWith('Other: ')) { sourceOtherDetails = source.substring(7); source = 'Other'; }
-      setBookingData({ ...item, source, sourceOtherDetails, bookingType: item.bookingType || 'Scheduled' });
+      if (item.source?.startsWith('Other: ')) { sourceOtherDetails = item.source.substring(7); }
+      setBookingData({ ...item, source: item.source, sourceOtherDetails, bookingType: item.bookingType || 'Scheduled' });
       setEditingId(item.id);
       setShowBookingForm(true);
     } else {
@@ -158,11 +173,10 @@ export const FrontOfficeDashboard: React.FC = () => {
       let sourceDoctorNotes = '';
       const notesMatch = sourceDoctorName.match(/\(Notes: (.*)\)$/);
       if (notesMatch && notesMatch[1]) { sourceDoctorName = sourceDoctorName.replace(notesMatch[0], '').trim(); sourceDoctorNotes = notesMatch[1]; }
-      let source = item.source || '';
       let sourceOtherDetails = '';
-      if (source.startsWith('Other: ')) { sourceOtherDetails = source.substring(7); source = 'Other'; }
+      if (item.source?.startsWith('Other: ')) { sourceOtherDetails = item.source.substring(7); }
       setFormData({ 
-        ...item, source, sourceOtherDetails, visitType: item.visitType || 'OPD', visit_type: item.visit_type || '', hasInsurance: item.hasInsurance || 'No', insuranceName: item.insuranceName || '', sourceDoctorName, sourceDoctorNotes,
+        ...item, source: item.source, sourceOtherDetails, visitType: item.visitType || 'OPD', visit_type: item.visit_type || '', hasInsurance: item.hasInsurance || 'No', insuranceName: item.insuranceName || '', sourceDoctorName, sourceDoctorNotes,
         entry_date: item.entry_date || new Date().toISOString().split('T')[0],
         arrivalTime: item.arrivalTime || new Date().toTimeString().split(' ')[0].substring(0, 5)
       });
@@ -174,7 +188,7 @@ export const FrontOfficeDashboard: React.FC = () => {
 
   const handleArrived = (appt: Appointment) => { 
     setFormData({ 
-      id: '', name: appt.name || '', dob: '', gender: undefined, age: undefined, mobile: appt.mobile || '', occupation: '', hasInsurance: 'No', insuranceName: '', source: appt.source || '', sourceDoctorName: appt.sourceDoctorName || '', condition: appt.condition, visitType: appt.bookingType === 'Follow Up' ? 'Follow Up' : 'OPD', visit_type: appt.visit_type || 'New',
+      id: '', name: appt.name || '', dob: '', gender: undefined, age: undefined, mobile: appt.mobile || '', occupation: '', hasInsurance: 'No', insuranceName: '', source: appt.source, sourceDoctorName: appt.sourceDoctorName || '', condition: appt.condition, visitType: appt.bookingType === 'Follow Up' ? 'Follow Up' : 'OPD', visit_type: appt.visit_type || 'New',
       entry_date: new Date().toISOString().split('T')[0],
       arrivalTime: new Date().toTimeString().split(' ')[0].substring(0, 5)
     }); 
@@ -203,7 +217,7 @@ export const FrontOfficeDashboard: React.FC = () => {
       mobile: item.mobile, 
       occupation: item.occupation || '', 
       condition: item.condition, 
-      source: item.source || 'Other', 
+      source: item.source || 'Others', 
       hasInsurance: item.hasInsurance || 'No', 
       insuranceName: item.insuranceName || '', 
       sourceDoctorName: item.sourceDoctorName || '', 
@@ -234,7 +248,7 @@ export const FrontOfficeDashboard: React.FC = () => {
     const apptData: any = {
       name: item.name,
       mobile: item.mobile,
-      source: item.source || 'Other',
+      source: item.source || 'Others',
       sourceDoctorName: item.sourceDoctorName || '',
       condition: item.condition,
       date: revisitScheduleData.date,
@@ -260,8 +274,14 @@ export const FrontOfficeDashboard: React.FC = () => {
     e.preventDefault();
     const isBasicValid = bookingData.name && bookingData.mobile && bookingData.date && bookingData.time && bookingData.source && bookingData.condition;
     if (!isBasicValid) return alert("Please provide all details.");
+    
+    const displaySource = getSourceDisplay(bookingData.source);
+    if (displaySource === 'Doctor Recommended' && !bookingData.sourceDoctorName) return alert("Please provide the Doctor Name.");
+    if (displaySource === 'Others' && !bookingData.sourceOtherDetails) return alert("Please provide source details.");
+
     const payload = { ...bookingData, bookingType: 'Scheduled' }; 
-    if (payload.source === 'Other' && payload.sourceOtherDetails) payload.source = `Other: ${payload.sourceOtherDetails}`;
+    if (displaySource === 'Others' && payload.sourceOtherDetails) payload.source = `Other: ${payload.sourceOtherDetails}`;
+    
     if (editingId && activeTab === 'APPOINTMENTS') await updateAppointment({ ...payload, id: editingId } as Appointment);
     else await addAppointment(payload as any);
     setShowBookingForm(false);
@@ -274,8 +294,10 @@ export const FrontOfficeDashboard: React.FC = () => {
     e.preventDefault();
     if (step === 1 && !editingId) {
       if (!formData.name || formData.age == null || !formData.gender || !formData.mobile || !formData.condition) return alert("Please complete all mandatory fields.");
-      if (formData.source === 'Doctor Recommended' && !formData.sourceDoctorName) return alert("Please provide the Doctor Name.");
-      if (formData.source === 'Other' && !formData.sourceOtherDetails) return alert("Please provide details for 'Other' source.");
+      
+      const displaySource = getSourceDisplay(formData.source);
+      if (displaySource === 'Doctor Recommended' && !formData.sourceDoctorName) return alert("Please provide the Doctor Name.");
+      if (displaySource === 'Others' && !formData.sourceOtherDetails) return alert("Please provide details for the source.");
       if (formData.hasInsurance === 'Yes' && !formData.insuranceName) return alert("Please provide the Insurance Name.");
       
       const isRevisit = patients.some(p => p.mobile === formData.mobile);
@@ -287,8 +309,10 @@ export const FrontOfficeDashboard: React.FC = () => {
     // Step 2 logic or step 1 edit logic
     if (!formData.id) return alert("Case Number is required.");
     const dataToSave = { ...formData };
-    if (dataToSave.source === 'Doctor Recommended' && dataToSave.sourceDoctorName) dataToSave.sourceDoctorName = dataToSave.sourceDoctorNotes ? `${dataToSave.sourceDoctorName} (Notes: ${dataToSave.sourceDoctorNotes})` : dataToSave.sourceDoctorName;
-    if (dataToSave.source === 'Other' && dataToSave.sourceOtherDetails) dataToSave.source = `Other: ${dataToSave.sourceOtherDetails}`;
+    
+    const displaySource = getSourceDisplay(dataToSave.source);
+    if (displaySource === 'Doctor Recommended' && dataToSave.sourceDoctorName) dataToSave.sourceDoctorName = dataToSave.sourceDoctorNotes ? `${dataToSave.sourceDoctorName} (Notes: ${dataToSave.sourceDoctorNotes})` : dataToSave.sourceDoctorName;
+    if (displaySource === 'Others' && dataToSave.sourceOtherDetails) dataToSave.source = `Other: ${dataToSave.sourceOtherDetails}`;
     
     if (editingId) { 
       const originalPatient = patients.find(p => p.id === editingId); 
@@ -344,7 +368,7 @@ export const FrontOfficeDashboard: React.FC = () => {
     if (activeTab === 'GLOBAL_SEARCH') {
       if (historyFilters.type !== 'ALL' && item.recordType !== historyFilters.type) return false;
       if (historyFilters.startDate || historyFilters.endDate) { const itemDate = item.displayEntryDate || ''; if (historyFilters.startDate && itemDate < historyFilters.startDate) return false; if (historyFilters.endDate && itemDate > historyFilters.endDate) return false; }
-      if (historyFilters.source && item.source !== historyFilters.source) return false;
+      if (historyFilters.source && getSourceDisplay(item.source) !== historyFilters.source) return false;
       if (historyFilters.visitType !== 'ALL' && calculateVisitType(item, patients) !== historyFilters.visitType) return false;
       if (historyFilters.status && item.displayStatus !== historyFilters.status) return false;
       if (historyFilters.condition && item.condition !== historyFilters.condition) return false;
@@ -573,9 +597,19 @@ export const FrontOfficeDashboard: React.FC = () => {
                     <div><label className="block text-[10px] font-black uppercase text-slate-400 mb-2 tracking-widest">Primary Complaint</label><select required className="w-full border-b-2 border-slate-100 p-2 outline-none focus:border-hospital-500 text-sm font-bold bg-white" value={bookingData.condition || ''} onChange={e => setBookingData({...bookingData, condition: e.target.value as Condition})}><option value="">Select Condition</option>{Object.values(Condition).map(c => <option key={c} value={c}>{c}</option>)}</select></div>
                     <div><label className="block text-[10px] font-black uppercase text-slate-400 mb-2 tracking-widest">Appt Date</label><input required type="date" className="w-full border-b-2 border-slate-100 p-2 text-sm font-bold" value={bookingData.date || ''} onChange={e => setBookingData({...bookingData, date: e.target.value})} /></div>
                     <div><label className="block text-[10px] font-black uppercase text-slate-400 mb-2 tracking-widest">Appt Time</label><input required type="time" className="w-full border-b-2 border-slate-100 p-2 text-sm font-bold" value={bookingData.time || ''} onChange={e => setBookingData({...bookingData, time: e.target.value})} /></div>
-                    <div><label className="block text-[10px] font-black uppercase text-slate-400 mb-2 tracking-widest">Lead Source</label><select required className="w-full border-b-2 border-slate-100 p-2 text-sm font-bold bg-white" value={bookingData.source || ''} onChange={e => setBookingData({...bookingData, source: e.target.value})}><option value="">Select Source</option>{sourceConfig.map(s => <option key={s.name} value={s.name}>{s.name}</option>)}</select></div>
-                    {bookingData.source === 'Doctor Recommended' && (<div className="md:col-span-2 animate-in slide-in-from-top-2 duration-300"><label className="block text-[10px] font-black uppercase text-hospital-600 mb-2 tracking-widest">Doctor Name</label><input required className="w-full text-xl font-bold border-b-2 border-hospital-100 p-2 outline-none focus:border-hospital-500 placeholder-slate-200" value={bookingData.sourceDoctorName || ''} onChange={e => setBookingData({...bookingData, sourceDoctorName: e.target.value})} placeholder="Dr. Enter Name" /></div>)}
-                    {bookingData.source === 'Other' && (<div className="md:col-span-2 animate-in slide-in-from-top-2 duration-300"><label className="block text-[10px] font-black uppercase text-hospital-600 mb-2 tracking-widest">Other Details</label><input required className="w-full text-xl font-bold border-b-2 border-hospital-100 p-2 outline-none focus:border-hospital-500 placeholder-slate-200" value={bookingData.sourceOtherDetails || ''} onChange={e => setBookingData({...bookingData, sourceOtherDetails: e.target.value})} placeholder="Enter Details..." /></div>)}
+                    <div><label className="block text-[10px] font-black uppercase text-slate-400 mb-2 tracking-widest">Lead Source</label><select required className="w-full border-b-2 border-slate-100 p-2 text-sm font-bold bg-white" value={getSourceDisplay(bookingData.source) || ''} onChange={e => setBookingData({...bookingData, source: e.target.value})}><option value="">Select Source</option>{sourceConfig.map(s => <option key={s.name} value={s.name}>{s.name}</option>)}</select></div>
+                    {getSourceDisplay(bookingData.source) === 'Doctor Recommended' && (
+                      <div className="md:col-span-2 animate-in slide-in-from-top-2 duration-300">
+                        <label className="block text-[10px] font-black uppercase text-hospital-600 mb-2 tracking-widest">Doctor Name</label>
+                        <input required className="w-full text-xl font-bold border-b-2 border-hospital-100 p-2 outline-none focus:border-hospital-500 placeholder-slate-200" value={bookingData.sourceDoctorName || ''} onChange={e => setBookingData({...bookingData, sourceDoctorName: e.target.value})} placeholder="Dr. Enter Name" />
+                      </div>
+                    )}
+                    {getSourceDisplay(bookingData.source) === 'Others' && (
+                      <div className="md:col-span-2 animate-in slide-in-from-top-2 duration-300">
+                        <label className="block text-[10px] font-black uppercase text-hospital-600 mb-2 tracking-widest">Source Name / Details</label>
+                        <input required className="w-full text-xl font-bold border-b-2 border-hospital-100 p-2 outline-none focus:border-hospital-500 placeholder-slate-200" value={bookingData.sourceOtherDetails || ''} onChange={e => setBookingData({...bookingData, sourceOtherDetails: e.target.value})} placeholder="Enter specific source name or details..." />
+                      </div>
+                    )}
                  </div>
                  <button type="submit" className="w-full py-4 bg-hospital-600 text-white rounded-2xl font-black text-xs uppercase shadow-xl hover:scale-105 transition-all mt-6">{editingId ? 'Update Appointment' : 'Create Appointment'}</button>
                </form>
@@ -623,11 +657,21 @@ export const FrontOfficeDashboard: React.FC = () => {
                        <div><label className="block text-[10px] font-black uppercase text-slate-500 mb-2">Mobile</label><input required type="tel" className="w-full text-xl border-b-2 border-slate-100 p-2 outline-none" value={formData.mobile || ''} onChange={e => setFormData({...formData, mobile: e.target.value})} /></div>
                        <div><label className="block text-[10px] font-black uppercase text-slate-500 mb-2">Condition</label><select required className="w-full border-b-2 border-slate-100 p-2 bg-white" value={formData.condition || ''} onChange={e => setFormData({...formData, condition: e.target.value as Condition})}><option value="">Select...</option>{Object.values(Condition).map(c => <option key={c} value={c}>{c}</option>)}</select></div>
                        <div><label className="block text-[10px] font-black uppercase text-slate-500 mb-2">Occupation</label><input className="w-full border-b-2 border-slate-100 p-2 outline-none" value={formData.occupation || ''} onChange={e => setFormData({...formData, occupation: e.target.value})} /></div>
-                       <div><label className="block text-[10px] font-black uppercase text-slate-500 mb-2">How did you hear about us?</label><select className="w-full border-b-2 border-slate-100 p-2 bg-white" value={formData.source || ''} onChange={e => setFormData({...formData, source: e.target.value})}><option value="">Select...</option>{sourceConfig.map(s => <option key={s.name} value={s.name}>{s.name}</option>)}</select></div>
+                       <div><label className="block text-[10px] font-black uppercase text-slate-500 mb-2">How did you hear about us?</label><select className="w-full border-b-2 border-slate-100 p-2 bg-white" value={getSourceDisplay(formData.source) || ''} onChange={e => setFormData({...formData, source: e.target.value})}><option value="">Select...</option>{sourceConfig.map(s => <option key={s.name} value={s.name}>{s.name}</option>)}</select></div>
                        <div><label className="block text-[10px] font-black uppercase text-slate-500 mb-2">Insurance</label><div className="flex gap-2 p-1 bg-slate-100 rounded-xl">{['Yes', 'No'].map(v => (<button key={v} type="button" onClick={() => setFormData({...formData, hasInsurance: v as any})} className={`flex-1 py-2 rounded-lg text-[10px] font-black uppercase transition-all ${formData.hasInsurance === v ? 'bg-hospital-600 text-white shadow' : 'text-slate-500'}`}>{v}</button>))}</div></div>
                        {formData.hasInsurance === 'Yes' && (<div className="animate-in slide-in-from-top-2 duration-300"><label className="block text-[10px] font-black uppercase text-hospital-600 mb-2 tracking-widest">Insurance Name</label><input required className="w-full text-lg font-bold border-b-2 border-hospital-100 p-2 outline-none focus:border-hospital-500 placeholder-slate-200" value={formData.insuranceName || ''} onChange={e => setFormData({...formData, insuranceName: e.target.value})} placeholder="Enter Insurance Provider" /></div>)}
-                       {formData.source === 'Doctor Recommended' && (<div className="animate-in slide-in-from-top-2 duration-300"><label className="block text-[10px] font-black uppercase text-hospital-600 mb-2 tracking-widest">Doctor Name</label><input required className="w-full text-lg font-bold border-b-2 border-hospital-100 p-2 outline-none focus:border-hospital-500 placeholder-slate-200" value={formData.sourceDoctorName || ''} onChange={e => setFormData({...formData, sourceDoctorName: e.target.value})} placeholder="Enter Doctor Name" /></div>)}
-                       {formData.source === 'Other' && (<div className="animate-in slide-in-from-top-2 duration-300"><label className="block text-[10px] font-black uppercase text-hospital-600 mb-2 tracking-widest">Other Details</label><input required className="w-full text-lg font-bold border-b-2 border-hospital-100 p-2 outline-none focus:border-hospital-500 placeholder-slate-200" value={formData.sourceOtherDetails || ''} onChange={e => setFormData({...formData, sourceOtherDetails: e.target.value})} placeholder="Enter Details" /></div>)}
+                       {getSourceDisplay(formData.source) === 'Doctor Recommended' && (
+                         <div className="animate-in slide-in-from-top-2 duration-300">
+                           <label className="block text-[10px] font-black uppercase text-hospital-600 mb-2 tracking-widest">Doctor Name</label>
+                           <input required className="w-full text-xl font-bold border-b-2 border-hospital-100 p-2 outline-none focus:border-hospital-500 placeholder-slate-200" value={formData.sourceDoctorName || ''} onChange={e => setFormData({...formData, sourceDoctorName: e.target.value})} placeholder="Enter Doctor Name" />
+                         </div>
+                       )}
+                       {getSourceDisplay(formData.source) === 'Others' && (
+                         <div className="animate-in slide-in-from-top-2 duration-300">
+                           <label className="block text-[10px] font-black uppercase text-hospital-600 mb-2 tracking-widest">Source Name / Details</label>
+                           <input required className="w-full text-xl font-bold border-b-2 border-hospital-100 p-2 outline-none focus:border-hospital-500 placeholder-slate-200" value={formData.sourceOtherDetails || ''} onChange={e => setFormData({...formData, sourceOtherDetails: e.target.value})} placeholder="Enter specific source name or details..." />
+                         </div>
+                       )}
                     </div>
                   ) : (
                     <div className="py-10 sm:py-20 flex flex-col items-center space-y-10"><h2 className="text-2xl sm:text-4xl font-black text-slate-900 uppercase">Assign Case Number</h2><input required className="text-3xl sm:text-5xl font-mono text-center border-4 border-slate-100 p-6 sm:p-10 rounded-[2.5rem] w-full focus:border-hospital-500 outline-none uppercase font-black" value={formData.id || ''} onChange={e => setFormData({...formData, id: e.target.value.toUpperCase().trim()})} placeholder="HMS-000" /></div>

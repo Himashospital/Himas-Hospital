@@ -19,8 +19,35 @@ const formatMonth = (dateString: string | undefined | null): string => {
   return date.toLocaleDateString('en-IN', { month: 'short', year: 'numeric' });
 };
 
-const ONLINE_SOURCES = ['Google', 'Facebook', 'Instagram', 'WhatsApp', 'YouTube', 'Website', 'Friends / Online'];
-const OFFLINE_SOURCES = ['Hospital Billboards', 'Doctor Recommended', 'Old Patient / Relatives', 'Other'];
+const ONLINE_SOURCES = [
+  'Google', 'Facebook', 'Instagram', 'WhatsApp', 'YouTube', 'Website', 'Friends / Online',
+  'Google / YouTube / Website', 'FB / Insta / WhatsApp', 'Friend + Online'
+];
+const OFFLINE_SOURCES = [
+  'Hospital Billboards', 'Doctor Recommended', 'Old Patient / Relatives', 'Other',
+  'Self / Old Patient / Relative', 'Others'
+];
+
+const SOURCE_DISPLAY_MAP: Record<string, string> = {
+  'Google': 'Google / YouTube / Website',
+  'YouTube': 'Google / YouTube / Website',
+  'Website': 'Google / YouTube / Website',
+  'Facebook': 'FB / Insta / WhatsApp',
+  'Instagram': 'FB / Insta / WhatsApp',
+  'WhatsApp': 'FB / Insta / WhatsApp',
+  'Old Patient / Relatives': 'Self / Old Patient / Relative',
+  'Friends / Online': 'Friend + Online',
+  'Hospital Billboards': 'Hospital Billboards',
+  'Doctor Recommended': 'Doctor Recommended',
+  'Other': 'Others',
+  'Others': 'Others'
+};
+
+const getSourceDisplay = (source: string | undefined): string => {
+  if (!source) return 'Others';
+  if (source.startsWith('Other: ')) return 'Others';
+  return SOURCE_DISPLAY_MAP[source] || source;
+};
 
 export const AnalyticsDashboard: React.FC = () => {
   const { patients, appointments } = useHospital();
@@ -90,27 +117,27 @@ export const AnalyticsDashboard: React.FC = () => {
         let offlineTotal = 0;
 
         validDataset.forEach(p => {
-          let s = p.source || 'Other';
-          if (s.startsWith('Other: ')) s = 'Other';
+          const rawS = p.source || 'Other';
+          const ds = getSourceDisplay(rawS);
           
           const isNew = (p.visit_type || '').trim().toLowerCase() === 'new';
           
-          if (ONLINE_SOURCES.includes(s)) {
+          if (ONLINE_SOURCES.includes(rawS) || ONLINE_SOURCES.includes(ds)) {
             if (isNew) onlineTotal++; // Count only new patients for digital flow totals
           } else {
             if (isNew) offlineTotal++; // Count only new patients for traditional flow totals
           }
 
-          if (!sourcesMap[s]) sourcesMap[s] = { total: 0, completed: 0, revenue: 0, new: 0, revisit: 0 };
+          if (!sourcesMap[ds]) sourcesMap[ds] = { total: 0, completed: 0, revenue: 0, new: 0, revisit: 0 };
           
           const vt = (p.visit_type || '').trim().toLowerCase();
-          sourcesMap[s].total++;
-          if (vt === 'revisit') sourcesMap[s].revisit++;
-          else sourcesMap[s].new++;
+          sourcesMap[ds].total++;
+          if (vt === 'revisit') sourcesMap[ds].revisit++;
+          else sourcesMap[ds].new++;
 
           if (p.packageProposal?.outcome === 'Completed') {
-            sourcesMap[s].completed++;
-            sourcesMap[s].revenue += parseInt(p.packageProposal.packageAmount?.replace(/,/g, '') || '0', 10);
+            sourcesMap[ds].completed++;
+            sourcesMap[ds].revenue += parseInt(p.packageProposal.packageAmount?.replace(/,/g, '') || '0', 10);
           }
         });
 
@@ -192,16 +219,16 @@ export const AnalyticsDashboard: React.FC = () => {
     let filteredData: Patient[] = [];
     switch (label) {
       case 'Online Traffic':
-        filteredData = stats.dataset.filter(p => 
-            ONLINE_SOURCES.includes(p.source.startsWith('Other: ') ? 'Other' : p.source) && 
-            (p.visit_type || '').toLowerCase() === 'new'
-        );
+        filteredData = stats.dataset.filter(p => {
+            const ds = getSourceDisplay(p.source);
+            return ONLINE_SOURCES.includes(p.source) || ONLINE_SOURCES.includes(ds);
+        }).filter(p => (p.visit_type || '').toLowerCase() === 'new');
         break;
       case 'Offline Traffic':
-        filteredData = stats.dataset.filter(p => 
-            !ONLINE_SOURCES.includes(p.source.startsWith('Other: ') ? 'Other' : p.source) && 
-            (p.visit_type || '').toLowerCase() === 'new'
-        );
+        filteredData = stats.dataset.filter(p => {
+            const ds = getSourceDisplay(p.source);
+            return !ONLINE_SOURCES.includes(p.source) && !ONLINE_SOURCES.includes(ds);
+        }).filter(p => (p.visit_type || '').toLowerCase() === 'new');
         break;
       case 'Scheduled Appts':
         filteredData = appointments
@@ -369,6 +396,7 @@ export const AnalyticsDashboard: React.FC = () => {
                        </div>
                        <div className="flex items-center gap-3">
                          <div className="p-2 bg-white rounded-xl text-slate-400"><Globe className="w-3.5 h-3.5" /></div>
+                         {/* Changed from getSourceDisplay to raw p.source for individual attribution accuracy */}
                          <span className="text-[10px] font-black uppercase text-slate-600 truncate max-w-[150px]">{p.source}</span>
                        </div>
                      </div>
@@ -557,7 +585,7 @@ export const AnalyticsDashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* Digital vs Traditional Section (Moved to bottom) */}
+      {/* Digital vs Traditional Flow Section (Moved to bottom) */}
       <div className="pb-20 space-y-8 animate-in slide-in-from-bottom-6 duration-700">
         <div className="flex flex-col md:flex-row md:items-center justify-between border-b border-slate-200 pb-4 gap-4">
            <div>
@@ -631,10 +659,9 @@ export const AnalyticsDashboard: React.FC = () => {
                 </div>
                 <div className="text-xs font-black text-slate-400 uppercase tracking-widest">Online Sources</div>
                 <div className="mt-6 pt-6 border-t border-slate-50 flex flex-wrap gap-2">
-                  {ONLINE_SOURCES.slice(0, 4).map(s => (
+                  {['Google / YouTube / Website', 'FB / Insta / WhatsApp', 'Friend + Online'].map(s => (
                     <span key={s} className="text-[8px] font-black px-2 py-1 rounded-full bg-slate-50 text-slate-400 uppercase">{s}</span>
                   ))}
-                  <span className="text-[8px] font-black px-2 py-1 rounded-full bg-slate-50 text-slate-400 uppercase">+{ONLINE_SOURCES.length - 4} More</span>
                 </div>
               </div>
 
@@ -647,8 +674,8 @@ export const AnalyticsDashboard: React.FC = () => {
                     <Landmark className="w-8 h-8" />
                   </div>
                   <div className="text-right">
-                     <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Traditional Share (New)</span>
-                     <div className="text-2xl font-black text-slate-600">
+                     <span className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">Traditional Share (New)</span>
+                     <div className="text-2xl font-black text-indigo-600">
                        {stats.newPatients > 0 ? ((stats.offlineTotal / stats.newPatients) * 100).toFixed(0) : 0}%
                      </div>
                   </div>
@@ -664,7 +691,7 @@ export const AnalyticsDashboard: React.FC = () => {
                 </div>
                 <div className="text-xs font-black text-slate-400 uppercase tracking-widest">Offline Sources</div>
                 <div className="mt-6 pt-6 border-t border-slate-50 flex flex-wrap gap-2">
-                  {OFFLINE_SOURCES.map(s => (
+                  {['Hospital Billboards', 'Doctor Recommended', 'Self / Old Patient / Relative', 'Others'].map(s => (
                     <span key={s} className="text-[8px] font-black px-2 py-1 rounded-full bg-slate-50 text-slate-400 uppercase">{s}</span>
                   ))}
                 </div>
@@ -700,7 +727,10 @@ export const AnalyticsDashboard: React.FC = () => {
                     
                     return visibleKeys.map((key, i) => {
                       const dayPatients = newPatientsOnly.filter(p => groupKey(p) === key);
-                      const onlineVol = dayPatients.filter(p => ONLINE_SOURCES.includes(p.source.startsWith('Other: ') ? 'Other' : p.source)).length;
+                      const onlineVol = dayPatients.filter(p => {
+                          const ds = getSourceDisplay(p.source);
+                          return ONLINE_SOURCES.includes(p.source) || ONLINE_SOURCES.includes(ds);
+                      }).length;
                       const offlineVol = dayPatients.length - onlineVol;
                       
                       const maxTotal = Math.max(...visibleKeys.map(k => newPatientsOnly.filter(p => groupKey(p) === k).length), 1);
