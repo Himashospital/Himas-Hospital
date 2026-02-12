@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { useHospital } from "../context/HospitalContext";
 import { supabase } from "../services/supabaseClient";
@@ -26,7 +25,7 @@ export const Login: React.FC = () => {
 
   const demoPasswords: Record<string, string> = {
     'office@himas.com': 'Himas1984@',
-    'doctor@himas.com': 'Doctor8419@',
+    'doctor@himas.com': 'Doctor@123',
     'team@himas.com': 'Team8131@',
     'report@himas.com': 'Report@123'
   };

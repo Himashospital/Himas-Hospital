@@ -67,9 +67,10 @@ const parseAmount = (amt: any): number => {
 };
 
 // Fixed calculateGrowth to return a number for better compatibility with arithmetic operations and type safety in TSX
+// Added explicit number typing for internal variables to prevent arithmetic operation errors
 const calculateGrowth = (current: any, previous: any): number => {
-  const curr = Number(current) || 0;
-  const prev = Number(previous) || 0;
+  const curr: number = Number(current) || 0;
+  const prev: number = Number(previous) || 0;
   if (prev === 0) return curr > 0 ? 100 : 0;
   return ((curr - prev) / prev) * 100;
 };
@@ -287,14 +288,14 @@ export const AnalyticsDashboard: React.FC = () => {
         });
 
         return {
-            total: totalArrived,
-            revenue,
-            conversions,
-            leads,
-            newPatients,
-            revisits,
-            onlineTotal,
-            offlineTotal,
+            total: totalArrived as number,
+            revenue: revenue as number,
+            conversions: conversions as number,
+            leads: leads as number,
+            newPatients: newPatients as number,
+            revisits: revisits as number,
+            onlineTotal: onlineTotal as number,
+            offlineTotal: offlineTotal as number,
             sources: sourcesMap,
             arrivedDataset: arrivedPatients,
             completedDataset: completedInPeriod,
@@ -316,7 +317,7 @@ export const AnalyticsDashboard: React.FC = () => {
 
     return {
       ...primaryStats,
-      scheduledCount,
+      scheduledCount: scheduledCount as number,
       comparison: compStats
     };
   }, [patients, appointments, appliedRange, showComparison, appliedCompRange]);
@@ -969,8 +970,8 @@ export const AnalyticsDashboard: React.FC = () => {
                   <div className="text-right">
                      <span className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">Digital Share (New)</span>
                      <div className="text-2xl font-black text-indigo-600">
-                        {/* Fixed arithmetic error by ensuring numeric types */}
-                       {Number(stats.newPatients) > 0 ? ((Number(stats.onlineTotal) / Number(stats.newPatients)) * 100).toFixed(0) : 0}%
+                        {/* Fixed arithmetic error by ensuring numeric types and casting explicitly */}
+                       {Number(stats.newPatients) > 0 ? (((Number(stats.onlineTotal) as number) / (Number(stats.newPatients) as number)) * 100).toFixed(0) : 0}%
                      </div>
                   </div>
                 </div>
@@ -978,8 +979,8 @@ export const AnalyticsDashboard: React.FC = () => {
                   <div className="text-4xl font-black text-slate-900">{stats.onlineTotal}</div>
                   {showComparison && stats.comparison && (
                     <div className={`flex items-center gap-1 text-xs font-black ${calculateGrowth(stats.onlineTotal, stats.comparison.onlineTotal) >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
-                      {calculateGrowth(stats.onlineTotal, stats.comparison.onlineTotal) >= 0 ? <TrendingUp className="w-4 h-4"/> : <TrendingDown className="w-4 h-4"/>}
-                      {calculateGrowth(stats.onlineTotal, stats.comparison.onlineTotal)}%
+                      {calculateGrowth(stats.onlineTotal, stats.comparison?.onlineTotal) >= 0 ? <TrendingUp className="w-4 h-4"/> : <TrendingDown className="w-4 h-4"/>}
+                      {calculateGrowth(stats.onlineTotal, stats.comparison?.onlineTotal).toFixed(1)}%
                     </div>
                   )}
                 </div>
@@ -1002,8 +1003,8 @@ export const AnalyticsDashboard: React.FC = () => {
                   <div className="text-right">
                      <span className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">Traditional Share (New)</span>
                      <div className="text-2xl font-black text-indigo-600">
-                        {/* Fixed arithmetic error by ensuring numeric types */}
-                       {Number(stats.newPatients) > 0 ? ((Number(stats.offlineTotal) / Number(stats.newPatients)) * 100).toFixed(0) : 0}%
+                        {/* Fixed arithmetic error by ensuring numeric types and casting explicitly */}
+                       {Number(stats.newPatients) > 0 ? (((Number(stats.offlineTotal) as number) / (Number(stats.newPatients) as number)) * 100).toFixed(0) : 0}%
                      </div>
                   </div>
                 </div>
@@ -1011,8 +1012,8 @@ export const AnalyticsDashboard: React.FC = () => {
                   <div className="text-4xl font-black text-slate-900">{stats.offlineTotal}</div>
                   {showComparison && stats.comparison && (
                     <div className={`flex items-center gap-1 text-xs font-black ${calculateGrowth(stats.offlineTotal, stats.comparison.offlineTotal) >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
-                      {calculateGrowth(stats.offlineTotal, stats.comparison.offlineTotal) >= 0 ? <TrendingUp className="w-4 h-4"/> : <TrendingDown className="w-4 h-4"/>}
-                      {calculateGrowth(stats.offlineTotal, stats.comparison.offlineTotal)}%
+                      {calculateGrowth(stats.offlineTotal, stats.comparison?.offlineTotal) >= 0 ? <TrendingUp className="w-4 h-4"/> : <TrendingDown className="w-4 h-4"/>}
+                      {calculateGrowth(stats.offlineTotal, stats.comparison?.offlineTotal).toFixed(1)}%
                     </div>
                   )}
                 </div>
