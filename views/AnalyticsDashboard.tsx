@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo } from 'react';
 import { useHospital } from '../context/HospitalContext';
 import { Patient, SurgeonCode, Condition } from '../types';
@@ -67,7 +68,7 @@ const parseAmount = (amt: any): number => {
 };
 
 // Fixed calculateGrowth to return a number for better compatibility with arithmetic operations and type safety in TSX
-// Added explicit number typing for internal variables to prevent arithmetic operation errors
+// Added explicit number typing and simplified arithmetic to satisfy strict TS requirements (TS2362/TS2363)
 const calculateGrowth = (current: any, previous: any): number => {
   const curr: number = Number(current) || 0;
   const prev: number = Number(previous) || 0;
@@ -234,7 +235,10 @@ export const AnalyticsDashboard: React.FC = () => {
 
         const conversions = completedInPeriod.length;
         const totalArrived = arrivedPatients.length;
-        const leads = arrivedPatients.filter(p => p.doctorAssessment?.quickCode === SurgeonCode.S1).length;
+        const leadsDataset = arrivedPatients.filter(p => p.doctorAssessment?.quickCode === SurgeonCode.S1);
+        const leads = leadsDataset.length;
+        const leadsRevenue = leadsDataset.reduce((sum, p) => sum + parseAmount(p.packageProposal?.packageAmount), 0);
+        
         const newPatients = arrivedPatients.filter(p => (p.visit_type || '').trim().toLowerCase() === 'new').length;
         const revisits = arrivedPatients.filter(p => (p.visit_type || '').trim().toLowerCase() === 'revisit').length;
 
@@ -264,7 +268,7 @@ export const AnalyticsDashboard: React.FC = () => {
 
         let offlineTotal = arrivedPatients.filter(p => {
           const ds = getSourceDisplay(p.source);
-          return !(ONLINE_SOURCES.includes(p.source) || ONLINE_SOURCES.includes(ds)) && (p.visit_type || '').trim().toLowerCase() === 'new';
+          return !(ONLINE_SOURCES.includes(p.source) || ONLINE_SOURCES.includes(ds)) && (p.visit_type || '').toLowerCase() === 'new';
         }).length;
 
         // Counseling status mix aggregation for new pie charts
@@ -292,6 +296,7 @@ export const AnalyticsDashboard: React.FC = () => {
             revenue: revenue as number,
             conversions: conversions as number,
             leads: leads as number,
+            leadsRevenue: leadsRevenue as number,
             newPatients: newPatients as number,
             revisits: revisits as number,
             onlineTotal: onlineTotal as number,
@@ -340,11 +345,13 @@ export const AnalyticsDashboard: React.FC = () => {
     ]);
     const dates = Array.from(allDates).filter(Boolean).sort((a: string, b: string) => b.localeCompare(a));
     
-    const headers = ['Date', 'Arrivals', 'New Patients', 'Revisit Patients', 'Leads', 'Conversions', 'Actual Revenue'];
+    const headers = ['Date', 'Arrivals', 'New Patients', 'Revisit Patients', 'Leads', 'Conversions', 'Opp. Revenue', 'Actual Revenue'];
     const rows = dates.map((date: string) => {
       const arrivedDay = stats.arrivedDataset.filter(p => (p.entry_date || p.registeredAt.split('T')[0]) === date);
       const completedDay = stats.completedDataset.filter(p => (p.completed_surgery || p.packageProposal?.outcomeDate?.split('T')[0]) === date);
-      const rev = completedDay.reduce((sum, p) => sum + parseAmount(p.packageProposal?.packageAmount), 0);
+      const actualRev = completedDay.reduce((sum, p) => sum + parseAmount(p.packageProposal?.packageAmount), 0);
+      
+      const combinedOppRev = arrivedDay.reduce((sum, p) => sum + parseAmount(p.packageProposal?.packageAmount), 0);
       
       return [
         formatDate(date).replace(/,/g, ''),
@@ -353,7 +360,8 @@ export const AnalyticsDashboard: React.FC = () => {
         arrivedDay.filter(p => (p.visit_type || '').toLowerCase() === 'revisit').length,
         arrivedDay.filter(p => p.doctorAssessment?.quickCode === SurgeonCode.S1).length,
         completedDay.length,
-        rev
+        combinedOppRev,
+        actualRev
       ].join(',');
     });
     const csvContent = [headers.join(','), ...rows].join('\n');
@@ -541,7 +549,7 @@ export const AnalyticsDashboard: React.FC = () => {
         {[
           { label: 'Scheduled Appts', val: stats.scheduledCount, icon: Calendar, color: 'slate', detail: 'Pending Arrivals' },
           { label: 'OPD Flow', val: stats.total, icon: Users, color: 'indigo', detail: `${stats.newPatients} New • ${stats.revisits} Revisit` },
-          { label: 'Surg Recommended', val: stats.leads, icon: Target, color: 'indigo', detail: 'S1 Assessments' },
+          { label: 'Surg Recommended', val: stats.leads, icon: Target, color: 'indigo', detail: 'S1 Assessments', subVal: `₹${stats.leadsRevenue.toLocaleString()}` },
           { label: 'Surg Completed', val: stats.conversions, icon: CheckCircle, color: 'emerald', detail: `${stats.conversionRate}% Conversion Rate` },
           { label: 'Total Revenue', val: `₹${stats.revenue.toLocaleString()}`, icon: Banknote, color: 'amber', detail: 'Actual Realized Completed Sales' }
         ].map((card, idx) => (
@@ -557,6 +565,7 @@ export const AnalyticsDashboard: React.FC = () => {
               <ArrowUpRight className="w-4 h-4 text-slate-300" />
             </div>
             <div className="text-3xl font-black text-slate-900 leading-none mb-2">{card.val}</div>
+            {card.subVal && <div className="text-sm font-black text-indigo-600 mb-2">{card.subVal}</div>}
             <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{card.label}</div>
             <div className={`mt-4 pt-4 border-t border-slate-50 text-[9px] font-bold text-${card.color}-600 uppercase`}>
               {card.detail}
@@ -727,6 +736,7 @@ export const AnalyticsDashboard: React.FC = () => {
                     <th className="px-6 py-4">Leads</th>
                     <th className="px-6 py-4 text-emerald-600">Conv.</th>
                     <th className="px-6 py-4 text-right">Opp. (Revenue)</th>
+                    <th className="px-6 py-4 text-right">Actual Revenue</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
@@ -742,7 +752,10 @@ export const AnalyticsDashboard: React.FC = () => {
                       .map((date: string, i: number) => {
                         const arrivedDay = stats.arrivedDataset.filter(p => (p.entry_date || p.registeredAt.split('T')[0]) === date);
                         const completedDay = stats.completedDataset.filter(p => (p.completed_surgery || p.packageProposal?.outcomeDate?.split('T')[0]) === date);
-                        const rev = completedDay.reduce((sum, p) => sum + parseAmount(p.packageProposal?.packageAmount), 0);
+                        const actualRev = completedDay.reduce((sum, p) => sum + parseAmount(p.packageProposal?.packageAmount), 0);
+                        
+                        const combinedOppRev = arrivedDay.reduce((sum, p) => sum + parseAmount(p.packageProposal?.packageAmount), 0);
+
                         return (
                           <tr key={i} className="hover:bg-slate-50 transition-colors group">
                             <td className="px-6 py-4 text-[11px] font-black text-slate-900">{formatDate(date)}</td>
@@ -751,7 +764,10 @@ export const AnalyticsDashboard: React.FC = () => {
                             <td className="px-6 py-4 text-xs font-bold text-orange-600">{arrivedDay.filter(p => (p.visit_type || '').toLowerCase() === 'revisit').length}</td>
                             <td className="px-6 py-4 text-xs font-bold text-indigo-500">{arrivedDay.filter(p => p.doctorAssessment?.quickCode === SurgeonCode.S1).length}</td>
                             <td className="px-6 py-4 text-xs font-bold text-emerald-600">{completedDay.length}</td>
-                            <td className="px-6 py-4 text-right text-xs font-black text-slate-900">₹{rev.toLocaleString()}</td>
+                            <td className="px-6 py-4 text-right text-xs font-black text-slate-900">
+                               ₹{combinedOppRev.toLocaleString()}
+                            </td>
+                            <td className="px-6 py-4 text-right text-xs font-black text-slate-900">₹{actualRev.toLocaleString()}</td>
                           </tr>
                         );
                       });
@@ -970,8 +986,8 @@ export const AnalyticsDashboard: React.FC = () => {
                   <div className="text-right">
                      <span className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">Digital Share (New)</span>
                      <div className="text-2xl font-black text-indigo-600">
-                        {/* Fixed arithmetic error by ensuring numeric types and casting explicitly */}
-                       {Number(stats.newPatients) > 0 ? (((Number(stats.onlineTotal) as number) / (Number(stats.newPatients) as number)) * 100).toFixed(0) : 0}%
+                        {/* Fixed arithmetic error by ensuring numeric types and casting explicitly to satisfy strict TS requirements */}
+                       {Number(stats.newPatients) > 0 ? (Math.round(((stats.onlineTotal as number) / (stats.newPatients as number)) * 100)) : 0}%
                      </div>
                   </div>
                 </div>
@@ -1003,8 +1019,8 @@ export const AnalyticsDashboard: React.FC = () => {
                   <div className="text-right">
                      <span className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">Traditional Share (New)</span>
                      <div className="text-2xl font-black text-indigo-600">
-                        {/* Fixed arithmetic error by ensuring numeric types and casting explicitly */}
-                       {Number(stats.newPatients) > 0 ? (((Number(stats.offlineTotal) as number) / (Number(stats.newPatients) as number)) * 100).toFixed(0) : 0}%
+                        {/* Fixed arithmetic error by ensuring numeric types and casting explicitly to satisfy strict TS requirements */}
+                       {Number(stats.newPatients) > 0 ? (Math.round(((stats.offlineTotal as number) / (stats.newPatients as number)) * 100)) : 0}%
                      </div>
                   </div>
                 </div>
