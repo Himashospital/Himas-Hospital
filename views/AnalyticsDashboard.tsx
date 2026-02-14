@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo } from 'react';
 import { useHospital } from '../context/HospitalContext';
 import { Patient, SurgeonCode, Condition } from '../types';
@@ -253,11 +254,8 @@ export const AnalyticsDashboard: React.FC = () => {
 
         const conversions = completedInPeriod.length;
 
-        // TOTAL OPD ACTIVITY UNION: Arrived in period OR Completed in period
-        const flowMap = new Map();
-        arrivedPatients.forEach(p => flowMap.set(p.id, p));
-        completedInPeriod.forEach(p => flowMap.set(p.id, p));
-        const flowDataset = Array.from(flowMap.values());
+        // TOTAL OPD ACTIVITY: Only Arrived in period (exclude 'move on' dates from flow metrics as per request)
+        const flowDataset = arrivedPatients;
 
         // STRICT visit_type BASED CALCULATION AS PER REQUEST
         const newPatientsCount = flowDataset.filter(p => (p.visit_type || '').trim().toLowerCase() === 'new').length;
@@ -310,10 +308,12 @@ export const AnalyticsDashboard: React.FC = () => {
         const decisionPatternMix: Record<string, number> = {};
         const proposalStageMix: Record<string, number> = {};
         
-        const activeCounselingPatients = Array.from(new Map([
-          ...arrivedPatients.filter(p => p.doctorAssessment?.quickCode === SurgeonCode.S1),
-          ...completedInPeriod
-        ].map(p => [p.id, p])).values());
+        // Active counseling pool includes everyone who arrived in range and had assessment
+        // OR completed in range (to ensure they show up in mix charts if they had activity)
+        const counselingPoolMap = new Map();
+        arrivedPatients.filter(p => p.doctorAssessment?.quickCode === SurgeonCode.S1).forEach(p => counselingPoolMap.set(p.id, p));
+        completedInPeriod.forEach(p => counselingPoolMap.set(p.id, p));
+        const activeCounselingPatients = Array.from(counselingPoolMap.values());
 
         activeCounselingPatients.forEach(p => {
           if (p.packageProposal) {
@@ -380,7 +380,7 @@ export const AnalyticsDashboard: React.FC = () => {
     
     const headers = ['Date', 'Total OPD Flow', 'New Patients', 'Revisit Patients', 'Leads', 'Conversions', 'Opp. Revenue', 'Actual Revenue'];
     const rows = dates.map((date: string) => {
-      const flowDay = stats.arrivedDataset.filter(p => (p.entry_date || p.registeredAt.split('T')[0]) === date || (p.completed_surgery || p.packageProposal?.outcomeDate?.split('T')[0]) === date);
+      const flowDay = stats.arrivedDataset.filter(p => (p.entry_date || p.registeredAt.split('T')[0]) === date);
       const completedDay = stats.completedDataset.filter(p => (p.completed_surgery || p.packageProposal?.outcomeDate?.split('T')[0]) === date);
       const actualRev = completedDay.reduce((sum, p) => sum + parseAmount(p.packageProposal?.packageAmount), 0);
       const combinedOppRev = flowDay.reduce((sum, p) => sum + parseAmount(p.packageProposal?.packageAmount), 0);
@@ -790,7 +790,7 @@ export const AnalyticsDashboard: React.FC = () => {
                       .sort((a: string, b: string) => b.localeCompare(a))
                       .slice(0, 10)
                       .map((date: string, i: number) => {
-                        const flowDay = stats.arrivedDataset.filter(p => (p.entry_date || p.registeredAt.split('T')[0]) === date || (p.completed_surgery || p.packageProposal?.outcomeDate?.split('T')[0]) === date);
+                        const flowDay = stats.arrivedDataset.filter(p => (p.entry_date || p.registeredAt.split('T')[0]) === date);
                         const completedDay = stats.completedDataset.filter(p => (p.completed_surgery || p.packageProposal?.outcomeDate?.split('T')[0]) === date);
                         const actualRev = completedDay.reduce((sum, p) => sum + parseAmount(p.packageProposal?.packageAmount), 0);
                         const combinedOppRev = flowDay.reduce((sum, p) => sum + parseAmount(p.packageProposal?.packageAmount), 0);
