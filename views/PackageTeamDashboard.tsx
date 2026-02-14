@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useHospital } from '../context/HospitalContext';
 import { ExportButtons } from '../components/ExportButtons';
@@ -66,6 +67,7 @@ export const PackageTeamDashboard: React.FC = () => {
   
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
   const [filter, setFilter] = useState<'ALL' | 'CR1' | 'CR2' | 'CR3' | 'CR4'>('ALL');
+  const [probabilityFilter, setProbabilityFilter] = useState<string>('ALL');
   
   const [outcomeModal, setOutcomeModal] = useState<{
     show: boolean;
@@ -145,6 +147,12 @@ export const PackageTeamDashboard: React.FC = () => {
     // Filter by Readiness (CR1-CR4) only for true Pending leads
     if (listCategory === 'PENDING' && filter !== 'ALL' && !outcome) {
       if (!p.doctorAssessment?.conversionReadiness?.startsWith(filter)) return false;
+    }
+
+    // Filter by Probability
+    if (probabilityFilter !== 'ALL') {
+      const stage = p.packageProposal?.proposalStage;
+      if (!stage || PROPOSAL_STAGES[stage]?.toString() !== probabilityFilter) return false;
     }
 
     // Advanced Filtering Logic based on Section using Common Date Filter
@@ -400,6 +408,19 @@ export const PackageTeamDashboard: React.FC = () => {
                   <input type="date" className={filterInputClasses} value={startDate} onChange={e => setStartDate(e.target.value)} />
                   <span className="text-[9px] font-black uppercase text-slate-400 shrink-0">To</span>
                   <input type="date" className={filterInputClasses} value={endDate} onChange={e => setEndDate(e.target.value)} />
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[9px] font-black uppercase text-slate-400 shrink-0">Prob. %</span>
+                  <select 
+                    className="h-10 w-28 bg-slate-50 border border-slate-100 rounded-xl px-2 text-[10px] font-bold focus:ring-2 focus:ring-hospital-500 outline-none transition-all appearance-none" 
+                    value={probabilityFilter} 
+                    onChange={e => setProbabilityFilter(e.target.value)}
+                  >
+                    <option value="ALL">All %</option>
+                    {Object.values(PROPOSAL_STAGES).map(pct => (
+                      <option key={pct} value={pct.toString()}>{pct}%</option>
+                    ))}
+                  </select>
                 </div>
               </div>
 
