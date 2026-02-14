@@ -1,5 +1,3 @@
-
-
 import React, { useState, useMemo } from 'react';
 import { useHospital } from '../context/HospitalContext';
 import { Patient, SurgeonCode, Condition } from '../types';
@@ -75,6 +73,26 @@ const calculateGrowth = (current: any, previous: any): number => {
   if (prev === 0) return curr > 0 ? 100 : 0;
   return ((curr - prev) / prev) * 100;
 };
+
+interface AnalyticsStats {
+  total: number;
+  revenue: number;
+  conversions: number;
+  leads: number;
+  leadsRevenue: number;
+  newPatients: number;
+  revisits: number;
+  onlineTotal: number;
+  offlineTotal: number;
+  sources: Record<string, { total: number, completed: number, revenue: number, new: number, revisit: number }>;
+  arrivedDataset: Patient[];
+  completedDataset: Patient[];
+  decisionPatternMix: Record<string, number>;
+  proposalStageMix: Record<string, number>;
+  conversionRate: string;
+  scheduledCount: number;
+  comparison: AnalyticsStats | null;
+}
 
 // SVG-based Pie/Donut Chart component for clinical and counseling breakdown
 const AnalyticsPieChart: React.FC<{ 
@@ -214,7 +232,7 @@ export const AnalyticsDashboard: React.FC = () => {
   };
 
   // Calculate stats for the selected range
-  const stats = useMemo(() => {
+  const stats: AnalyticsStats = useMemo(() => {
     const processSet = (dataset: Patient[], range: { from: string, to: string }) => {
         // FLOW METRICS: Patients who arrived in the period (OPD Flow based on entry_date)
         const arrivedPatients = dataset.filter(p => 
@@ -338,8 +356,8 @@ export const AnalyticsDashboard: React.FC = () => {
     return {
       ...primaryStats,
       scheduledCount: scheduledCount as number,
-      comparison: compStats
-    };
+      comparison: compStats as AnalyticsStats | null
+    } as AnalyticsStats;
   }, [patients, appointments, appliedRange, showComparison, appliedCompRange]);
 
   const sourceStats = useMemo(() => {
