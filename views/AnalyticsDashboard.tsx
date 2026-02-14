@@ -1,4 +1,5 @@
 
+
 import React, { useState, useMemo } from 'react';
 import { useHospital } from '../context/HospitalContext';
 import { Patient, SurgeonCode, Condition } from '../types';
@@ -68,10 +69,9 @@ const parseAmount = (amt: any): number => {
 };
 
 // Fixed calculateGrowth to return a number for better compatibility with arithmetic operations and type safety in TSX
-// Added explicit number typing and simplified arithmetic to satisfy strict TS requirements (TS2362/TS2363)
 const calculateGrowth = (current: any, previous: any): number => {
-  const curr: number = Number(current) || 0;
-  const prev: number = Number(previous) || 0;
+  const curr = Number(current) || 0;
+  const prev = Number(previous) || 0;
   if (prev === 0) return curr > 0 ? 100 : 0;
   return ((curr - prev) / prev) * 100;
 };
@@ -234,48 +234,64 @@ export const AnalyticsDashboard: React.FC = () => {
         }, 0);
 
         const conversions = completedInPeriod.length;
-        const totalArrived = arrivedPatients.length;
-        const leadsDataset = arrivedPatients.filter(p => p.doctorAssessment?.quickCode === SurgeonCode.S1);
+
+        // TOTAL OPD ACTIVITY UNION: Arrived in period OR Completed in period
+        const flowMap = new Map();
+        arrivedPatients.forEach(p => flowMap.set(p.id, p));
+        completedInPeriod.forEach(p => flowMap.set(p.id, p));
+        const flowDataset = Array.from(flowMap.values());
+
+        // STRICT visit_type BASED CALCULATION AS PER REQUEST
+        const newPatientsCount = flowDataset.filter(p => (p.visit_type || '').trim().toLowerCase() === 'new').length;
+        const revisitsCount = flowDataset.filter(p => (p.visit_type || '').trim().toLowerCase() === 'revisit').length;
+
+        // OPD Flow count calculated strictly based on visit_type column
+        const total = newPatientsCount + revisitsCount;
+        const newPatients = newPatientsCount;
+        const revisits = revisitsCount;
+
+        const leadsDataset = flowDataset.filter(p => p.doctorAssessment?.quickCode === SurgeonCode.S1);
         const leads = leadsDataset.length;
         const leadsRevenue = leadsDataset.reduce((sum, p) => sum + parseAmount(p.packageProposal?.packageAmount), 0);
-        
-        const newPatients = arrivedPatients.filter(p => (p.visit_type || '').trim().toLowerCase() === 'new').length;
-        const revisits = arrivedPatients.filter(p => (p.visit_type || '').trim().toLowerCase() === 'revisit').length;
 
-        // Grouping sources for both arrived flow and completed revenue
+        // Grouping sources for the entire flow dataset (filtered by visit_type existence)
         const sourcesMap: Record<string, { total: number, completed: number, revenue: number, new: number, revisit: number }> = {};
         
-        arrivedPatients.forEach(p => {
+        flowDataset.forEach(p => {
+          const vt = (p.visit_type || '').trim().toLowerCase();
+          if (vt !== 'new' && vt !== 'revisit') return;
+
           const ds = getSourceDisplay(p.source);
           if (!sourcesMap[ds]) sourcesMap[ds] = { total: 0, completed: 0, revenue: 0, new: 0, revisit: 0 };
           sourcesMap[ds].total++;
-          if ((p.visit_type || '').trim().toLowerCase() === 'revisit') sourcesMap[ds].revisit++;
+          
+          if (vt === 'revisit') sourcesMap[ds].revisit++;
           else sourcesMap[ds].new++;
         });
 
-        // Map revenue strictly to the sources of the completed surgeries
+        // Add revenue data to sources strictly from the completed set
         completedInPeriod.forEach(p => {
           const ds = getSourceDisplay(p.source);
-          if (!sourcesMap[ds]) sourcesMap[ds] = { total: 0, completed: 0, revenue: 0, new: 0, revisit: 0 };
-          sourcesMap[ds].completed++;
-          sourcesMap[ds].revenue += parseAmount(p.packageProposal?.packageAmount);
+          if (sourcesMap[ds]) {
+            sourcesMap[ds].completed++;
+            sourcesMap[ds].revenue += parseAmount(p.packageProposal?.packageAmount);
+          }
         });
 
-        let onlineTotal = arrivedPatients.filter(p => {
+        // Digital split for total flow (New + Revisit) strictly based on visit_type column
+        let onlineTotal = flowDataset.filter(p => {
+          const vt = (p.visit_type || '').trim().toLowerCase();
+          if (vt !== 'new' && vt !== 'revisit') return false;
           const ds = getSourceDisplay(p.source);
-          return (ONLINE_SOURCES.includes(p.source) || ONLINE_SOURCES.includes(ds)) && (p.visit_type || '').trim().toLowerCase() === 'new';
+          return (ONLINE_SOURCES.includes(p.source) || ONLINE_SOURCES.includes(ds));
         }).length;
 
-        let offlineTotal = arrivedPatients.filter(p => {
-          const ds = getSourceDisplay(p.source);
-          return !(ONLINE_SOURCES.includes(p.source) || ONLINE_SOURCES.includes(ds)) && (p.visit_type || '').toLowerCase() === 'new';
-        }).length;
+        let offlineTotal = total - onlineTotal;
 
-        // Counseling status mix aggregation for new pie charts
+        // Counseling status mix aggregation
         const decisionPatternMix: Record<string, number> = {};
         const proposalStageMix: Record<string, number> = {};
         
-        // Merge arrived S1s and completions to get the full Counseling pool relevant for this period
         const activeCounselingPatients = Array.from(new Map([
           ...arrivedPatients.filter(p => p.doctorAssessment?.quickCode === SurgeonCode.S1),
           ...completedInPeriod
@@ -292,7 +308,7 @@ export const AnalyticsDashboard: React.FC = () => {
         });
 
         return {
-            total: totalArrived as number,
+            total: total as number,
             revenue: revenue as number,
             conversions: conversions as number,
             leads: leads as number,
@@ -302,7 +318,7 @@ export const AnalyticsDashboard: React.FC = () => {
             onlineTotal: onlineTotal as number,
             offlineTotal: offlineTotal as number,
             sources: sourcesMap,
-            arrivedDataset: arrivedPatients,
+            arrivedDataset: flowDataset,
             completedDataset: completedInPeriod,
             decisionPatternMix,
             proposalStageMix,
@@ -312,7 +328,6 @@ export const AnalyticsDashboard: React.FC = () => {
 
     const primaryStats = processSet(patients, appliedRange);
     
-    // Explicitly type compStats as 'any' to avoid inference as 'null' and allow later assignment
     let compStats: any = null;
     if (showComparison && appliedCompRange) {
         compStats = processSet(patients, appliedCompRange);
@@ -335,7 +350,7 @@ export const AnalyticsDashboard: React.FC = () => {
         ...sData,
         conversionRate: sData.total > 0 ? ((sData.completed / sData.total) * 100).toFixed(1) : '0'
       };
-    }).sort((a, b) => b.new - a.new);
+    }).sort((a, b) => b.total - a.total);
   }, [stats.sources]);
 
   const handleExportDaily = () => {
@@ -345,20 +360,23 @@ export const AnalyticsDashboard: React.FC = () => {
     ]);
     const dates = Array.from(allDates).filter(Boolean).sort((a: string, b: string) => b.localeCompare(a));
     
-    const headers = ['Date', 'Arrivals', 'New Patients', 'Revisit Patients', 'Leads', 'Conversions', 'Opp. Revenue', 'Actual Revenue'];
+    const headers = ['Date', 'Total OPD Flow', 'New Patients', 'Revisit Patients', 'Leads', 'Conversions', 'Opp. Revenue', 'Actual Revenue'];
     const rows = dates.map((date: string) => {
-      const arrivedDay = stats.arrivedDataset.filter(p => (p.entry_date || p.registeredAt.split('T')[0]) === date);
+      const flowDay = stats.arrivedDataset.filter(p => (p.entry_date || p.registeredAt.split('T')[0]) === date || (p.completed_surgery || p.packageProposal?.outcomeDate?.split('T')[0]) === date);
       const completedDay = stats.completedDataset.filter(p => (p.completed_surgery || p.packageProposal?.outcomeDate?.split('T')[0]) === date);
       const actualRev = completedDay.reduce((sum, p) => sum + parseAmount(p.packageProposal?.packageAmount), 0);
+      const combinedOppRev = flowDay.reduce((sum, p) => sum + parseAmount(p.packageProposal?.packageAmount), 0);
       
-      const combinedOppRev = arrivedDay.reduce((sum, p) => sum + parseAmount(p.packageProposal?.packageAmount), 0);
-      
+      const dayNew = flowDay.filter(p => (p.visit_type || '').trim().toLowerCase() === 'new').length;
+      const dayRevisits = flowDay.filter(p => (p.visit_type || '').trim().toLowerCase() === 'revisit').length;
+      const dayArrivals = dayNew + dayRevisits;
+
       return [
         formatDate(date).replace(/,/g, ''),
-        arrivedDay.length,
-        arrivedDay.filter(p => (p.visit_type || '').toLowerCase() === 'new').length,
-        arrivedDay.filter(p => (p.visit_type || '').toLowerCase() === 'revisit').length,
-        arrivedDay.filter(p => p.doctorAssessment?.quickCode === SurgeonCode.S1).length,
+        dayArrivals,
+        dayNew,
+        dayRevisits,
+        flowDay.filter(p => p.doctorAssessment?.quickCode === SurgeonCode.S1).length,
         completedDay.length,
         combinedOppRev,
         actualRev
@@ -436,14 +454,18 @@ export const AnalyticsDashboard: React.FC = () => {
     switch (label) {
       case 'Online Traffic':
         filteredData = stats.arrivedDataset.filter(p => {
+            const vt = (p.visit_type || '').trim().toLowerCase();
+            if (vt !== 'new' && vt !== 'revisit') return false;
             const ds = getSourceDisplay(p.source);
-            return (ONLINE_SOURCES.includes(p.source) || ONLINE_SOURCES.includes(ds)) && (p.visit_type || '').toLowerCase() === 'new';
+            return (ONLINE_SOURCES.includes(p.source) || ONLINE_SOURCES.includes(ds));
         });
         break;
       case 'Offline Traffic':
         filteredData = stats.arrivedDataset.filter(p => {
+            const vt = (p.visit_type || '').trim().toLowerCase();
+            if (vt !== 'new' && vt !== 'revisit') return false;
             const ds = getSourceDisplay(p.source);
-            return !(ONLINE_SOURCES.includes(p.source) || ONLINE_SOURCES.includes(ds)) && (p.visit_type || '').toLowerCase() === 'new';
+            return !(ONLINE_SOURCES.includes(p.source) || ONLINE_SOURCES.includes(ds));
         });
         break;
       case 'Scheduled Appts':
@@ -482,7 +504,6 @@ export const AnalyticsDashboard: React.FC = () => {
   };
 
   const handleCounselingClick = (category: 'DP' | 'PS', label: string) => {
-    // Re-aggregate the relevant counseling pool for precise drill-down
     const counselingPool = Array.from(new Map([
       ...stats.arrivedDataset.filter(p => p.doctorAssessment?.quickCode === SurgeonCode.S1),
       ...stats.completedDataset
@@ -750,19 +771,23 @@ export const AnalyticsDashboard: React.FC = () => {
                       .sort((a: string, b: string) => b.localeCompare(a))
                       .slice(0, 10)
                       .map((date: string, i: number) => {
-                        const arrivedDay = stats.arrivedDataset.filter(p => (p.entry_date || p.registeredAt.split('T')[0]) === date);
+                        const flowDay = stats.arrivedDataset.filter(p => (p.entry_date || p.registeredAt.split('T')[0]) === date || (p.completed_surgery || p.packageProposal?.outcomeDate?.split('T')[0]) === date);
                         const completedDay = stats.completedDataset.filter(p => (p.completed_surgery || p.packageProposal?.outcomeDate?.split('T')[0]) === date);
                         const actualRev = completedDay.reduce((sum, p) => sum + parseAmount(p.packageProposal?.packageAmount), 0);
+                        const combinedOppRev = flowDay.reduce((sum, p) => sum + parseAmount(p.packageProposal?.packageAmount), 0);
                         
-                        const combinedOppRev = arrivedDay.reduce((sum, p) => sum + parseAmount(p.packageProposal?.packageAmount), 0);
+                        // Strict visit_type counts for the table row
+                        const dayNew = flowDay.filter(p => (p.visit_type || '').trim().toLowerCase() === 'new').length;
+                        const dayRevisits = flowDay.filter(p => (p.visit_type || '').trim().toLowerCase() === 'revisit').length;
+                        const dayArrivals = dayNew + dayRevisits;
 
                         return (
                           <tr key={i} className="hover:bg-slate-50 transition-colors group">
                             <td className="px-6 py-4 text-[11px] font-black text-slate-900">{formatDate(date)}</td>
-                            <td className="px-6 py-4 text-xs font-bold text-slate-600">{arrivedDay.length}</td>
-                            <td className="px-6 py-4 text-xs font-bold text-teal-600">{arrivedDay.filter(p => (p.visit_type || '').toLowerCase() === 'new').length}</td>
-                            <td className="px-6 py-4 text-xs font-bold text-orange-600">{arrivedDay.filter(p => (p.visit_type || '').toLowerCase() === 'revisit').length}</td>
-                            <td className="px-6 py-4 text-xs font-bold text-indigo-500">{arrivedDay.filter(p => p.doctorAssessment?.quickCode === SurgeonCode.S1).length}</td>
+                            <td className="px-6 py-4 text-xs font-bold text-slate-600">{dayArrivals}</td>
+                            <td className="px-6 py-4 text-xs font-bold text-teal-600">{dayNew}</td>
+                            <td className="px-6 py-4 text-xs font-bold text-orange-600">{dayRevisits}</td>
+                            <td className="px-6 py-4 text-xs font-bold text-indigo-500">{flowDay.filter(p => p.doctorAssessment?.quickCode === SurgeonCode.S1).length}</td>
                             <td className="px-6 py-4 text-xs font-bold text-emerald-600">{completedDay.length}</td>
                             <td className="px-6 py-4 text-right text-xs font-black text-slate-900">
                                ₹{combinedOppRev.toLocaleString()}
@@ -795,23 +820,23 @@ export const AnalyticsDashboard: React.FC = () => {
           <div className="bg-white rounded-[2.5rem] border border-slate-100 p-8 shadow-sm space-y-10">
             <div>
               <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-6 flex justify-between">
-                <span>Patient Flow (New Patients Only)</span>
+                <span>Total Patient Flow Attribution</span>
                 <span className="flex gap-4">
-                  <span className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-hospital-500"></div> New Patients</span>
+                  <span className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-hospital-500"></div> All OPD Traffic</span>
                 </span>
               </h4>
               <div className="space-y-4">
                 {sourceStats.slice(0, 10).map((s, idx) => {
-                  const max = Math.max(...sourceStats.map(x => x.new), 1);
-                  const pNew = (s.new / max * 100).toFixed(0);
+                  const max = Math.max(...sourceStats.map(x => x.total), 1);
+                  const pTotal = (s.total / max * 100).toFixed(0);
                   return (
                     <div key={idx} className="group">
                       <div className="flex justify-between text-[10px] font-black uppercase mb-1.5">
                         <span className="text-slate-600 group-hover:text-hospital-600 transition-colors">{s.name}</span>
-                        <span className="text-slate-900">{s.new} <span className="text-slate-300 font-bold">New</span></span>
+                        <span className="text-slate-900">{s.total} <span className="text-slate-300 font-bold">Total</span></span>
                       </div>
                       <div className="h-2.5 bg-slate-50 rounded-full overflow-hidden border border-slate-100 flex">
-                        <div className="h-full bg-hospital-500 transition-all duration-700" style={{ width: `${pNew}%` }}></div>
+                        <div className="h-full bg-hospital-500 transition-all duration-700" style={{ width: `${pTotal}%` }}></div>
                       </div>
                     </div>
                   );
@@ -932,7 +957,7 @@ export const AnalyticsDashboard: React.FC = () => {
         <div className="flex flex-col md:flex-row md:items-center justify-between border-b border-slate-200 pb-4 gap-4">
            <div>
              <h3 className="text-2xl font-black text-slate-900 uppercase">Digital vs Traditional Flow</h3>
-             <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] mt-1">Source Category Comparison (Online vs Offline) - New Patients Only</p>
+             <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] mt-1">Source Category Comparison (Online vs Offline) - Total OPD Activity</p>
            </div>
            
            <div className="flex flex-wrap items-center gap-3">
@@ -984,10 +1009,10 @@ export const AnalyticsDashboard: React.FC = () => {
                     <Zap className="w-8 h-8" />
                   </div>
                   <div className="text-right">
-                     <span className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">Digital Share (New)</span>
+                     <span className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">Digital Share (Net)</span>
                      <div className="text-2xl font-black text-indigo-600">
-                        {/* Fixed arithmetic error by ensuring numeric types and casting explicitly to satisfy strict TS requirements */}
-                       {Number(stats.newPatients) > 0 ? (Math.round(((stats.onlineTotal as number) / (stats.newPatients as number)) * 100)) : 0}%
+                       {/* Fixed: Explicitly convert operands to Number to satisfy arithmetic type requirements */}
+                       {Number(stats.total) > 0 ? (Math.round((Number(stats.onlineTotal) / Number(stats.total)) * 100)) : 0}%
                      </div>
                   </div>
                 </div>
@@ -1017,10 +1042,10 @@ export const AnalyticsDashboard: React.FC = () => {
                     <Landmark className="w-8 h-8" />
                   </div>
                   <div className="text-right">
-                     <span className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">Traditional Share (New)</span>
+                     <span className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">Traditional Share (Net)</span>
                      <div className="text-2xl font-black text-indigo-600">
-                        {/* Fixed arithmetic error by ensuring numeric types and casting explicitly to satisfy strict TS requirements */}
-                       {Number(stats.newPatients) > 0 ? (Math.round(((stats.offlineTotal as number) / (stats.newPatients as number)) * 100)) : 0}%
+                       {/* Fixed: Explicitly convert operands to Number to satisfy arithmetic type requirements */}
+                       {Number(stats.total) > 0 ? (Math.round((Number(stats.offlineTotal) / Number(stats.total)) * 100)) : 0}%
                      </div>
                   </div>
                 </div>
@@ -1045,8 +1070,8 @@ export const AnalyticsDashboard: React.FC = () => {
            <div className="lg:col-span-8 bg-white rounded-[2.5rem] border border-slate-100 p-8 shadow-sm flex flex-col">
               <div className="flex items-center justify-between mb-8">
                  <div>
-                   <h4 className="text-sm font-black text-slate-900 uppercase">{graphGranularity === 'monthly' ? 'Monthly New Flow breakdown' : 'Daily New Flow Comparison'}</h4>
-                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Attribution for New Patients Only</p>
+                   <h4 className="text-sm font-black text-slate-900 uppercase">{graphGranularity === 'monthly' ? 'Monthly Flow activity' : 'Daily Flow Comparison'}</h4>
+                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Attribution for all OPD Activity</p>
                  </div>
                  <div className="flex gap-4">
                     <div className="flex items-center gap-2">
@@ -1064,20 +1089,18 @@ export const AnalyticsDashboard: React.FC = () => {
                  {useMemo(() => {
                     const groupKey = graphGranularity === 'monthly' ? (p: Patient) => (p.entry_date || p.registeredAt).substring(0, 7) : (p: Patient) => (p.entry_date || p.registeredAt.split('T')[0]);
                     
-                    // Filter dataset to only include new patients for graph calculations
-                    const newPatientsOnly = stats.arrivedDataset.filter(p => (p.visit_type || '').toLowerCase() === 'new');
-                    const uniqueKeys = Array.from(new Set(newPatientsOnly.map(groupKey))).sort((a: any, b: any) => a.localeCompare(b)) as string[];
+                    const uniqueKeys = Array.from(new Set(stats.arrivedDataset.map(groupKey))).sort((a: any, b: any) => a.localeCompare(b)) as string[];
                     const visibleKeys = uniqueKeys.slice(graphGranularity === 'monthly' ? -12 : -15);
                     
                     return visibleKeys.map((key, i) => {
-                      const dayPatients = newPatientsOnly.filter(p => groupKey(p) === key);
+                      const dayPatients = stats.arrivedDataset.filter(p => groupKey(p) === key);
                       const onlineVol = dayPatients.filter(p => {
                           const ds = getSourceDisplay(p.source);
                           return ONLINE_SOURCES.includes(p.source) || ONLINE_SOURCES.includes(ds);
                       }).length;
                       const offlineVol = dayPatients.length - onlineVol;
                       
-                      const maxTotal = Math.max(...visibleKeys.map(k => newPatientsOnly.filter(p => groupKey(p) === k).length), 1);
+                      const maxTotal = Math.max(...visibleKeys.map(k => stats.arrivedDataset.filter(p => groupKey(p) === k).length), 1);
                       
                       return (
                         <div key={i} className="flex items-center gap-4 group">
