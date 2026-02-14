@@ -3,17 +3,17 @@ import React, { useState, useEffect } from 'react';
 import { useHospital } from '../context/HospitalContext';
 import { ExportButtons } from '../components/ExportButtons';
 import { Patient, PackageProposal, Role, SurgeonCode, ProposalOutcome } from '../types';
-// Added Database to lucide-react imports
 import { Briefcase, Calendar, Users, BadgeCheck, User, Activity, ShieldCheck, Banknote, Trash2, Clock, X, Share2, Stethoscope, LayoutList, Columns, Search, Phone, Filter, Tag, CalendarClock, Ban, ChevronLeft, ChevronRight, LayoutPanelLeft, MessageSquareQuote, FileText, ChevronDown, AlertCircle, RefreshCcw, Database, Gauge } from 'lucide-react';
 
 const lostReasons = [
+  "Not Accepting for Surgery",
+  "Got Treatment at Another Place",
   "Cost / Financial Constraints",
-  "Family not in agreement",
-  "Opted for Conservative Treatment",
-  "Sought Second Opinion Elsewhere",
-  "Insurance Rejection",
-  "Fear of Surgery",
-  "Personal / Non-Medical Reasons"
+  "Cashless Insurance Required",
+  "Decision Makers Not Agreeing",
+  "Seeing Another Doctor",
+  "Hospital Facilities Reasons",
+  "No Communication / Response"
 ];
 
 const PROPOSAL_STAGES: Record<string, number> = {
@@ -61,7 +61,6 @@ export const PackageTeamDashboard: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [isSidebarMinimized, setIsSidebarMinimized] = useState(false);
 
-  // Common Date Filter for both PENDING (Leads) and DONE (Moved) sections
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   
@@ -133,7 +132,7 @@ export const PackageTeamDashboard: React.FC = () => {
 
     // Filter by Directory Category
     if (listCategory === 'PENDING') {
-      // Logic for Pending tab includes Leads (no outcome) and Done Data (has outcome)
+      // Logic handled during partition later, but baseline filter applies here
     } else if (listCategory === 'SCHEDULED') {
       if (outcome !== 'Scheduled') return false;
     } else if (listCategory === 'FOLLOWUP') {
@@ -150,22 +149,23 @@ export const PackageTeamDashboard: React.FC = () => {
     }
 
     // Filter by Probability
+    // The request specifies refining the 'Done Data (Moved)' list specifically
     if (probabilityFilter !== 'ALL') {
       const stage = p.packageProposal?.proposalStage;
+      // If we are in PENDING, the filter only applies to those with an outcome (Done Data)
+      // or if they have a stage defined.
       if (!stage || PROPOSAL_STAGES[stage]?.toString() !== probabilityFilter) return false;
     }
 
     // Advanced Filtering Logic based on Section using Common Date Filter
     if (listCategory === 'PENDING') {
       if (!outcome) {
-        // Pending Lead Section: Filter by Arrival Date (startDate/endDate)
         if (startDate || endDate) {
           const filterDate = p.entry_date || '';
           if (startDate && filterDate < startDate) return false;
           if (endDate && filterDate > endDate) return false;
         }
       } else {
-        // Done Data Section: Filter by Updated Date (status_updated_at) using the same startDate/endDate
         if (startDate || endDate) {
           const filterDate = p.status_updated_at ? p.status_updated_at.split('T')[0] : '';
           if (startDate && filterDate < startDate) return false;
@@ -173,7 +173,6 @@ export const PackageTeamDashboard: React.FC = () => {
         }
       }
     } else {
-      // Standard Filter Logic for other tabs
       if (startDate || endDate) {
         let filterDate = p.entry_date || '';
         if (listCategory === 'SCHEDULED') filterDate = p.surgery_date || p.packageProposal?.surgeryDate || '';
@@ -186,7 +185,6 @@ export const PackageTeamDashboard: React.FC = () => {
       }
     }
 
-    // Quick Search
     if (searchTerm) {
       const s = searchTerm.toLowerCase();
       const match = p.name.toLowerCase().includes(s) || 
@@ -205,31 +203,27 @@ export const PackageTeamDashboard: React.FC = () => {
       return dateA - dateB; 
     }
 
-    // FIX: Special sorting for COMPLETED category based on completion date
     if (listCategory === 'COMPLETED') {
       const valA = a.completed_surgery || a.packageProposal?.outcomeDate;
       const valB = b.completed_surgery || b.packageProposal?.outcomeDate;
       const dateA = valA ? new Date(valA).getTime() : 0;
       const dateB = valB ? new Date(valB).getTime() : 0;
-      return dateB - dateA; // Most recently completed first
+      return dateB - dateA; 
     }
     
     if (listCategory === 'PENDING') {
       const aHasOutcome = !!a.packageProposal?.outcome;
       const bHasOutcome = !!b.packageProposal?.outcome;
       
-      // Divide directory: Leads (no outcome) at top, Done Data (has outcome) at bottom
       if (!aHasOutcome && bHasOutcome) return -1;
       if (aHasOutcome && !bHasOutcome) return 1;
       
-      // Inside Leads section: Sort by most recent arrival (registeredAt) DESC
       if (!aHasOutcome && !bHasOutcome) {
         const timeA = new Date(a.registeredAt).getTime();
         const timeB = new Date(b.registeredAt).getTime();
         return timeB - timeA;
       }
       
-      // Inside Done Data section: Sort by transition date (status_updated_at) DESC
       if (aHasOutcome && bHasOutcome) {
         const timeA = new Date(a.status_updated_at || a.updated_at || 0).getTime();
         const timeB = new Date(b.status_updated_at || b.updated_at || 0).getTime();
@@ -237,7 +231,6 @@ export const PackageTeamDashboard: React.FC = () => {
       }
     }
 
-    // Default sort for other tabs: Newest first
     const dateA = a.entry_date ? new Date(a.entry_date).getTime() : new Date(a.registeredAt).getTime();
     const dateB = b.entry_date ? new Date(b.entry_date).getTime() : new Date(b.registeredAt).getTime();
     if (dateB !== dateA) return dateB - dateA;
@@ -468,13 +461,10 @@ export const PackageTeamDashboard: React.FC = () => {
                     {allPatients.map((p, index) => {
                       const followUpDateVal = p.followup_date || p.packageProposal?.followUpDate;
                       const hasOutcome = !!p.packageProposal?.outcome;
-                      
-                      // Updated isOverdue logic: Highlight past dates in FOLLOWUP section or PENDING section without outcome
                       const isOverdue = followUpDateVal && 
                                       followUpDateVal < todayStr && 
                                       (listCategory === 'FOLLOWUP' || (!hasOutcome && p.packageProposal?.outcome !== 'Lost'));
 
-                      // Section Splitter logic for Pending and COMPLETED tabs
                       const prevP = allPatients[index - 1];
                       const isFirstMoved = listCategory === 'PENDING' && hasOutcome && (!prevP || !prevP.packageProposal?.outcome);
                       
@@ -485,7 +475,6 @@ export const PackageTeamDashboard: React.FC = () => {
                           currentGroupDate = (p.status_updated_at || p.updated_at || '').split('T')[0];
                           prevGroupDate = (prevP?.status_updated_at || prevP?.updated_at || '').split('T')[0];
                       } else if (listCategory === 'COMPLETED') {
-                          // FIX: Sync grouping based on Surgery Completion Date for COMPLETED section
                           currentGroupDate = (p.completed_surgery || p.packageProposal?.outcomeDate || '').split('T')[0];
                           prevGroupDate = (prevP?.completed_surgery || prevP?.packageProposal?.outcomeDate || '').split('T')[0];
                       }
@@ -656,7 +645,6 @@ export const PackageTeamDashboard: React.FC = () => {
                              </span>
                           </div>
                           <div className={`text-sm font-black ${selectedPatient.packageProposal?.outcome === 'Completed' ? 'text-teal-900' : 'text-emerald-900'} truncate leading-tight`}>
-                            {/* FIX: Detail header prioritization for completion date */}
                             {selectedPatient.packageProposal?.outcome === 'Completed' 
                               ? formatToDDMMYYYY(selectedPatient.completed_surgery || selectedPatient.packageProposal?.outcomeDate)
                               : selectedPatient.status_updated_at ? formatToDDMMYYYY(selectedPatient.status_updated_at) : '---'

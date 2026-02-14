@@ -248,6 +248,7 @@ export const ExportButtons: React.FC<ExportButtonsProps> = ({ patients, role, se
       'Decision Pattern',
       'Objection',
       'Strategy',
+      'Lost Reason',
       'Follow Up Date',
       'Remark'
     ];
@@ -284,6 +285,7 @@ export const ExportButtons: React.FC<ExportButtonsProps> = ({ patients, role, se
       p.packageProposal?.decisionPattern || '',
       p.packageProposal?.objectionIdentified || '',
       p.packageProposal?.counselingStrategy || '',
+      p.packageProposal?.lostReason || '',
       formatDate(p.packageProposal?.followUpDate),
       p.packageProposal?.remarks || ''
     ].map(cell => `"${(cell || '').toString().replace(/"/g, '""')}"`).join(','));

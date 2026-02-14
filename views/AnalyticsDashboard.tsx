@@ -422,7 +422,7 @@ export const AnalyticsDashboard: React.FC = () => {
       headers = [
         'Patient ID', 'Name', 'Source', 'Status', 'Decision Pattern', 
         'Proposal Stage', 'Surgery Completed Date', 'Arrived Date', 
-        'Surgery Lost', 'Surgery Follow-Up', 'Surgery Scheduled'
+        'Surgery Lost', 'Lost Reason', 'Surgery Follow-Up', 'Surgery Scheduled'
       ];
       rows = drillDown.data.map(p => [
         p.id,
@@ -434,6 +434,7 @@ export const AnalyticsDashboard: React.FC = () => {
         formatDate(p.completed_surgery || (p.packageProposal?.outcome === 'Completed' ? p.packageProposal.outcomeDate : null)),
         formatDate(p.entry_date || p.registeredAt),
         formatDate(p.surgery_lost_date || (p.packageProposal?.outcome === 'Lost' ? p.packageProposal.outcomeDate : null)),
+        p.packageProposal?.lostReason || '---',
         formatDate(p.followup_date || p.packageProposal?.followUpDate),
         formatDate(p.surgery_date || p.packageProposal?.surgeryDate)
       ]);
