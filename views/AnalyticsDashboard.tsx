@@ -294,15 +294,15 @@ export const AnalyticsDashboard: React.FC = () => {
           }
         });
 
-        // Digital split for total flow (New + Revisit) strictly based on visit_type column
+        // Digital split for 'New' patients flow strictly based on visit_type column
         let onlineTotal = flowDataset.filter(p => {
           const vt = (p.visit_type || '').trim().toLowerCase();
-          if (vt !== 'new' && vt !== 'revisit') return false;
+          if (vt !== 'new') return false; // Exclusion of Revisit records for Digital vs Traditional Flow section
           const ds = getSourceDisplay(p.source);
           return (ONLINE_SOURCES.includes(p.source) || ONLINE_SOURCES.includes(ds));
         }).length;
 
-        let offlineTotal = total - onlineTotal;
+        let offlineTotal = newPatients - onlineTotal;
 
         // Counseling status mix aggregation
         const decisionPatternMix: Record<string, number> = {};
@@ -474,7 +474,7 @@ export const AnalyticsDashboard: React.FC = () => {
       case 'Online Traffic':
         filteredData = stats.arrivedDataset.filter(p => {
             const vt = (p.visit_type || '').trim().toLowerCase();
-            if (vt !== 'new' && vt !== 'revisit') return false;
+            if (vt !== 'new') return false; // Only show New patients in flow analytics share
             const ds = getSourceDisplay(p.source);
             return (ONLINE_SOURCES.includes(p.source) || ONLINE_SOURCES.includes(ds));
         });
@@ -482,7 +482,7 @@ export const AnalyticsDashboard: React.FC = () => {
       case 'Offline Traffic':
         filteredData = stats.arrivedDataset.filter(p => {
             const vt = (p.visit_type || '').trim().toLowerCase();
-            if (vt !== 'new' && vt !== 'revisit') return false;
+            if (vt !== 'new') return false; // Only show New patients in flow analytics share
             const ds = getSourceDisplay(p.source);
             return !(ONLINE_SOURCES.includes(p.source) || ONLINE_SOURCES.includes(ds));
         });
@@ -976,7 +976,7 @@ export const AnalyticsDashboard: React.FC = () => {
         <div className="flex flex-col md:flex-row md:items-center justify-between border-b border-slate-200 pb-4 gap-4">
            <div>
              <h3 className="text-2xl font-black text-slate-900 uppercase">Digital vs Traditional Flow</h3>
-             <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] mt-1">Source Category Comparison (Online vs Offline) - Total OPD Activity</p>
+             <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] mt-1">Source Category Comparison (Online vs Offline) - 'New' Patient Activity</p>
            </div>
            
            <div className="flex flex-wrap items-center gap-3">
@@ -1028,10 +1028,10 @@ export const AnalyticsDashboard: React.FC = () => {
                     <Zap className="w-8 h-8" />
                   </div>
                   <div className="text-right">
-                     <span className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">Digital Share (Net)</span>
+                     <span className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">Digital Share (Net New)</span>
                      <div className="text-2xl font-black text-indigo-600">
                        {/* Fixed: Explicitly convert operands to Number to satisfy arithmetic type requirements */}
-                       {Number(stats.total) > 0 ? (Math.round((Number(stats.onlineTotal) / Number(stats.total)) * 100)) : 0}%
+                       {Number(stats.newPatients) > 0 ? (Math.round((Number(stats.onlineTotal) / Number(stats.newPatients)) * 100)) : 0}%
                      </div>
                   </div>
                 </div>
@@ -1044,7 +1044,7 @@ export const AnalyticsDashboard: React.FC = () => {
                     </div>
                   )}
                 </div>
-                <div className="text-xs font-black text-slate-400 uppercase tracking-widest">Online Sources</div>
+                <div className="text-xs font-black text-slate-400 uppercase tracking-widest">Online Sources (New Only)</div>
                 <div className="mt-6 pt-6 border-t border-slate-50 flex flex-wrap gap-2">
                   {['Google / YouTube / Website', 'FB / Insta / WhatsApp', 'Friend + Online'].map(s => (
                     <span key={s} className="text-[8px] font-black px-2 py-1 rounded-full bg-slate-50 text-slate-400 uppercase">{s}</span>
@@ -1061,10 +1061,10 @@ export const AnalyticsDashboard: React.FC = () => {
                     <Landmark className="w-8 h-8" />
                   </div>
                   <div className="text-right">
-                     <span className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">Traditional Share (Net)</span>
+                     <span className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">Traditional Share (Net New)</span>
                      <div className="text-2xl font-black text-indigo-600">
                        {/* Fixed: Explicitly convert operands to Number to satisfy arithmetic type requirements */}
-                       {Number(stats.total) > 0 ? (Math.round((Number(stats.offlineTotal) / Number(stats.total)) * 100)) : 0}%
+                       {Number(stats.newPatients) > 0 ? (Math.round((Number(stats.offlineTotal) / Number(stats.newPatients)) * 100)) : 0}%
                      </div>
                   </div>
                 </div>
@@ -1077,7 +1077,7 @@ export const AnalyticsDashboard: React.FC = () => {
                     </div>
                   )}
                 </div>
-                <div className="text-xs font-black text-slate-400 uppercase tracking-widest">Offline Sources</div>
+                <div className="text-xs font-black text-slate-400 uppercase tracking-widest">Offline Sources (New Only)</div>
                 <div className="mt-6 pt-6 border-t border-slate-50 flex flex-wrap gap-2">
                   {['Hospital Billboards', 'Doctor Recommended', 'Self / Old Patient / Relative', 'Others'].map(s => (
                     <span key={s} className="text-[8px] font-black px-2 py-1 rounded-full bg-slate-50 text-slate-400 uppercase">{s}</span>
@@ -1089,8 +1089,8 @@ export const AnalyticsDashboard: React.FC = () => {
            <div className="lg:col-span-8 bg-white rounded-[2.5rem] border border-slate-100 p-8 shadow-sm flex flex-col">
               <div className="flex items-center justify-between mb-8">
                  <div>
-                   <h4 className="text-sm font-black text-slate-900 uppercase">{graphGranularity === 'monthly' ? 'Monthly Flow activity' : 'Daily Flow Comparison'}</h4>
-                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Attribution for all OPD Activity</p>
+                   <h4 className="text-sm font-black text-slate-900 uppercase">{graphGranularity === 'monthly' ? 'Monthly New Patient flow' : 'Daily New Patient Comparison'}</h4>
+                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Attribution for 'New' Patient OPD Activity Only</p>
                  </div>
                  <div className="flex gap-4">
                     <div className="flex items-center gap-2">
@@ -1112,14 +1112,14 @@ export const AnalyticsDashboard: React.FC = () => {
                     const visibleKeys = uniqueKeys.slice(graphGranularity === 'monthly' ? -12 : -15);
                     
                     return visibleKeys.map((key, i) => {
-                      const dayPatients = stats.arrivedDataset.filter(p => groupKey(p) === key);
+                      const dayPatients = stats.arrivedDataset.filter(p => groupKey(p) === key && (p.visit_type || '').toLowerCase() === 'new');
                       const onlineVol = dayPatients.filter(p => {
                           const ds = getSourceDisplay(p.source);
                           return ONLINE_SOURCES.includes(p.source) || ONLINE_SOURCES.includes(ds);
                       }).length;
                       const offlineVol = dayPatients.length - onlineVol;
                       
-                      const maxTotal = Math.max(...visibleKeys.map(k => stats.arrivedDataset.filter(p => groupKey(p) === k).length), 1);
+                      const maxTotal = Math.max(...visibleKeys.map(k => stats.arrivedDataset.filter(p => groupKey(p) === k && (p.visit_type || '').toLowerCase() === 'new').length), 1);
                       
                       return (
                         <div key={i} className="flex items-center gap-4 group">
