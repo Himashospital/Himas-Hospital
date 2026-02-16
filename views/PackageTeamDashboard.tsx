@@ -67,9 +67,9 @@ export const PackageTeamDashboard: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [isSidebarMinimized, setIsSidebarMinimized] = useState(false);
 
-  // Set default filter dates to current date
-  const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
-  const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
+  // Set default filter dates to empty strings
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
   
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
   const [filter, setFilter] = useState<'ALL' | 'CR1' | 'CR2' | 'CR3' | 'CR4'>('ALL');
