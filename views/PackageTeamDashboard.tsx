@@ -167,6 +167,13 @@ export const PackageTeamDashboard: React.FC = () => {
       if (endDate && filterDate > endDate) return false;
     }
 
+    if (probabilityFilter !== 'ALL') {
+      const stage = p.packageProposal?.proposalStage;
+      if (!stage) return false;
+      const prob = PROPOSAL_STAGES[stage];
+      if (prob?.toString() !== probabilityFilter) return false;
+    }
+
     if (searchTerm) {
       const s = searchTerm.toLowerCase();
       const match = p.name.toLowerCase().includes(s) || 
@@ -299,6 +306,19 @@ export const PackageTeamDashboard: React.FC = () => {
                   <span className="text-[9px] font-black uppercase text-slate-400 shrink-0">To</span>
                   <input type="date" className={filterInputClasses} value={endDate} onChange={e => setEndDate(e.target.value)} />
                 </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[9px] font-black uppercase text-slate-400 shrink-0">Prob. %</span>
+                  <select 
+                    className={filterInputClasses} 
+                    value={probabilityFilter} 
+                    onChange={e => setProbabilityFilter(e.target.value)}
+                  >
+                    <option value="ALL">ALL PROB.</option>
+                    {Array.from(new Set(Object.values(PROPOSAL_STAGES))).sort((a, b) => a - b).map(prob => (
+                      <option key={prob} value={prob.toString()}>{prob}%</option>
+                    ))}
+                  </select>
+                </div>
               </div>
 
               <div className="flex items-center gap-3 w-full xl:w-auto justify-end">
@@ -362,8 +382,10 @@ export const PackageTeamDashboard: React.FC = () => {
                             </div>
                           )}
                           {p.updated_at && (
-                            <div className="text-[8px] font-black text-slate-300 uppercase tracking-tighter flex items-center gap-1">
-                              <RefreshCcw className="w-2.5 h-2.5" /> UPDATED: {formatToDateTime(p.updated_at)}
+                            <div className="text-[10px] font-black uppercase tracking-tight flex items-center gap-1 mt-2 text-slate-500 pt-2 border-t border-slate-50">
+                              <RefreshCcw className="w-3 h-3 text-hospital-500" />
+                              <span className="opacity-60 text-[9px]">UPDATED:</span>
+                              <span className="text-slate-800 font-mono">{formatToDateTime(p.updated_at)}</span>
                             </div>
                           )}
                         </div>
