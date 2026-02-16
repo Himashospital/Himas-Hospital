@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useHospital } from '../context/HospitalContext';
 import { ExportButtons } from '../components/ExportButtons';
@@ -27,15 +26,15 @@ const PROPOSAL_STAGES: Record<string, number> = {
 
 const formatToDDMMYYYY = (dateString: string | undefined | null): string => {
   if (!dateString) return '';
-  const datePart = dateString.split('T')[0];
-  const parts = datePart.split('-');
-  if (parts.length === 3) {
-    if (parts[0].length === 4) { // YYYY-MM-DD
-      return `${parts[2]}-${parts[1]}-${parts[0]}`;
-    }
-    return datePart; 
-  }
-  return dateString;
+  const date = new Date(dateString);
+  if (isNaN(date.getTime())) return '';
+  
+  return new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Asia/Kolkata',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric'
+  }).format(date).replace(/\//g, '-');
 };
 
 const formatToDateTime = (dateString: string | undefined | null): string => {
@@ -43,13 +42,21 @@ const formatToDateTime = (dateString: string | undefined | null): string => {
   const date = new Date(dateString);
   if (isNaN(date.getTime())) return '';
   
-  const d = date.getDate().toString().padStart(2, '0');
-  const m = (date.getMonth() + 1).toString().padStart(2, '0');
-  const y = date.getFullYear();
-  const h = date.getHours().toString().padStart(2, '0');
-  const min = date.getMinutes().toString().padStart(2, '0');
+  // Use parts-based formatting to ensure absolute consistency for IST
+  const formatter = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Asia/Kolkata',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false
+  });
+
+  const parts = formatter.formatToParts(date);
+  const getPart = (type: string) => parts.find(p => p.type === type)?.value || '';
   
-  return `${d}-${m}-${y} ${h}:${min}`;
+  return `${getPart('day')}-${getPart('month')}-${getPart('year')} ${getPart('hour')}:${getPart('minute')}`;
 };
 
 export const PackageTeamDashboard: React.FC = () => {
