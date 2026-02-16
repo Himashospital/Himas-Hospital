@@ -28,8 +28,9 @@ const getVisitTypeLabel = (p: Patient, allPatients: Patient[]): string => {
   return 'Revisit';
 };
 
-// Helper to get descriptive status for reports
+// Helper to get descriptive status for reports - Synchronized with Dashboard logic
 const getStatusLabel = (p: Patient): string => {
+  // Counseling stage outcome
   if (p.packageProposal?.outcome) {
     switch (p.packageProposal.outcome) {
       case 'Scheduled': return 'Surgery Scheduled';
@@ -38,13 +39,18 @@ const getStatusLabel = (p: Patient): string => {
       case 'Completed': return 'Surgery Completed';
     }
   }
+  // Medical stage assessment
   if (p.doctorAssessment) {
     if (p.doctorAssessment.quickCode === SurgeonCode.S1) return 'Package Proposal';
     if (p.doctorAssessment.quickCode === SurgeonCode.M1) return 'Medication Done';
     return 'Doctor Done';
   }
-  if (p.status === 'Arrived') return 'Arrived';
-  return p.visitType === 'Follow Up' ? 'Follow Up' : 'Scheduled';
+  
+  // Registration stage status
+  if (p.status === 'Arrived') return p.visit_type === 'Revisit' ? 'Revisit' : 'Arrived';
+  
+  // Lead / Appointment status fallback
+  return p.status || (p.visitType === 'Follow Up' ? 'Follow Up' : 'Scheduled');
 };
 
 interface ExportButtonsProps {
@@ -73,14 +79,12 @@ export const ExportButtons: React.FC<ExportButtonsProps> = ({ patients, role, se
       const today = formatDate(prop.outcomeDate || prop.proposalCreatedAt || new Date().toISOString());
       const stayText = prop.stayDays ? `${prop.stayDays} DAYS` : '---';
       const packageAmt = prop.packageAmount ? `₹ ${parseInt(prop.packageAmount.replace(/,/g, '')).toLocaleString()}` : '₹ 0';
-      // Use raw source to display original stored value for old records
       const displaySource = p.source === 'Doctor Recommended' ? `DR. ${p.sourceDoctorName || 'RECOMMENDED'}` : p.source.toUpperCase();
 
       const surgeryText = p.doctorAssessment?.surgeryProcedure === 'Other'
         ? (p.doctorAssessment?.otherSurgeryName || 'OTHER PROCEDURE')
         : (p.doctorAssessment?.surgeryProcedure || '---');
 
-      // Logic to determine Post-Op Follow-Up display string
       let followUpDisplay = '---';
       if (prop.postFollowUp === 'Excluded') {
         followUpDisplay = 'NO';
@@ -91,7 +95,6 @@ export const ExportButtons: React.FC<ExportButtonsProps> = ({ patients, role, se
           followUpDisplay = 'INCLUDED';
         }
       } else if (prop.postFollowUp) {
-        // Support legacy values if they exist
         followUpDisplay = prop.postFollowUp.toUpperCase();
       }
 
@@ -262,7 +265,6 @@ export const ExportButtons: React.FC<ExportButtonsProps> = ({ patients, role, se
       p.mobile,
       p.occupation || '',
       p.insuranceName || 'N/A',
-      // Always use raw p.source to preserve original stored attribution
       p.source === 'Doctor Recommended' ? `Dr. ${p.sourceDoctorName || 'Recommended'}` : p.source,
       p.condition,
       getVisitTypeLabel(p, patients),

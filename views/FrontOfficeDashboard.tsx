@@ -46,9 +46,7 @@ const getSourceDisplay = (source: string | undefined): string => {
 };
 
 const getHistoryStatus = (p: Patient): string => {
-  if (p.visit_type === 'Revisit' && p.status === 'Arrived' && !p.doctorAssessment) {
-    return 'Revisit';
-  }
+  // Priority 1: Package Team / Counseling Outcome (Final stages)
   if (p.packageProposal?.outcome) {
     switch (p.packageProposal.outcome) {
       case 'Scheduled': return 'Surgery Scheduled';
@@ -57,13 +55,29 @@ const getHistoryStatus = (p: Patient): string => {
       case 'Completed': return 'Surgery Completed';
     }
   }
+
+  // Priority 2: Doctor Assessment Stage (Medical recommendation)
   if (p.doctorAssessment) {
     if (p.doctorAssessment.quickCode === SurgeonCode.S1) return 'Package Proposal';
     if (p.doctorAssessment.quickCode === SurgeonCode.M1) return 'Medication Done';
     return 'Doctor Done';
   }
+
+  // Priority 3: Specific manual status from Front Office (if updated via Edit)
+  if (p.status && p.status !== 'Arrived' && p.status !== 'Scheduled' && p.status !== 'Follow Up') {
+    return p.status;
+  }
+
+  // Priority 4: Revisit lead identification
+  if (p.visit_type === 'Revisit' && p.status === 'Arrived') {
+    return 'Revisit';
+  }
+
+  // Priority 5: Standard Arrived status
   if (p.status === 'Arrived') return 'Arrived';
-  return p.visitType === 'Follow Up' ? 'Follow Up' : 'Scheduled';
+
+  // Fallback: Use visit type or status
+  return p.status || (p.visitType === 'Follow Up' ? 'Follow Up' : 'Scheduled');
 };
 
 export const FrontOfficeDashboard: React.FC = () => {
@@ -187,7 +201,6 @@ export const FrontOfficeDashboard: React.FC = () => {
   };
 
   const handleArrived = (appt: Appointment) => { 
-    // Lookup historical data if it's a revisit to pre-fill the form
     let existingPatient: Patient | undefined = undefined;
     if (appt.visit_type === 'Revisit') {
       existingPatient = patients
@@ -196,7 +209,7 @@ export const FrontOfficeDashboard: React.FC = () => {
     }
 
     setFormData({ 
-      id: '', // New registration requires a new case number or re-assignment
+      id: '', 
       name: appt.name || existingPatient?.name || '', 
       dob: existingPatient?.dob || '', 
       gender: existingPatient?.gender || undefined, 
@@ -327,7 +340,6 @@ export const FrontOfficeDashboard: React.FC = () => {
       setStep(2); return;
     }
     
-    // Step 2 logic or step 1 edit logic
     if (!formData.id) return alert("Case Number is required.");
     const dataToSave = { ...formData };
     
@@ -364,7 +376,13 @@ export const FrontOfficeDashboard: React.FC = () => {
   }).sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
 
   const combinedHistoryData = [
-    ...patients.map(p => ({ ...p, recordType: 'Registration' as const, displayDate: p.registeredAt, displayEntryDate: p.entry_date, displayStatus: getHistoryStatus(p) })),
+    ...patients.map(p => ({ 
+      ...p, 
+      recordType: 'Registration' as const, 
+      displayDate: p.updated_at || p.registeredAt, 
+      displayEntryDate: p.entry_date, 
+      displayStatus: getHistoryStatus(p) 
+    })),
     ...appointments.map(a => ({ 
       id: '---', 
       name: a.name, 
@@ -373,11 +391,12 @@ export const FrontOfficeDashboard: React.FC = () => {
       source: a.source, 
       sourceDoctorName: a.sourceDoctorName || '',
       registeredAt: a.createdAt, 
+      updated_at: a.createdAt,
       entry_date: a.date, 
       recordType: 'Appointment' as const, 
       displayDate: a.date + 'T' + (a.time || '00:00') + ':00', 
       displayEntryDate: a.date, 
-      displayStatus: a.visit_type === 'Revisit' ? 'Revisit' : 'Scheduled',
+      displayStatus: a.status || (a.visit_type === 'Revisit' ? 'Revisit' : a.bookingType),
       age: undefined as any,
       gender: undefined as any,
       visit_type: a.visit_type || ''
@@ -399,7 +418,7 @@ export const FrontOfficeDashboard: React.FC = () => {
 
   const handleExportFilteredCSV = () => {
     const headers = ['Type', 'File ID', 'Date', 'Name', 'Age', 'Gender', 'Mobile', 'Source', 'Condition', 'Visit Type', 'Status'];
-    const rows = combinedHistoryData.map(item => [item.recordType, item.id === '---' ? 'N/A' : item.id.split('_V')[0], formatDate(item.displayEntryDate), item.name, item.age || '', item.gender || '', item.mobile, item.source, item.condition, calculateVisitType(item, patients), item.displayStatus || getHistoryStatus(item as Patient)].map(cell => `"${(cell || '').toString().replace(/"/g, '""')}"`).join(','));
+    const rows = combinedHistoryData.map(item => [item.recordType, item.id === '---' ? 'N/A' : item.id.split('_V')[0], formatDate(item.displayEntryDate), item.name, item.age || '', item.gender || '', item.mobile, item.source, item.condition, calculateVisitType(item, patients), item.displayStatus].map(cell => `"${(cell || '').toString().replace(/"/g, '""')}"`).join(','));
     const csvContent = [headers.join(','), ...rows].join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
@@ -527,7 +546,7 @@ export const FrontOfficeDashboard: React.FC = () => {
             </thead>
             <tbody className="divide-y divide-slate-100">
               {displayData.map((item: any) => (
-                <tr key={item.id + (item.registeredAt || item.displayDate)} className="hover:bg-slate-50/50 transition-colors">
+                <tr key={item.id + (item.updated_at || item.registeredAt || item.displayDate)} className="hover:bg-slate-50/50 transition-colors">
                   <td className="p-5 whitespace-nowrap">
                     {activeTab === 'APPOINTMENTS' ? (
                       <div className="font-mono font-black text-slate-500 flex items-center gap-2"><Clock className="w-4 h-4 text-hospital-400" /> {item.time}</div>
@@ -716,7 +735,6 @@ export const FrontOfficeDashboard: React.FC = () => {
         </div>
       )}
 
-      {/* Revisit Choice Modal */}
       {showRevisitModal && revisitPatient && (
         <div className="fixed inset-0 z-[200] bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200">
           <div className="bg-white w-full max-w-md rounded-[2rem] shadow-2xl p-8 border border-slate-100 animate-in zoom-in-95 duration-200">
@@ -736,7 +754,6 @@ export const FrontOfficeDashboard: React.FC = () => {
         </div>
       )}
 
-      {/* Revisit Schedule Modal */}
       {showRevisitScheduleModal && revisitPatient && (
         <div className="fixed inset-0 z-[200] bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200">
           <div className="bg-white w-full max-w-md rounded-[2rem] shadow-2xl p-8 border border-slate-100 animate-in zoom-in-95 duration-200">
