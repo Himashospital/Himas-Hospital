@@ -147,6 +147,29 @@ export const PackageTeamDashboard: React.FC = () => {
       if (outcome !== 'Lost') return false;
     }
 
+    // Filtering by Date Range
+    if (startDate || endDate) {
+      let filterDate = '';
+      if (listCategory === 'PENDING') {
+        if (!outcome) {
+          filterDate = p.entry_date || '';
+        } else {
+          filterDate = (p.status_updated_at || p.updated_at || '').split('T')[0];
+        }
+      } else if (listCategory === 'SCHEDULED') {
+        filterDate = p.surgery_date || p.packageProposal?.surgeryDate || '';
+      } else if (listCategory === 'FOLLOWUP') {
+        filterDate = p.followup_date || p.packageProposal?.followUpDate || '';
+      } else if (listCategory === 'COMPLETED') {
+        filterDate = p.completed_surgery || p.packageProposal?.outcomeDate || '';
+      } else if (listCategory === 'LOST') {
+        filterDate = p.surgery_lost_date || p.packageProposal?.outcomeDate || '';
+      }
+
+      if (startDate && filterDate < startDate) return false;
+      if (endDate && filterDate > endDate) return false;
+    }
+
     if (searchTerm) {
       const s = searchTerm.toLowerCase();
       const match = p.name.toLowerCase().includes(s) || 
@@ -204,6 +227,7 @@ export const PackageTeamDashboard: React.FC = () => {
   };
 
   const selectClasses = "w-full p-3 bg-slate-50 border-2 border-transparent rounded-xl text-[10px] font-black uppercase outline-none focus:bg-white focus:border-hospital-500 transition-all appearance-none cursor-pointer pr-10";
+  const filterInputClasses = "h-10 w-full bg-slate-50 border border-slate-100 rounded-xl px-3 text-[10px] font-bold outline-none";
 
   const renderActionButtons = (currentOutcome: ProposalOutcome | undefined) => {
     return (
@@ -250,6 +274,15 @@ export const PackageTeamDashboard: React.FC = () => {
             </div>
 
             <div className="flex flex-col xl:flex-row justify-between items-center gap-4">
+              <div className="flex flex-col sm:flex-row items-center gap-4 w-full xl:w-auto flex-wrap">
+                <div className="flex items-center gap-2">
+                  <span className="text-[9px] font-black uppercase text-slate-400 shrink-0">Filter From</span>
+                  <input type="date" className={filterInputClasses} value={startDate} onChange={e => setStartDate(e.target.value)} />
+                  <span className="text-[9px] font-black uppercase text-slate-400 shrink-0">To</span>
+                  <input type="date" className={filterInputClasses} value={endDate} onChange={e => setEndDate(e.target.value)} />
+                </div>
+              </div>
+
               <div className="flex items-center gap-3 w-full xl:w-auto justify-end">
                 <div className="relative w-full sm:w-64">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
@@ -564,7 +597,7 @@ export const PackageTeamDashboard: React.FC = () => {
                              </div>
                           </div>
                           <div>
-                             <label className="block text-[10px] font-black uppercase text-slate-400 mb-3 tracking-widest flex items-center gap-2">
+                             <label className="block text-[10px] font-black uppercase text-slate-400 mb-3 flex items-center gap-2">
                                <FileText className="w-3 h-3" /> Counseling Notes / Remarks
                              </label>
                              <textarea 
