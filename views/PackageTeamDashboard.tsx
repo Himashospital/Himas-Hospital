@@ -256,12 +256,15 @@ export const PackageTeamDashboard: React.FC = () => {
 
   const renderActionButtons = (currentOutcome: ProposalOutcome | undefined) => {
     return (
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         <button type="button" onClick={() => handleOpenOutcomeModal('Scheduled')} className="py-4 bg-emerald-600 text-white rounded-2xl font-black text-[10px] uppercase shadow-lg flex flex-col items-center gap-2 hover:bg-emerald-700 transition-all">
           <Calendar className="w-5 h-5" /> Schedule
         </button>
         <button type="button" onClick={() => handleOpenOutcomeModal('Follow-Up')} className="py-4 bg-blue-600 text-white rounded-2xl font-black text-[10px] uppercase shadow-lg flex flex-col items-center gap-2 hover:bg-blue-700 transition-all">
           <Clock className="w-5 h-5" /> Follow-Up
+        </button>
+        <button type="button" onClick={() => handleOpenOutcomeModal('Completed')} className="py-4 bg-teal-600 text-white rounded-2xl font-black text-[10px] uppercase shadow-lg flex flex-col items-center gap-2 hover:bg-teal-700 transition-all">
+          <BadgeCheck className="w-5 h-5" /> Surgery Completed
         </button>
         <button type="button" onClick={() => handleOpenOutcomeModal('Lost')} className="py-4 bg-rose-600 text-white rounded-2xl font-black text-[10px] uppercase shadow-lg flex flex-col items-center gap-2 hover:bg-rose-700 transition-all">
           <Trash2 className="w-5 h-5" /> Lost
@@ -702,14 +705,14 @@ export const PackageTeamDashboard: React.FC = () => {
       {outcomeModal.show && (
         <div className="fixed inset-0 z-[150] bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in">
           <div className="bg-white w-full max-w-lg rounded-[2.5rem] shadow-2xl overflow-hidden border border-white/20">
-            <header className={`p-6 border-b flex justify-between items-center ${outcomeModal.type === 'Lost' ? 'bg-rose-50 text-rose-900' : 'bg-emerald-50 text-emerald-900'}`}>
+            <header className={`p-6 border-b flex justify-between items-center ${outcomeModal.type === 'Lost' ? 'bg-rose-50 text-rose-900' : outcomeModal.type === 'Completed' ? 'bg-teal-50 text-teal-900' : 'bg-emerald-50 text-emerald-900'}`}>
               <h3 className="text-xl font-black uppercase tracking-tight">Finalizing: {outcomeModal.type}</h3>
               <button onClick={() => setOutcomeModal({ ...outcomeModal, show: false })}><X className="w-6 h-6 text-slate-400" /></button>
             </header>
             <div className="p-10 space-y-8">
                {outcomeModal.type !== 'Lost' ? (
                  <div className="space-y-4">
-                    <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest">Select {outcomeModal.type === 'Follow-Up' ? 'Follow-Up' : 'Surgery'} Date</label>
+                    <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest">Select {outcomeModal.type === 'Follow-Up' ? 'Follow-Up' : outcomeModal.type === 'Completed' ? 'Completion' : 'Surgery'} Date</label>
                     <input type="date" className="w-full p-4 bg-slate-50 border-2 border-slate-100 rounded-2xl text-sm font-black outline-none focus:border-hospital-500 transition-all" value={outcomeModal.date} onChange={e => setOutcomeModal({ ...outcomeModal, date: e.target.value })} />
                  </div>
                ) : (
@@ -721,7 +724,7 @@ export const PackageTeamDashboard: React.FC = () => {
             </div>
             <footer className="p-8 border-t flex flex-col sm:flex-row gap-4 bg-slate-50/50">
               <button onClick={() => setOutcomeModal({ ...outcomeModal, show: false })} className="flex-1 py-4 text-[10px] font-black uppercase text-slate-400 hover:text-slate-600 transition-colors">Cancel</button>
-              <button onClick={handleConfirmOutcome} className={`flex-1 py-4 text-[10px] font-black uppercase text-white rounded-xl shadow-xl transition-transform active:scale-95 ${outcomeModal.type === 'Lost' ? 'bg-rose-600 hover:bg-rose-700 shadow-rose-200' : 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-200'}`}>Confirm</button>
+              <button onClick={handleConfirmOutcome} className={`flex-1 py-4 text-[10px] font-black uppercase text-white rounded-xl shadow-xl transition-transform active:scale-95 ${outcomeModal.type === 'Lost' ? 'bg-rose-600 hover:bg-rose-700 shadow-rose-200' : outcomeModal.type === 'Completed' ? 'bg-teal-600 hover:bg-teal-700 shadow-teal-200' : 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-200'}`}>Confirm</button>
             </footer>
           </div>
         </div>
