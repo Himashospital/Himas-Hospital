@@ -6,7 +6,8 @@ import {
   Users, Banknote, Download, Target, RefreshCw, Layers, Search, 
   Globe, PieChart, ArrowUpRight, CheckCircle,
   X, Phone, Calendar, Tag, Briefcase, Zap, Landmark, BarChart3, TrendingUp, TrendingDown, CalendarDays,
-  PieChart as PieChartIcon, LayoutDashboard, Target as TargetIcon, Activity, Ban, FileSpreadsheet
+  PieChart as PieChartIcon, LayoutDashboard, Target as TargetIcon, Activity, Ban, FileSpreadsheet,
+  Calculator
 } from 'lucide-react';
 
 const formatDate = (dateString: string | undefined | null): string => {
@@ -85,6 +86,9 @@ interface AnalyticsStats {
   revisits: number;
   onlineTotal: number;
   offlineTotal: number;
+  marketingLeads: number;
+  marketingCompleted: number;
+  marketingRevenue: number;
   sources: Record<string, { total: number, completed: number, revenue: number, new: number, revisit: number }>;
   arrivedDataset: Patient[];
   completedDataset: Patient[];
@@ -216,6 +220,8 @@ export const AnalyticsDashboard: React.FC = () => {
   // Drill down state
   const [drillDown, setDrillDown] = useState<{ label: string, data: Patient[], viewMode?: 'cards' | 'table' } | null>(null);
 
+  const [marketingBudget, setMarketingBudget] = useState<number>(0);
+
   const filterByRange = (dateStr: string | undefined, range: { from: string, to: string }) => {
     if (!dateStr) return false;
     const dateOnly = dateStr.split('T')[0];
@@ -304,6 +310,24 @@ export const AnalyticsDashboard: React.FC = () => {
 
         let offlineTotal = newPatients - onlineTotal;
 
+        const marketingLeads = flowDataset.filter(p => {
+          const vt = (p.visit_type || '').trim().toLowerCase();
+          if (vt !== 'new') return false;
+          const ds = getSourceDisplay(p.source);
+          const isOnline = ONLINE_SOURCES.includes(p.source) || ONLINE_SOURCES.includes(ds);
+          return isOnline && p.doctorAssessment?.quickCode === SurgeonCode.S1;
+        }).length;
+
+        const marketingCompleted = completedInPeriod.filter(p => {
+          const ds = getSourceDisplay(p.source);
+          return ONLINE_SOURCES.includes(p.source) || ONLINE_SOURCES.includes(ds);
+        }).length;
+
+        const marketingRevenue = completedInPeriod.filter(p => {
+          const ds = getSourceDisplay(p.source);
+          return ONLINE_SOURCES.includes(p.source) || ONLINE_SOURCES.includes(ds);
+        }).reduce((sum, p) => sum + parseAmount(p.packageProposal?.packageAmount), 0);
+
         // Counseling status mix aggregation
         const decisionPatternMix: Record<string, number> = {};
         const proposalStageMix: Record<string, number> = {};
@@ -335,6 +359,9 @@ export const AnalyticsDashboard: React.FC = () => {
             revisits: revisits as number,
             onlineTotal: onlineTotal as number,
             offlineTotal: offlineTotal as number,
+            marketingLeads: marketingLeads as number,
+            marketingCompleted: marketingCompleted as number,
+            marketingRevenue: marketingRevenue as number,
             sources: sourcesMap,
             arrivedDataset: flowDataset,
             completedDataset: completedInPeriod,
@@ -1163,6 +1190,94 @@ export const AnalyticsDashboard: React.FC = () => {
                   )}
               </div>
            </div>
+        </div>
+      </div>
+
+      {/* Marketing Budget & Cost Analytics Section */}
+      <div className="pb-20 space-y-8 animate-in slide-in-from-bottom-6 duration-700">
+        <div className="flex items-center justify-between border-b border-slate-200 pb-4">
+          <div>
+            <h3 className="text-2xl font-black text-slate-900 uppercase tracking-tight flex items-center gap-3">
+              <Calculator className="w-7 h-7 text-hospital-600" />
+              Marketing ROI & Cost Analytics
+            </h3>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] mt-1">Online Lead Performance & Acquisition Cost</p>
+          </div>
+          <div className="flex items-center gap-4">
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[9px] font-black text-slate-400 uppercase">Budget ₹</span>
+              <input 
+                type="number" 
+                value={marketingBudget || ''} 
+                onChange={e => setMarketingBudget(Number(e.target.value))}
+                placeholder="Enter Budget"
+                className="pl-16 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-black outline-none focus:ring-2 focus:ring-hospital-500 w-48 shadow-sm"
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+          {[
+            { 
+              label: 'Marketing OPDs', 
+              val: stats.onlineTotal, 
+              icon: Globe, 
+              color: 'indigo', 
+              detail: 'Total Online New Patients' 
+            },
+            { 
+              label: 'Marketing Leads', 
+              val: stats.marketingLeads, 
+              icon: Target, 
+              color: 'blue', 
+              detail: 'Online S1 Recommendations' 
+            },
+            { 
+              label: 'Marketing Surgeries', 
+              val: stats.marketingCompleted, 
+              icon: CheckCircle, 
+              color: 'emerald', 
+              detail: 'Online Completed Surgeries' 
+            },
+            { 
+              label: 'Cost per OPD', 
+              val: stats.onlineTotal > 0 ? `₹${Math.round(marketingBudget / stats.onlineTotal).toLocaleString()}` : '₹0', 
+              icon: TrendingDown, 
+              color: 'amber', 
+              detail: 'Budget / Online OPDs' 
+            },
+            { 
+              label: 'Cost per Surgery', 
+              val: stats.marketingCompleted > 0 ? `₹${Math.round(marketingBudget / stats.marketingCompleted).toLocaleString()}` : '₹0', 
+              icon: Banknote, 
+              color: 'rose', 
+              detail: 'Budget / Online Surgeries' 
+            },
+            { 
+              label: 'Total Revenue from Completed Surgeries', 
+              val: `₹${(stats.marketingRevenue - marketingBudget).toLocaleString()}`, 
+              icon: TrendingUp, 
+              color: 'teal', 
+              detail: `Cost/OPD: ₹${stats.onlineTotal > 0 ? Math.round(marketingBudget / stats.onlineTotal).toLocaleString() : 0} | Cost/Surg: ₹${stats.marketingCompleted > 0 ? Math.round(marketingBudget / stats.marketingCompleted).toLocaleString() : 0}` 
+            }
+          ].map((card, idx) => (
+            <div 
+              key={idx} 
+              className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm hover:shadow-md transition-all group"
+            >
+              <div className="flex justify-between items-start mb-4">
+                <div className={`p-3 rounded-2xl bg-${card.color}-50 text-${card.color}-600`}>
+                  <card.icon className="w-6 h-6" />
+                </div>
+              </div>
+              <div className="text-2xl font-black text-slate-900 leading-none mb-2">{card.val}</div>
+              <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{card.label}</div>
+              <div className={`mt-4 pt-4 border-t border-slate-50 text-[9px] font-bold text-${card.color}-600 uppercase`}>
+                {card.detail}
+              </div>
+            </div>
+          ))}
         </div>
       </div>
     </div>
