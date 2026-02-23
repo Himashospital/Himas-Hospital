@@ -87,6 +87,8 @@ interface AnalyticsStats {
   onlineTotal: number;
   offlineTotal: number;
   marketingLeads: number;
+  marketingLeadsNew: number;
+  marketingLeadsRevisit: number;
   marketingCompleted: number;
   marketingRevenue: number;
   sources: Record<string, { total: number, completed: number, revenue: number, new: number, revisit: number }>;
@@ -222,6 +224,14 @@ export const AnalyticsDashboard: React.FC = () => {
 
   const [marketingBudget, setMarketingBudget] = useState<number>(0);
 
+  const [targetPlannerModal, setTargetPlannerModal] = useState<{
+    show: boolean;
+    targetSurgeries: number;
+  }>({
+    show: false,
+    targetSurgeries: 0
+  });
+
   const filterByRange = (dateStr: string | undefined, range: { from: string, to: string }) => {
     if (!dateStr) return false;
     const dateOnly = dateStr.split('T')[0];
@@ -310,13 +320,14 @@ export const AnalyticsDashboard: React.FC = () => {
 
         let offlineTotal = newPatients - onlineTotal;
 
-        const marketingLeads = flowDataset.filter(p => {
-          const vt = (p.visit_type || '').trim().toLowerCase();
-          if (vt !== 'new') return false;
+        const marketingLeadsData = flowDataset.filter(p => {
           const ds = getSourceDisplay(p.source);
           const isOnline = ONLINE_SOURCES.includes(p.source) || ONLINE_SOURCES.includes(ds);
           return isOnline && p.doctorAssessment?.quickCode === SurgeonCode.S1;
-        }).length;
+        });
+        const marketingLeads = marketingLeadsData.length;
+        const marketingLeadsNew = marketingLeadsData.filter(p => (p.visit_type || '').trim().toLowerCase() === 'new').length;
+        const marketingLeadsRevisit = marketingLeadsData.filter(p => (p.visit_type || '').trim().toLowerCase() === 'revisit').length;
 
         const marketingCompleted = completedInPeriod.filter(p => {
           const ds = getSourceDisplay(p.source);
@@ -360,6 +371,8 @@ export const AnalyticsDashboard: React.FC = () => {
             onlineTotal: onlineTotal as number,
             offlineTotal: offlineTotal as number,
             marketingLeads: marketingLeads as number,
+            marketingLeadsNew: marketingLeadsNew as number,
+            marketingLeadsRevisit: marketingLeadsRevisit as number,
             marketingCompleted: marketingCompleted as number,
             marketingRevenue: marketingRevenue as number,
             sources: sourcesMap,
@@ -542,6 +555,27 @@ export const AnalyticsDashboard: React.FC = () => {
       case 'Surg Completed':
       case 'Total Revenue':
         filteredData = stats.completedDataset;
+        break;
+      case 'Marketing OPDs':
+        filteredData = stats.arrivedDataset.filter(p => {
+          const vt = (p.visit_type || '').trim().toLowerCase();
+          if (vt !== 'new') return false;
+          const ds = getSourceDisplay(p.source);
+          return ONLINE_SOURCES.includes(p.source) || ONLINE_SOURCES.includes(ds);
+        });
+        break;
+      case 'Marketing Leads':
+        filteredData = stats.arrivedDataset.filter(p => {
+          const ds = getSourceDisplay(p.source);
+          const isOnline = ONLINE_SOURCES.includes(p.source) || ONLINE_SOURCES.includes(ds);
+          return isOnline && p.doctorAssessment?.quickCode === SurgeonCode.S1;
+        });
+        break;
+      case 'Marketing Surgeries':
+        filteredData = stats.completedDataset.filter(p => {
+          const ds = getSourceDisplay(p.source);
+          return ONLINE_SOURCES.includes(p.source) || ONLINE_SOURCES.includes(ds);
+        });
         break;
       default:
         filteredData = stats.arrivedDataset;
@@ -1224,21 +1258,24 @@ export const AnalyticsDashboard: React.FC = () => {
               val: stats.onlineTotal, 
               icon: Globe, 
               color: 'indigo', 
-              detail: 'Total Online New Patients' 
+              detail: 'Total Online New Patients',
+              category: 'Marketing OPDs'
             },
             { 
               label: 'Marketing Leads', 
               val: stats.marketingLeads, 
               icon: Target, 
               color: 'blue', 
-              detail: 'Online S1 Recommendations' 
+              detail: `New: ${stats.marketingLeadsNew} | Revisit: ${stats.marketingLeadsRevisit}`,
+              category: 'Marketing Leads'
             },
             { 
               label: 'Marketing Surgeries', 
               val: stats.marketingCompleted, 
               icon: CheckCircle, 
               color: 'emerald', 
-              detail: 'Online Completed Surgeries' 
+              detail: 'Online Completed Surgeries',
+              category: 'Marketing Surgeries'
             },
             { 
               label: 'Cost per OPD', 
@@ -1256,15 +1293,16 @@ export const AnalyticsDashboard: React.FC = () => {
             },
             { 
               label: 'Total Revenue from Completed Surgeries', 
-              val: `₹${(stats.marketingRevenue - marketingBudget).toLocaleString()}`, 
+              val: `₹${stats.marketingRevenue.toLocaleString()}`, 
               icon: TrendingUp, 
               color: 'teal', 
-              detail: `Cost/OPD: ₹${stats.onlineTotal > 0 ? Math.round(marketingBudget / stats.onlineTotal).toLocaleString() : 0} | Cost/Surg: ₹${stats.marketingCompleted > 0 ? Math.round(marketingBudget / stats.marketingCompleted).toLocaleString() : 0}` 
+              detail: `Net Revenue: ₹${(stats.marketingRevenue - marketingBudget).toLocaleString()} (After Budget Deduction)` 
             }
           ].map((card, idx) => (
             <div 
               key={idx} 
-              className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm hover:shadow-md transition-all group"
+              onClick={() => card.category && handleKpiClick(card.category)}
+              className={`bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm hover:shadow-md transition-all group ${card.category ? 'cursor-pointer' : ''}`}
             >
               <div className="flex justify-between items-start mb-4">
                 <div className={`p-3 rounded-2xl bg-${card.color}-50 text-${card.color}-600`}>
@@ -1279,7 +1317,200 @@ export const AnalyticsDashboard: React.FC = () => {
             </div>
           ))}
         </div>
+
+        <div 
+          onClick={() => setTargetPlannerModal({ ...targetPlannerModal, show: true })}
+          className="bg-hospital-50/50 p-8 rounded-[2.5rem] border border-hospital-100 cursor-pointer hover:bg-hospital-100 transition-all group mt-8"
+        >
+          <div className="flex flex-col md:flex-row items-center justify-between gap-6">
+            <div className="flex items-center gap-4">
+              <div className="p-4 bg-white rounded-2xl shadow-sm text-hospital-600 group-hover:scale-110 transition-transform">
+                <Target className="w-8 h-8" />
+              </div>
+              <div>
+                <h4 className="text-sm font-black text-slate-900 uppercase">Future Target Planner</h4>
+                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-1">
+                  Plan your next month's marketing goals based on current performance metrics.
+                </p>
+                <p className="text-[9px] font-black text-hospital-600 uppercase mt-2 flex items-center gap-1">
+                  <Zap className="w-3 h-3" /> Click to start forecasting
+                </p>
+              </div>
+            </div>
+            <div className="text-right">
+              <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Target Achievement Potential</div>
+              <div className="text-3xl font-black text-hospital-600">
+                Forecast
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
+
+      {/* Future Target Planner Modal */}
+      {targetPlannerModal.show && (
+        <div className="fixed inset-0 z-[150] bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-300">
+          <div className="bg-white w-full max-w-4xl rounded-[3rem] shadow-2xl overflow-hidden border border-white/20 flex flex-col max-h-[90vh]">
+            <header className="p-8 border-b flex justify-between items-center bg-slate-50/50 shrink-0">
+               <div>
+                  <h3 className="text-2xl font-black text-slate-900 uppercase tracking-tight flex items-center gap-3">
+                    <Target className="w-7 h-7 text-hospital-600" />
+                    Future Target Planner
+                  </h3>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Forecasting & Resource Planning</p>
+               </div>
+               <button 
+                 onClick={() => setTargetPlannerModal({ ...targetPlannerModal, show: false })}
+                 className="p-3 bg-white border border-slate-100 rounded-2xl text-slate-400 hover:text-slate-900 hover:shadow-md transition-all active:scale-90"
+               >
+                 <X className="w-6 h-6" />
+               </button>
+            </header>
+
+            <div className="flex-1 overflow-auto p-8 space-y-10">
+               {/* Inputs */}
+               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-slate-50 p-6 rounded-[2rem] border border-slate-100">
+                  <div className="space-y-2">
+                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Reference Period Budget (₹)</label>
+                    <div className="p-3 bg-white border border-slate-200 rounded-xl text-sm font-black text-slate-900">
+                      ₹{marketingBudget.toLocaleString()}
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Target Surgeries for Next Month</label>
+                    <input 
+                      type="number" 
+                      value={targetPlannerModal.targetSurgeries || ''} 
+                      onChange={e => setTargetPlannerModal({ ...targetPlannerModal, targetSurgeries: Number(e.target.value) })}
+                      placeholder="Enter Target Number"
+                      className="w-full p-3 bg-white border border-slate-200 rounded-xl text-sm font-black outline-none focus:ring-2 focus:ring-hospital-500"
+                    />
+                  </div>
+               </div>
+
+               {(() => {
+                 // Reference Metrics (Current Period)
+                 const refOPD = stats.onlineTotal;
+                 const refLeads = stats.marketingLeads;
+                 const refCompleted = stats.marketingCompleted;
+                 const refBudget = marketingBudget;
+
+                 const costPerOPD = refOPD > 0 ? refBudget / refOPD : 0;
+                 const costPerSurgery = refCompleted > 0 ? refBudget / refCompleted : 0;
+                 const opdToLeadRatio = refOPD > 0 ? refLeads / refOPD : 0;
+                 const leadToSurgeryRatio = refLeads > 0 ? refCompleted / refLeads : 0;
+                 const opdToSurgeryRatio = refOPD > 0 ? refCompleted / refOPD : 0;
+
+                 // Forecast Metrics
+                 const targetSurgeries = targetPlannerModal.targetSurgeries;
+                 
+                 // If we want X surgeries, how many OPDs do we need?
+                 // surgeries = OPD * opdToSurgeryRatio => OPD = surgeries / opdToSurgeryRatio
+                 const requiredOPD = opdToSurgeryRatio > 0 ? Math.ceil(targetSurgeries / opdToSurgeryRatio) : 0;
+                 
+                 // If we want X surgeries, how many leads do we need?
+                 // surgeries = leads * leadToSurgeryRatio => leads = surgeries / leadToSurgeryRatio
+                 const requiredLeads = leadToSurgeryRatio > 0 ? Math.ceil(targetSurgeries / leadToSurgeryRatio) : 0;
+                 
+                 // Budget needed
+                 const requiredBudget = targetSurgeries * costPerSurgery;
+
+                 return (
+                   <div className="space-y-10">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                         {/* Last Month Summary */}
+                         <div className="space-y-6">
+                            <div className="flex items-center gap-2 text-[10px] font-black uppercase text-slate-400 tracking-widest">
+                              <Activity className="w-4 h-4" /> Reference Period Performance
+                            </div>
+                            <div className="bg-white border border-slate-100 rounded-[2rem] p-6 shadow-sm space-y-4">
+                               <div className="flex justify-between items-center py-2 border-b border-slate-50">
+                                  <span className="text-[10px] font-black text-slate-400 uppercase">Budget Spent</span>
+                                  <span className="text-sm font-black text-slate-900">₹{refBudget.toLocaleString()}</span>
+                               </div>
+                               <div className="flex justify-between items-center py-2 border-b border-slate-50">
+                                  <span className="text-[10px] font-black text-slate-400 uppercase">Online OPD</span>
+                                  <span className="text-sm font-black text-slate-900">{refOPD}</span>
+                               </div>
+                               <div className="flex justify-between items-center py-2 border-b border-slate-50">
+                                  <span className="text-[10px] font-black text-slate-400 uppercase">Leads (Recommended)</span>
+                                  <span className="text-sm font-black text-slate-900">{refLeads}</span>
+                               </div>
+                               <div className="flex justify-between items-center py-2">
+                                  <span className="text-[10px] font-black text-slate-400 uppercase">Surgeries Completed</span>
+                                  <span className="text-sm font-black text-emerald-600">{refCompleted}</span>
+                               </div>
+                            </div>
+                         </div>
+
+                         {/* Next Month Forecast */}
+                         <div className="space-y-6">
+                            <div className="flex items-center gap-2 text-[10px] font-black uppercase text-hospital-600 tracking-widest">
+                              <TrendingUp className="w-4 h-4" /> Next Month Forecast
+                            </div>
+                            <div className="bg-hospital-50/30 border border-hospital-100 rounded-[2rem] p-6 shadow-sm space-y-4">
+                               <div className="flex justify-between items-center py-2 border-b border-hospital-100">
+                                  <span className="text-[10px] font-black text-hospital-400 uppercase">Required Budget</span>
+                                  <span className="text-sm font-black text-hospital-600">₹{Math.round(requiredBudget).toLocaleString()}</span>
+                               </div>
+                               <div className="flex justify-between items-center py-2 border-b border-hospital-100">
+                                  <span className="text-[10px] font-black text-hospital-400 uppercase">Target OPD Required</span>
+                                  <span className="text-sm font-black text-hospital-600">{requiredOPD}</span>
+                               </div>
+                               <div className="flex justify-between items-center py-2 border-b border-hospital-100">
+                                  <span className="text-[10px] font-black text-hospital-400 uppercase">Target Leads</span>
+                                  <span className="text-sm font-black text-hospital-600">{requiredLeads}</span>
+                               </div>
+                               <div className="flex justify-between items-center py-2">
+                                  <span className="text-[10px] font-black text-hospital-400 uppercase">Target Surgeries</span>
+                                  <span className="text-sm font-black text-hospital-600">{targetSurgeries}</span>
+                               </div>
+                            </div>
+                         </div>
+                      </div>
+
+                      {/* Summary Insights */}
+                      <div className="bg-slate-900 rounded-[2.5rem] p-8 text-white">
+                         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 text-center">
+                            <div>
+                               <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">Efficiency Metric</div>
+                               <div className="text-xl font-black text-hospital-400">
+                                 {refOPD > 0 ? ((refCompleted / refOPD) * 100).toFixed(1) : 0}%
+                               </div>
+                               <div className="text-[8px] font-bold text-slate-500 uppercase mt-1">OPD to Surgery Conversion</div>
+                            </div>
+                            <div>
+                               <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">Acquisition Cost</div>
+                               <div className="text-xl font-black text-white">
+                                 ₹{Math.round(costPerSurgery).toLocaleString()}
+                               </div>
+                               <div className="text-[8px] font-bold text-slate-500 uppercase mt-1">Per Completed Surgery</div>
+                            </div>
+                            <div>
+                               <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">Planning Goal</div>
+                               <div className="text-xl font-black text-emerald-400">
+                                 {targetSurgeries > 0 ? 'Ready' : 'Set Target'}
+                               </div>
+                               <div className="text-[8px] font-bold text-slate-500 uppercase mt-1">Forecast Status</div>
+                            </div>
+                         </div>
+                      </div>
+                   </div>
+                 );
+               })()}
+            </div>
+            
+            <footer className="p-8 border-t bg-slate-50/30 flex justify-end">
+               <button 
+                 onClick={() => setTargetPlannerModal({ ...targetPlannerModal, show: false })}
+                 className="px-10 py-4 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase shadow-xl active:scale-95 transition-all"
+               >
+                 Close Planner
+               </button>
+            </footer>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
