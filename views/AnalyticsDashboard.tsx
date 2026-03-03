@@ -479,7 +479,7 @@ export const AnalyticsDashboard: React.FC = () => {
         formatDate(p.surgery_date || p.packageProposal?.surgeryDate)
       ]);
     } else {
-      headers = ['ID', 'Name', 'Condition', 'Mobile', 'Type', 'Source', 'Arrived', 'Affordability', 'Amount'];
+      headers = ['ID', 'Name', 'Condition', 'Mobile', 'Type', 'Source', 'Status', 'Arrived', 'Affordability', 'Amount'];
       rows = drillDown.data.map(p => [
         p.id,
         p.name,
@@ -487,6 +487,7 @@ export const AnalyticsDashboard: React.FC = () => {
         p.mobile,
         p.visit_type || 'OPD',
         p.source,
+        p.packageProposal?.outcome || 'Pending',
         formatDate(p.entry_date),
         p.doctorAssessment?.affordability || '---',
         p.packageProposal?.packageAmount || '0'
